@@ -1,0 +1,62 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Payment Successful - IUBAT Lost & Find{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-emerald-50 flex items-center justify-center px-4">
+    <div class="max-w-lg w-full animate-fade-in">
+        <div class="bg-white rounded-2xl p-8 border border-gray-100 shadow-xl shadow-emerald-500/5 text-center">
+            <div class="w-20 h-20 rounded-2xl gradient-success flex items-center justify-center mx-auto mb-6">
+                <i class="bi bi-check-lg text-white text-4xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Payment Successful!</h1>
+            <p class="text-gray-500 mb-2">Thank you for your purchase. Your membership is now active.</p>
+            <p class="text-sm text-gray-400 mb-8">A confirmation email has been sent to your registered email address.</p>
+
+            <div class="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-4 mb-8">
+                <div class="flex items-center justify-center gap-2 text-emerald-700">
+                    <i class="bi bi-gem text-lg"></i>
+                    <span class="text-sm font-semibold">{{ membership.plan.name|default:"Premium" }} Plan Activated</span>
+                </div>
+                <p class="text-xs text-emerald-600 mt-1">Valid until {{ membership.expires_at|date:"F d, Y" }}</p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <a href="{% url 'dashboard:home' %}" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition flex items-center gap-2">
+                    <i class="bi bi-grid-1x2"></i> Go to Dashboard
+                </a>
+                <a href="{% url 'posts:create' %}" class="px-6 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 transition flex items-center gap-2">
+                    <i class="bi bi-plus-circle"></i> Create a Post
+                </a>
+            </div>
+        </div>
+
+        {% if payment %}
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-100 shadow-sm mt-4">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <i class="bi bi-receipt text-indigo-500"></i> Transaction Details
+            </h3>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-500">Transaction ID</span>
+                    <span class="text-gray-800 font-mono font-medium">{{ payment.transaction_id|default:payment.sslcommerz_tran_id|default_if_none:"N/A" }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">Amount</span>
+                    <span class="text-gray-800 font-medium">{{ payment.amount|default:"0.00" }} BDT</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">Date</span>
+                    <span class="text-gray-800">{{ payment.created_at|date:"M d, Y h:i A"|default:"Now" }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">Status</span>
+                    <span class="text-gray-800 font-medium text-emerald-600">Completed</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

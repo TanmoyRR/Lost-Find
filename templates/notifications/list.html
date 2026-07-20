@@ -1,0 +1,101 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Notifications{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Notifications</h1>
+            <p class="text-gray-500 text-sm mt-1">Stay updated with your latest activity</p>
+        </div>
+        <div class="flex items-center gap-3">
+            {% if unread_count > 0 %}
+            <a href="{% url 'notifications:mark_all_read' %}" class="px-4 py-2 rounded-xl text-sm font-medium text-indigo-600 hover:bg-indigo-50 border border-indigo-200 hover:border-indigo-300 transition flex items-center gap-2">
+                <i class="bi bi-check2-all"></i> Mark All Read
+            </a>
+            {% endif %}
+            <a href="{% url 'accounts:settings' %}" class="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:border-indigo-300 transition">
+                <i class="bi bi-gear"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Notifications List -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {% if notifications %}
+        <div class="divide-y divide-gray-50">
+            {% for notification in notifications %}
+            <div class="flex items-start gap-4 p-5 transition {% if not notification.is_read %}bg-indigo-50/50 hover:bg-indigo-50/80{% else %}hover:bg-gray-50{% endif %}">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 {% if notification.notification_type == 'match_found' %}bg-purple-100 text-purple-600{% elif notification.notification_type == 'post_resolved' %}bg-blue-100 text-blue-600{% elif notification.notification_type == 'post_claimed' %}bg-emerald-100 text-emerald-600{% elif notification.notification_type == 'message' %}bg-indigo-100 text-indigo-600{% elif notification.notification_type == 'system' %}bg-amber-100 text-amber-600{% else %}bg-gray-100 text-gray-600{% endif %}">
+                    <i class="bi {% if notification.notification_type == 'match_found' %}bi-robot{% elif notification.notification_type == 'post_resolved' %}bi-check-circle{% elif notification.notification_type == 'post_claimed' %}bi-shield-check{% elif notification.notification_type == 'message' %}bi-chat-dots{% elif notification.notification_type == 'system' %}bi-megaphone{% else %}bi-bell{% endif %} text-lg"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-sm font-medium {% if not notification.is_read %}text-gray-900{% else %}text-gray-700{% endif %}">
+                                {{ notification.title }}
+                                {% if not notification.is_read %}
+                                <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 ml-2"></span>
+                                {% endif %}
+                            </p>
+                            <p class="text-sm text-gray-500 mt-0.5">{{ notification.message }}</p>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <p class="text-xs text-gray-400 whitespace-nowrap">{{ notification.created_at|timesince }} ago</p>
+                            {% if not notification.is_read %}
+                            <a href="{% url 'notifications:mark_read' notification.pk %}" class="text-xs text-indigo-500 hover:text-indigo-700 mt-1 inline-block">Mark read</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if notification.action_url %}
+                    <a href="{{ notification.action_url }}" class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 mt-2">
+                        View Details <i class="bi bi-arrow-right"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <!-- Empty State -->
+        <div class="py-16 text-center">
+            <div class="w-20 h-20 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                <i class="bi bi-bell-slash text-3xl text-gray-300"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">No notifications yet</h3>
+            <p class="text-gray-400 text-sm">You're all caught up! When something happens, you'll see it here.</p>
+            <a href="{% url 'dashboard:home' %}" class="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl text-sm font-medium text-indigo-600 hover:bg-indigo-50 border border-indigo-200 transition">
+                <i class="bi bi-grid-1x2"></i> Back to Dashboard
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if notifications.paginator.num_pages > 1 %}
+    <div class="flex justify-center">
+        <div class="inline-flex items-center gap-2 bg-white rounded-2xl p-2 shadow-sm border border-gray-100">
+            {% if notifications.has_previous %}
+            <a href="?page={{ notifications.previous_page_number }}" class="px-3 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            {% endif %}
+            {% for num in notifications.paginator.page_range %}
+            <a href="?page={{ num }}" class="w-10 h-10 rounded-xl text-sm font-medium flex items-center justify-center transition {% if num == notifications.number %}gradient-primary text-white shadow-md{% else %}text-gray-600 hover:bg-indigo-50 hover:text-indigo-600{% endif %}">
+                {{ num }}
+            </a>
+            {% endfor %}
+            {% if notifications.has_next %}
+            <a href="?page={{ notifications.next_page_number }}" class="px-3 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

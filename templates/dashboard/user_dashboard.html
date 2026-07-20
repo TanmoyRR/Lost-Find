@@ -1,0 +1,270 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-8 animate-fade-in">
+    <!-- Welcome Section -->
+    <div class="relative overflow-hidden rounded-2xl gradient-primary px-8 py-8 text-white">
+        <div class="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-0 w-56 h-56 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+        <div class="absolute top-1/3 right-1/4 w-32 h-32 bg-white/5 rounded-full"></div>
+        <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">Welcome back, {{ user.get_full_name|default:user.username }}!</h1>
+                <p class="text-white/70">Here's what's happening with your lost & found items.</p>
+            </div>
+            <div class="flex items-center gap-3 flex-shrink-0">
+                {% if membership and membership.is_active %}
+                <div class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20">
+                    <i class="bi bi-gem text-amber-300 text-sm"></i>
+                    <span class="text-white/80 text-sm">Membership</span>
+                    <span class="text-white font-semibold text-sm ml-1">{{ membership.days_remaining }} days left</span>
+                </div>
+                {% else %}
+                <a href="{% url 'membership:index' %}" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/15 backdrop-blur-sm text-white text-sm font-medium hover:bg-white/25 transition-all duration-200 border border-white/20">
+                    <i class="bi bi-gem"></i> Get Membership
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-xl gradient-primary flex items-center justify-center shadow-md shadow-indigo-500/10">
+                    <i class="bi bi-file-earmark-text text-white text-lg"></i>
+                </div>
+                <span class="text-2xl font-bold text-gray-800">{{ total_posts }}</span>
+            </div>
+            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Total Posts</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center shadow-md shadow-amber-500/10">
+                    <i class="bi bi-clock-history text-amber-600 text-lg"></i>
+                </div>
+                <span class="text-2xl font-bold text-gray-800">{{ open_posts }}</span>
+            </div>
+            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Open Posts</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center shadow-md shadow-emerald-500/10">
+                    <i class="bi bi-check-circle text-emerald-600 text-lg"></i>
+                </div>
+                <span class="text-2xl font-bold text-gray-800">{{ resolved_posts }}</span>
+            </div>
+            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Resolved</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shadow-md shadow-blue-500/10">
+                    <i class="bi bi-search text-blue-600 text-lg"></i>
+                </div>
+                <span class="text-2xl font-bold text-gray-800">{{ lost_posts }}</span>
+            </div>
+            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Lost Items</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-xl bg-teal-100 flex items-center justify-center shadow-md shadow-teal-500/10">
+                    <i class="bi bi-hand-index-thumb text-teal-600 text-lg"></i>
+                </div>
+                <span class="text-2xl font-bold text-gray-800">{{ found_posts }}</span>
+            </div>
+            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Found Items</p>
+        </div>
+    </div>
+
+    <!-- Extended Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center shadow-md shadow-purple-500/10">
+                    <i class="bi bi-graph-up text-purple-600 text-lg"></i>
+                </div>
+                <span class="text-2xl font-bold text-gray-800">{{ recovery_rate }}%</span>
+            </div>
+            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Recovery Rate</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-xl bg-rose-100 flex items-center justify-center shadow-md shadow-rose-500/10">
+                    <i class="bi bi-bell text-rose-600 text-lg"></i>
+                </div>
+                <span class="text-2xl font-bold text-gray-800">{{ unread_notifications }}</span>
+            </div>
+            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Unread Notifications</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-xl bg-violet-100 flex items-center justify-center shadow-md shadow-violet-500/10">
+                    <i class="bi bi-arrow-repeat text-violet-600 text-lg"></i>
+                </div>
+                <span class="text-2xl font-bold text-gray-800">{{ active_recoveries }}</span>
+            </div>
+            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Active Recoveries</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-xl bg-cyan-100 flex items-center justify-center shadow-md shadow-cyan-500/10">
+                    <i class="bi bi-star text-cyan-600 text-lg"></i>
+                </div>
+                <span class="text-2xl font-bold text-gray-800">{{ user.reputation_score }}</span>
+            </div>
+            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Reputation</p>
+        </div>
+    </div>
+
+    <!-- Two Column Layout: AI Matches + Recent Activity -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- AI Matches -->
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <div class="px-6 py-4 flex items-center justify-between border-b border-gray-100">
+                <h3 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+                    <i class="bi bi-robot text-indigo-500"></i> AI Suggested Matches
+                </h3>
+                <a href="{% url 'ai:matches' %}" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition">View All</a>
+            </div>
+            <div class="p-6">
+                {% if matches %}
+                <div class="space-y-3">
+                    {% for match in matches %}
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-indigo-50 transition group">
+                        <div class="min-w-0 flex-1">
+                            <a href="{% url 'posts:detail' match.matched_post.pk %}" class="text-sm font-medium text-gray-800 group-hover:text-indigo-600 transition block truncate">{{ match.matched_post.title }}</a>
+                            <p class="text-xs text-gray-500 mt-0.5">{{ match.matched_post.get_post_type_display }} - {{ match.matched_post.created_at|date:"M d" }}</p>
+                        </div>
+                        <div class="flex items-center gap-3 flex-shrink-0 ml-3">
+                            <span class="text-xs font-semibold px-2.5 py-1 rounded-lg {% if match.similarity_score > 0.8 %}bg-emerald-100 text-emerald-700{% elif match.similarity_score > 0.6 %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                                {{ match.similarity_score|floatformat:1 }}%
+                            </span>
+                            <a href="{% url 'posts:detail' match.matched_post.pk %}" class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center hover:bg-indigo-200 transition">
+                                <i class="bi bi-arrow-right text-xs"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-8">
+                    <div class="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                        <i class="bi bi-robot text-gray-300"></i>
+                    </div>
+                    <p class="text-gray-400 text-sm">No matches yet</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <div class="px-6 py-4 flex items-center justify-between border-b border-gray-100">
+                <h3 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+                    <i class="bi bi-activity text-indigo-500"></i> Recent Activity
+                </h3>
+                <a href="{% url 'accounts:profile' %}" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition">View All</a>
+            </div>
+            <div class="p-6">
+                {% if recent_activities %}
+                <div class="space-y-3">
+                    {% for activity in recent_activities %}
+                    <div class="flex items-start gap-3 group">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm
+                            {% if activity.activity_type == 'post_created' %}bg-emerald-100 text-emerald-600
+                            {% elif activity.activity_type == 'post_resolved' %}bg-blue-100 text-blue-600
+                            {% elif activity.activity_type == 'membership_purchased' %}bg-purple-100 text-purple-600
+                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                            <i class="bi {% if activity.activity_type == 'post_created' %}bi-plus-circle
+                                      {% elif activity.activity_type == 'post_resolved' %}bi-check-circle
+                                      {% elif activity.activity_type == 'membership_purchased' %}bi-gem
+                                      {% else %}bi-arrow-right-circle{% endif %}"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm text-gray-700 truncate">{{ activity.description }}</p>
+                            <p class="text-xs text-gray-400 mt-0.5">{{ activity.created_at|timesince }} ago</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-8">
+                    <div class="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                        <i class="bi bi-inbox text-gray-300"></i>
+                    </div>
+                    <p class="text-gray-400 text-sm">No recent activity</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- My Posts Table -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="px-6 py-4 flex items-center justify-between border-b border-gray-100">
+            <h3 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <i class="bi bi-file-earmark-text text-indigo-500"></i> My Posts
+            </h3>
+            <a href="{% url 'posts:my_posts' %}" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition">View All</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-400 border-b border-gray-50 bg-gray-50/50">
+                        <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider">Title</th>
+                        <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for post in posts %}
+                    <tr class="border-b border-gray-50 hover:bg-indigo-50/30 transition">
+                        <td class="px-6 py-3.5">
+                            <a href="{% url 'posts:detail' post.pk %}" class="text-sm font-medium text-gray-800 hover:text-indigo-600 transition">{{ post.title|truncatechars:40 }}</a>
+                        </td>
+                        <td class="px-6 py-3.5">
+                            <span class="text-xs font-semibold px-2.5 py-1 rounded-lg {% if post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                {{ post.get_post_type_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-3.5">
+                            <span class="text-xs font-semibold px-2.5 py-1 rounded-lg {% if post.status == 'open' %}bg-amber-100 text-amber-700{% elif post.status == 'resolved' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                                {{ post.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-3.5 text-sm text-gray-500">{{ post.created_at|date:"M d, Y" }}</td>
+                        <td class="px-6 py-3.5 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                <a href="{% url 'posts:edit' post.pk %}" class="p-2 rounded-lg hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 transition" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'posts:delete' post.pk %}" class="p-2 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-600 transition" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center">
+                            <div class="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                                <i class="bi bi-inbox text-gray-300"></i>
+                            </div>
+                            <p class="text-gray-400 text-sm">No posts yet</p>
+                            <a href="{% url 'posts:create' %}" class="inline-block mt-2 text-sm font-medium text-indigo-600 hover:text-indigo-700">Create your first post</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

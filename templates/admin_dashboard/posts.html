@@ -1,0 +1,155 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+
+{% block page_title %}Post Management{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Total Posts</p>
+                    <p class="text-2xl font-bold text-gray-800 mt-1">{{ total_posts_count }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center">
+                    <i class="bi bi-file-earmark-text text-xl text-indigo-500"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Pending</p>
+                    <p class="text-2xl font-bold text-amber-600 mt-1">{{ pending_count }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center">
+                    <i class="bi bi-clock-history text-xl text-amber-500"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Resolved</p>
+                    <p class="text-2xl font-bold text-emerald-600 mt-1">{{ resolved_count }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                    <i class="bi bi-check-circle text-xl text-emerald-500"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Posts Table -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-gray-800">All Posts</h3>
+            <span class="text-sm text-gray-400">{{ total_posts_count }} posts found</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-100">
+                        <th class="pb-3 font-medium">Post</th>
+                        <th class="pb-3 font-medium">User</th>
+                        <th class="pb-3 font-medium">Category</th>
+                        <th class="pb-3 font-medium">Location</th>
+                        <th class="pb-3 font-medium">Type</th>
+                        <th class="pb-3 font-medium">Status</th>
+                        <th class="pb-3 font-medium">Active</th>
+                        <th class="pb-3 font-medium">Views</th>
+                        <th class="pb-3 font-medium">Date</th>
+                        <th class="pb-3 font-medium">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for post in posts %}
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition {% if not post.is_active %}opacity-60 bg-gray-50{% endif %}">
+                        <td class="py-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                                    {% if post.image %}
+                                    <img src="{{ post.image.url }}" alt="" class="w-full h-full object-cover">
+                                    {% else %}
+                                    <div class="w-full h-full flex items-center justify-center">
+                                        <i class="bi bi-image text-gray-300"></i>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <a href="{% url 'posts:detail' post.pk %}" class="text-sm font-medium text-gray-800 hover:text-indigo-600">{{ post.title|truncatechars:35 }}</a>
+                                    <p class="text-xs text-gray-400">{{ post.description|truncatechars:50 }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-medium">{{ post.user.get_full_name|default:post.user.username|first|upper }}</div>
+                                <span class="text-sm text-gray-600">{{ post.user.get_full_name|default:post.user.username }}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 text-sm text-gray-500">{{ post.category.name|default:'N/A' }}</td>
+                        <td class="py-3 text-sm text-gray-500">{{ post.location.name|default:'N/A' }}</td>
+                        <td class="py-3">
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg {% if post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                {{ post.get_post_type_display }}
+                            </span>
+                        </td>
+                        <td class="py-3">
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg {% if post.status == 'open' %}bg-amber-100 text-amber-700{% elif post.status == 'resolved' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                                {{ post.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="py-3">
+                            {% if post.is_active %}
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700">Active</span>
+                            {% else %}
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg bg-red-100 text-red-700">Deleted</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-sm text-gray-500">{{ post.views_count }}</td>
+                        <td class="py-3 text-sm text-gray-500">{{ post.created_at|date:"M d, Y" }}</td>
+                        <td class="py-3">
+                            <div class="flex items-center gap-1">
+                                <a href="{% url 'posts:detail' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-indigo-600" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if post.status == 'open' %}
+                                <a href="{% url 'dashboard:admin_post_reject' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600" title="Reject" onclick="return confirm('Reject this post?')">
+                                    <i class="bi bi-x-circle"></i>
+                                </a>
+                                {% endif %}
+                                {% if post.is_active %}
+                                <a href="{% url 'dashboard:admin_post_soft_delete' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600" title="Soft Delete" onclick="return confirm('Soft delete this post?')">
+                                    <i class="bi bi-archive"></i>
+                                </a>
+                                {% else %}
+                                <a href="{% url 'dashboard:admin_post_restore' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-emerald-600" title="Restore">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </a>
+                                <a href="{% url 'dashboard:admin_post_permanent_delete' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600" title="Permanent Delete" onclick="return confirm('Permanently delete this post? This cannot be undone.')">
+                                    <i class="bi bi-trash3"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="py-12 text-center text-gray-400">
+                            <div class="w-20 h-20 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                                <i class="bi bi-inbox text-3xl text-gray-300"></i>
+                            </div>
+                            <p class="text-gray-500 font-medium mb-1">No posts found</p>
+                            <p class="text-gray-400 text-sm">There are no posts matching your criteria.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

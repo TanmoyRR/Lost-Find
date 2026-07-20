@@ -1,0 +1,33 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="flex h-screen overflow-hidden bg-gray-50" x-data="{ mobileOpen: false }">
+    {% include 'includes/sidebar.html' %}
+
+    <!-- Main Content Area - offset for fixed sidebar -->
+    <div class="pl-[80px] flex-1 flex flex-col overflow-hidden min-w-0">
+        {% include 'includes/topbar.html' %}
+
+        <!-- Scrollable Content - no width restrictions -->
+        <main class="flex-1 overflow-y-auto p-6 lg:p-8 bg-gray-50 animate-fade-in">
+            {% if messages %}
+            <div class="mb-6 space-y-2 max-w-7xl mx-auto">
+                {% for message in messages %}
+                <div class="px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2
+                    {% if message.tags == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+                    {% elif message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
+                    {% elif message.tags == 'warning' %}bg-amber-50 text-amber-700 border border-amber-200
+                    {% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
+                    <i class="bi {% if message.tags == 'success' %}bi-check-circle{% elif message.tags == 'error' %}bi-exclamation-circle{% elif message.tags == 'warning' %}bi-exclamation-triangle{% else %}bi-info-circle{% endif %}"></i>
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% block dashboard_content %}{% endblock %}
+        </main>
+    </div>
+</div>
+{% endblock %}

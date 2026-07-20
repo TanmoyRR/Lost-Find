@@ -1,0 +1,40 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ story.title }} - Lost & Found{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-12 animate-fade-in">
+    <a href="{% url 'posts:success_stories' %}" class="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-indigo-600 mb-6 transition">
+        <i class="bi bi-arrow-left"></i> Back to Stories
+    </a>
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {% if story.post.image %}
+        <img src="{{ story.post.image.url }}" alt="{{ story.title }}" class="w-full h-64 object-cover">
+        {% endif %}
+        <div class="p-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ story.title }}</h1>
+            <div class="flex items-center gap-4 text-sm text-gray-500 mb-6">
+                <span>Found by {{ story.finder_name }}</span>
+                <span>Returned to {{ story.owner_name }}</span>
+                <span>{{ story.published_at|date:"F d, Y" }}</span>
+            </div>
+            <div class="prose max-w-none">
+                <p class="text-gray-700 leading-relaxed">{{ story.story|linebreaks }}</p>
+                {% if story.finder_message %}
+                <div class="mt-8 p-6 bg-blue-50 rounded-xl">
+                    <h3 class="font-semibold text-gray-900 mb-2">Message from the Finder</h3>
+                    <p class="text-gray-700">{{ story.finder_message }}</p>
+                </div>
+                {% endif %}
+                {% if story.owner_message %}
+                <div class="mt-4 p-6 bg-green-50 rounded-xl">
+                    <h3 class="font-semibold text-gray-900 mb-2">Message from the Owner</h3>
+                    <p class="text-gray-700">{{ story.owner_message }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

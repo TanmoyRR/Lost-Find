@@ -1,0 +1,114 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+
+{% block page_title %}Browse Items{% endblock %}
+
+{% block dashboard_content %}
+<div class="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-indigo-100">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Browse Items</h1>
+                <p class="text-gray-500 mt-1">Search through all lost and found items on campus</p>
+            </div>
+            <a href="{% url 'posts:create' %}" class="gradient-primary text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition flex items-center gap-2">
+                <i class="bi bi-plus-lg"></i> New Post
+            </a>
+        </div>
+
+        <!-- Search & Filters -->
+        <div class="glass rounded-2xl p-6 border border-white/20 mb-8">
+            <div class="flex flex-col lg:flex-row gap-4">
+                <div class="flex-1 relative">
+                    <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    <input id="search-input" type="text" placeholder="Search items..." value="{{ current_query }}" class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm" autocomplete="off">
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <select name="type" class="filter-select px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
+                        <option value="">All Types</option>
+                        <option value="lost" {% if current_type == 'lost' %}selected{% endif %}>Lost</option>
+                        <option value="found" {% if current_type == 'found' %}selected{% endif %}>Found</option>
+                    </select>
+                    <select name="category" class="filter-select px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.slug }}" {% if current_category == cat.slug %}selected{% endif %}>{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="location" class="filter-select px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.slug }}" {% if current_location == loc.slug %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results count -->
+        <p id="results-info" class="text-sm text-gray-500 mb-4">{{ posts.paginator.count }} posts found</p>
+
+        <!-- Loading indicator -->
+        <div id="loading-indicator" class="hidden text-center py-8">
+            <div class="inline-block w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+            <p class="text-gray-400 text-sm mt-2">Searching...</p>
+        </div>
+
+        <!-- Posts Grid -->
+        <div id="posts-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for post in posts %}
+            <a href="{% url 'posts:detail' post.pk %}" class="block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 card-hover">
+                {% if post.image %}
+                <div class="h-48 bg-gray-100 overflow-hidden">
+                    <img src="{{ post.image.url }}" alt="{{ post.title }}" class="w-full h-full object-cover">
+                </div>
+                {% else %}
+                <div class="h-48 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center">
+                    <i class="bi bi-image text-4xl text-gray-300"></i>
+                </div>
+                {% endif %}
+                <div class="p-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-full {% if post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ post.get_post_type_display }}</span>
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-full {% if post.status == 'open' %}bg-amber-100 text-amber-700{% elif post.status == 'resolved' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ post.get_status_display }}</span>
+                    </div>
+                    <h3 class="font-semibold text-gray-800 text-sm mb-1">{{ post.title|truncatechars:50 }}</h3>
+                    <p class="text-xs text-gray-500 line-clamp-2">{{ post.description|truncatechars:100 }}</p>
+                    <div class="flex items-center gap-3 mt-3 text-xs text-gray-400">
+                        <span><i class="bi bi-geo-alt mr-1"></i>{{ post.location.name|default:'N/A' }}</span>
+                        <span><i class="bi bi-calendar mr-1"></i>{{ post.created_at|date:"M d, Y" }}</span>
+                    </div>
+                </div>
+            </a>
+            {% empty %}
+            <div class="col-span-full">
+                <div class="glass rounded-2xl p-12 text-center">
+                    <div class="w-20 h-20 rounded-2xl bg-indigo-100 flex items-center justify-center mx-auto mb-4">
+                        <i class="bi bi-inbox text-3xl text-indigo-500"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">No posts found</h3>
+                    <p class="text-gray-500 text-sm">Try adjusting your search or filter criteria.</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination (server-side fallback) -->
+        {% if posts.has_other_pages %}
+        <div class="flex justify-center mt-8 gap-2">
+            {% if posts.has_previous %}
+            <a href="?page={{ posts.previous_page_number }}" class="px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">&laquo; Prev</a>
+            {% endif %}
+            <span class="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-medium">{{ posts.number }}</span>
+            {% if posts.has_next %}
+            <a href="?page={{ posts.next_page_number }}" class="px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Next &raquo;</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock dashboard_content %}
+
+{% block extra_js %}
+<script src="{% static 'js/browse.js' %}"></script>
+{% endblock %}

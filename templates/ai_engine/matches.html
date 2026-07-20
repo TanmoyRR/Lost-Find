@@ -1,0 +1,187 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}AI Match Suggestions{% endblock %}
+
+{% block dashboard_content %}
+<div class="animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">AI Match Suggestions</h1>
+            <p class="text-gray-500 text-sm mt-1">Smart matches between lost and found items on campus</p>
+        </div>
+        <a href="{% url 'posts:browse' %}" class="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:text-indigo-600 bg-white hover:bg-indigo-50 border border-gray-200 transition shadow-sm">
+            <i class="bi bi-grid"></i> Browse All Posts
+        </a>
+    </div>
+
+    {% if matches %}
+    <!-- Stats Summary -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-md shadow-indigo-500/10">
+                <i class="bi bi-robot text-white text-lg"></i>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-gray-800">{{ matches|length }}</p>
+                <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Total Matches</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center shadow-md shadow-emerald-500/10">
+                <i class="bi bi-check-circle text-emerald-600 text-lg"></i>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-gray-800">{{ matches|dictsortreversed:"similarity_score"|first|default:0 }}</p>
+                <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Highest Score</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center shadow-md shadow-blue-500/10">
+                <i class="bi bi-eye text-blue-600 text-lg"></i>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-gray-800">{{ matches|dictsort:"similarity_score"|first|default:0 }}</p>
+                <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Lowest Score</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Matches List -->
+    <div class="space-y-4">
+        {% for match in matches %}
+        <div class="card-hover bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div class="p-6">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl {% if match.similarity_score > 0.8 %}gradient-success{% elif match.similarity_score > 0.6 %}gradient-warning{% else %}gradient-info{% endif %} flex items-center justify-center shadow-lg">
+                            <i class="bi bi-robot text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+                                Match #{{ forloop.counter }}
+                                {% if not match.is_viewed %}
+                                <span class="px-2 py-0.5 rounded-lg text-xs font-bold bg-indigo-100 text-indigo-700">New</span>
+                                {% endif %}
+                            </h3>
+                            <p class="text-xs text-gray-400">Suggested {{ match.created_at|naturaltime }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex flex-col items-center">
+                            <div class="relative w-14 h-14">
+                                <svg class="w-14 h-14 transform -rotate-90" viewBox="0 0 36 36">
+                                    <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e5e7eb" stroke-width="2.5"></circle>
+                                    <circle cx="18" cy="18" r="15.5" fill="none"
+                                        stroke="{% if match.similarity_score > 0.8 %}#10b981{% elif match.similarity_score > 0.6 %}#f59e0b{% else %}#6366f1{% endif %}"
+                                        stroke-width="2.5" stroke-dasharray="{{ match.similarity_score }}, 100"
+                                        stroke-linecap="round"></circle>
+                                </svg>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span class="text-xs font-bold {% if match.similarity_score > 0.8 %}text-emerald-600{% elif match.similarity_score > 0.6 %}text-amber-600{% else %}text-indigo-600{% endif %}">
+                                        {{ match.similarity_score }}%
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="text-xs text-gray-400 mt-0.5">Match</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- Your Post -->
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded-lg {% if match.post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                {{ match.post.get_post_type_display }}
+                            </span>
+                            <span class="text-xs text-gray-400">Your Post</span>
+                        </div>
+                        <a href="{% url 'posts:detail' match.post.pk %}" class="text-sm font-semibold text-gray-800 hover:text-indigo-600 transition block mb-1">
+                            {{ match.post.title }}
+                        </a>
+                        <p class="text-xs text-gray-500 line-clamp-2">{{ match.post.description|truncatechars:80 }}</p>
+                        <div class="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                            {% if match.post.category %}
+                            <span class="flex items-center gap-1"><i class="bi bi-tag text-indigo-400"></i> {{ match.post.category.name }}</span>
+                            {% endif %}
+                            {% if match.post.location %}
+                            <span class="flex items-center gap-1"><i class="bi bi-geo-alt text-indigo-400"></i> {{ match.post.location.name }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Matched Post -->
+                    <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded-lg {% if match.matched_post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                {{ match.matched_post.get_post_type_display }}
+                            </span>
+                            <span class="text-xs text-gray-400">Matched Item</span>
+                        </div>
+                        <a href="{% url 'posts:detail' match.matched_post.pk %}" class="text-sm font-semibold text-gray-800 hover:text-indigo-600 transition block mb-1">
+                            {{ match.matched_post.title }}
+                        </a>
+                        <p class="text-xs text-gray-500 line-clamp-2">{{ match.matched_post.description|truncatechars:80 }}</p>
+                        <div class="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                            {% if match.matched_post.category %}
+                            <span class="flex items-center gap-1"><i class="bi bi-tag text-indigo-400"></i> {{ match.matched_post.category.name }}</span>
+                            {% endif %}
+                            {% if match.matched_post.location %}
+                            <span class="flex items-center gap-1"><i class="bi bi-geo-alt text-indigo-400"></i> {{ match.matched_post.location.name }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
+                    <a href="{% url 'posts:detail' match.matched_post.pk %}"
+                        class="px-4 py-2 rounded-xl text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition inline-flex items-center gap-2">
+                        <i class="bi bi-eye"></i> View Details
+                    </a>
+                    <a href="{% url 'ai:contact_match' match.pk %}"
+                        class="px-4 py-2 rounded-xl text-sm font-medium text-emerald-600 hover:bg-emerald-50 border border-emerald-200 transition inline-flex items-center gap-2">
+                        <i class="bi bi-envelope"></i> Contact
+                    </a>
+                    <a href="{% url 'ai:accept_match' match.pk %}"
+                        class="px-4 py-2 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition inline-flex items-center gap-2">
+                        <i class="bi bi-check-lg"></i> Accept
+                    </a>
+                    <a href="{% url 'ai:dismiss_match' match.pk %}"
+                        class="px-4 py-2 rounded-xl text-sm font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 border border-gray-200 transition inline-flex items-center gap-2">
+                        <i class="bi bi-x-lg"></i> Dismiss
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <!-- No Matches -->
+    <div class="bg-white rounded-2xl p-16 border border-gray-100 shadow-sm text-center">
+        <div class="w-24 h-24 rounded-2xl bg-indigo-100 flex items-center justify-center mx-auto mb-6">
+            <i class="bi bi-robot text-4xl text-indigo-500"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">No Match Suggestions Yet</h2>
+        <p class="text-gray-500 max-w-lg mx-auto leading-relaxed mb-8">
+            Our AI is constantly analyzing posts for potential matches. Create more posts or check back later
+            to see if any items match yours.
+        </p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a href="{% url 'posts:create' %}" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition inline-flex items-center gap-2">
+                <i class="bi bi-plus-circle"></i> Create a Post
+            </a>
+            <a href="{% url 'posts:browse' %}" class="px-6 py-2.5 rounded-xl text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition inline-flex items-center gap-2">
+                <i class="bi bi-grid"></i> Browse Items
+            </a>
+            <a href="{% url 'ai:search' %}" class="px-6 py-2.5 rounded-xl text-sm font-medium text-indigo-600 bg-white border border-gray-200 hover:bg-indigo-50 transition inline-flex items-center gap-2">
+                <i class="bi bi-search"></i> Try AI Search
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

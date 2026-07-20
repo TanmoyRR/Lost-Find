@@ -1,0 +1,347 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}{{ profile_user.get_full_name|default:profile_user.username }} - User Details{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in" x-data="{ activeTab: 'posts' }">
+    <!-- User Profile Header -->
+    <div class="relative overflow-hidden rounded-2xl gradient-primary p-8 text-white">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+        <div class="relative z-10 flex items-center gap-6">
+            <div class="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-3xl font-bold border-2 border-white/30">
+                {{ profile_user.get_full_name|default:profile_user.username|first|upper }}
+            </div>
+            <div class="flex-1">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-2xl font-bold">{{ profile_user.get_full_name|default:profile_user.username }}</h1>
+                    <span class="px-3 py-1 rounded-lg text-xs font-medium bg-white/20 backdrop-blur-sm
+                        {% if profile_user.role == 'admin' %}bg-purple-500/30 text-purple-200{% else %}bg-blue-500/30 text-blue-200{% endif %}">
+                        {{ profile_user.get_role_display }}
+                    </span>
+                    <span class="px-3 py-1 rounded-lg text-xs font-medium bg-white/20 backdrop-blur-sm
+                        {% if profile_user.is_suspended %}bg-red-500/30 text-red-200{% elif profile_user.is_active %}bg-emerald-500/30 text-emerald-200{% else %}bg-gray-500/30 text-gray-200{% endif %}">
+                        {% if profile_user.is_suspended %}Suspended{% elif profile_user.is_active %}Active{% else %}Inactive{% endif %}
+                    </span>
+                </div>
+                <p class="text-white/70 text-sm mt-1">{{ profile_user.student_id|default:"Student ID not set" }} &bull; {{ profile_user.get_department_display|default:"Department not set" }}</p>
+                <p class="text-white/50 text-xs mt-1 flex items-center gap-2">
+                    <i class="bi bi-envelope"></i> {{ profile_user.email }}
+                    <i class="bi bi-calendar ml-2"></i> Joined {{ profile_user.date_joined|date:"F d, Y" }}
+                </p>
+            </div>
+            <div class="flex gap-2">
+                {% if profile_user.is_suspended %}
+                <a href="{% url 'dashboard:admin_activate_user' profile_user.pk %}" class="glass px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-emerald-500/30 transition flex items-center gap-2">
+                    <i class="bi bi-check-circle"></i> Activate
+                </a>
+                {% else %}
+                <a href="{% url 'dashboard:admin_suspend_user' profile_user.pk %}" class="glass px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-red-500/30 transition flex items-center gap-2">
+                    <i class="bi bi-ban"></i> Suspend
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                    <i class="bi bi-file-earmark-text text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ total_posts|default:"0" }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Total Posts</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-warning flex items-center justify-center">
+                    <i class="bi bi-clock-history text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ open_posts|default:"0" }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Open Posts</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-success flex items-center justify-center">
+                    <i class="bi bi-check-circle text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ resolved_posts|default:"0" }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Resolved</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-info flex items-center justify-center">
+                    <i class="bi bi-payment text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ payment_count|default:"0" }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Payments</h3>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm inline-flex">
+        <button @click="activeTab = 'posts'" :class="activeTab === 'posts' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">Posts</button>
+        <button @click="activeTab = 'activity'" :class="activeTab === 'activity' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">Activity</button>
+        <button @click="activeTab = 'payments'" :class="activeTab === 'payments' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">Payments</button>
+        <button @click="activeTab = 'info'" :class="activeTab === 'info' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">User Info</button>
+        <button @click="activeTab = 'membership'" :class="activeTab === 'membership' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">Membership</button>
+    </div>
+
+    <!-- Posts Tab -->
+    <div x-show="activeTab === 'posts'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="bi bi-file-earmark-text text-indigo-500"></i> User Posts
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 border-b border-gray-100">
+                            <th class="pb-3 font-medium">Title</th>
+                            <th class="pb-3 font-medium">Type</th>
+                            <th class="pb-3 font-medium">Category</th>
+                            <th class="pb-3 font-medium">Status</th>
+                            <th class="pb-3 font-medium">Date</th>
+                            <th class="pb-3 font-medium">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for post in user_posts %}
+                        <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                            <td class="py-3">
+                                <a href="{% url 'posts:detail' post.pk %}" class="text-sm font-medium text-gray-800 hover:text-indigo-600">{{ post.title|truncatechars:40 }}</a>
+                            </td>
+                            <td class="py-3">
+                                <span class="text-xs font-medium px-2 py-1 rounded-lg {% if post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                    {{ post.get_post_type_display }}
+                                </span>
+                            </td>
+                            <td class="py-3 text-sm text-gray-500">{{ post.category.name|default:'N/A' }}</td>
+                            <td class="py-3">
+                                <span class="text-xs font-medium px-2 py-1 rounded-lg {% if post.status == 'open' %}bg-amber-100 text-amber-700{% elif post.status == 'resolved' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                                    {{ post.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="py-3 text-sm text-gray-500">{{ post.created_at|date:"M d, Y" }}</td>
+                            <td class="py-3">
+                                <a href="{% url 'posts:detail' post.pk %}" class="text-indigo-500 hover:text-indigo-700 text-sm font-medium">View</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-gray-400">
+                                <i class="bi bi-inbox text-3xl block mb-2"></i>
+                                <p>No posts yet.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Tab -->
+    <div x-show="activeTab === 'activity'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="bi bi-clock-history text-indigo-500"></i> Activity Log
+            </h3>
+            <div class="space-y-4">
+                {% for activity in user_activities %}
+                <div class="flex items-start gap-4 p-4 rounded-xl bg-gray-50/50 hover:bg-gray-50 transition">
+                    <div class="w-10 h-10 rounded-xl {% if activity.activity_type == 'post_created' %}bg-emerald-100 text-emerald-600{% elif activity.activity_type == 'post_resolved' %}bg-blue-100 text-blue-600{% elif activity.activity_type == 'membership_purchased' %}bg-purple-100 text-purple-600{% elif activity.activity_type == 'profile_updated' %}bg-indigo-100 text-indigo-600{% else %}bg-gray-100 text-gray-600{% endif %} flex items-center justify-center flex-shrink-0">
+                        <i class="bi {% if activity.activity_type == 'post_created' %}bi-plus-circle{% elif activity.activity_type == 'post_resolved' %}bi-check-circle{% elif activity.activity_type == 'membership_purchased' %}bi-gem{% elif activity.activity_type == 'profile_updated' %}bi-person{% else %}bi-arrow-right-circle{% endif %} text-lg"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-gray-700">{{ activity.description }}</p>
+                        <div class="flex items-center gap-3 mt-1">
+                            <span class="text-xs text-gray-400">{{ activity.created_at|timesince }} ago</span>
+                            <span class="text-xs text-gray-300">&bull;</span>
+                            <span class="text-xs text-gray-400">{{ activity.created_at|date:"M d, Y h:i A" }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-12">
+                    <div class="w-20 h-20 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                        <i class="bi bi-clock-history text-3xl text-gray-300"></i>
+                    </div>
+                    <p class="text-gray-400 text-sm">No activity recorded yet</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments Tab -->
+    <div x-show="activeTab === 'payments'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="bi bi-credit-card text-indigo-500"></i> Payment History
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 border-b border-gray-100">
+                            <th class="pb-3 font-medium">Transaction ID</th>
+                            <th class="pb-3 font-medium">Amount</th>
+                            <th class="pb-3 font-medium">Type</th>
+                            <th class="pb-3 font-medium">Status</th>
+                            <th class="pb-3 font-medium">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in user_payments %}
+                        <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                            <td class="py-3 text-sm text-gray-500 font-mono">{{ payment.transaction_id|default:'N/A' }}</td>
+                            <td class="py-3 text-sm font-medium text-gray-800">{{ payment.amount }} BDT</td>
+                            <td class="py-3 text-sm text-gray-500">{{ payment.get_payment_type_display|default:'N/A' }}</td>
+                            <td class="py-3">
+                                <span class="text-xs font-medium px-2 py-1 rounded-lg {% if payment.status == 'completed' %}bg-emerald-100 text-emerald-700{% elif payment.status == 'pending' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
+                                    {{ payment.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="py-3 text-sm text-gray-500">{{ payment.created_at|date:"M d, Y" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-gray-400">
+                                <i class="bi bi-credit-card text-3xl block mb-2"></i>
+                                <p>No payments yet.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Info Tab -->
+    <div x-show="activeTab === 'info'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <i class="bi bi-person-badge text-indigo-500"></i> Account Information
+                </h3>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Username</span>
+                        <span class="text-sm font-medium text-gray-800">{{ profile_user.username }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Email</span>
+                        <span class="text-sm font-medium text-gray-800">{{ profile_user.email }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Full Name</span>
+                        <span class="text-sm font-medium text-gray-800">{{ profile_user.get_full_name|default:'N/A' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Student ID</span>
+                        <span class="text-sm font-medium text-gray-800">{{ profile_user.student_id|default:'N/A' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Department</span>
+                        <span class="text-sm font-medium text-gray-800">{{ profile_user.get_department_display|default:'N/A' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Phone</span>
+                        <span class="text-sm font-medium text-gray-800">{{ profile_user.phone|default:'N/A' }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <i class="bi bi-shield-check text-indigo-500"></i> Account Status
+                </h3>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Role</span>
+                        <span class="text-xs font-medium px-2 py-1 rounded-lg {% if profile_user.role == 'admin' %}bg-purple-100 text-purple-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ profile_user.get_role_display }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Status</span>
+                        <span class="text-xs font-medium px-2 py-1 rounded-lg {% if profile_user.is_suspended %}bg-red-100 text-red-700{% elif profile_user.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                            {% if profile_user.is_suspended %}Suspended{% elif profile_user.is_active %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Email Verified</span>
+                        <span class="text-sm font-medium text-gray-800">
+                            {% if profile_user.email_verified %}<span class="text-emerald-600"><i class="bi bi-check-circle-fill"></i> Yes</span>{% else %}<span class="text-amber-600"><i class="bi bi-exclamation-circle"></i> No</span>{% endif %}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Date Joined</span>
+                        <span class="text-sm font-medium text-gray-800">{{ profile_user.date_joined|date:"F d, Y" }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                        <span class="text-sm text-gray-500">Last Login</span>
+                        <span class="text-sm font-medium text-gray-800">{{ profile_user.last_login|date:"F d, Y h:i A"|default:'Never' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3">
+                        <span class="text-sm text-gray-500">Membership</span>
+                        <span class="text-sm font-medium text-gray-800">{{ profile_user.membership_type|default:'Free' }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Membership Tab -->
+    <div x-show="activeTab === 'membership'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="bi bi-gem text-indigo-500"></i> Membership Management
+            </h3>
+            {% with membership=profile_user.membership %}
+            <div class="space-y-4">
+                <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                    <span class="text-sm text-gray-500">Current Status</span>
+                    <span class="text-sm font-medium {% if membership and membership.is_active %}text-emerald-600{% else %}text-gray-500{% endif %}">
+                        {% if membership and membership.is_active %}Active{% else %}Inactive / Free{% endif %}
+                    </span>
+                </div>
+                {% if membership %}
+                <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                    <span class="text-sm text-gray-500">Plan</span>
+                    <span class="text-sm font-medium text-gray-800">{{ membership.plan.name|default:'N/A' }}</span>
+                </div>
+                <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                    <span class="text-sm text-gray-500">Started</span>
+                    <span class="text-sm font-medium text-gray-800">{{ membership.started_at|date:"M d, Y"|default:'N/A' }}</span>
+                </div>
+                <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                    <span class="text-sm text-gray-500">Expires</span>
+                    <span class="text-sm font-medium text-gray-800">{{ membership.expires_at|date:"M d, Y"|default:'N/A' }}</span>
+                </div>
+                <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                    <span class="text-sm text-gray-500">Days Remaining</span>
+                    <span class="text-sm font-medium text-gray-800">{{ membership.days_remaining|default:'0' }}</span>
+                </div>
+                {% endif %}
+                <div class="pt-4">
+                    <a href="{% url 'dashboard:admin_toggle_membership' profile_user.pk %}"
+                       class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
+                       {% if membership and membership.is_active %}bg-red-50 text-red-700 hover:bg-red-100 border border-red-200
+                       {% else %}bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200{% endif %}">
+                        <i class="bi {% if membership and membership.is_active %}bi-x-circle{% else %}bi-gem{% endif %}"></i>
+                        {% if membership and membership.is_active %}Revoke Membership{% else %}Grant Membership{% endif %}
+                    </a>
+                </div>
+            </div>
+            {% endwith %}
+        </div>
+    </div>
+</div>
+{% endblock %}

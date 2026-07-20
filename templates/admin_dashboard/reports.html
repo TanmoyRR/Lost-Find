@@ -1,0 +1,253 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Reports{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Reports</h1>
+            <p class="text-sm text-gray-400 mt-1">Generate and view reports</p>
+        </div>
+        <div class="flex gap-2">
+            <button class="gradient-primary text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg transition flex items-center gap-2">
+                <i class="bi bi-download"></i> Export CSV
+            </button>
+            <button class="px-5 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition flex items-center gap-2">
+                <i class="bi bi-printer"></i> Print
+            </button>
+        </div>
+    </div>
+
+    <!-- Date Range -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <i class="bi bi-calendar-range text-indigo-500"></i> Date Range
+            </h3>
+            <div class="flex flex-wrap items-center gap-3">
+                <input type="date" class="px-4 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                <span class="text-gray-400 text-sm">to</span>
+                <input type="date" class="px-4 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                <button class="gradient-primary text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition">Generate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                    <i class="bi bi-people text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ new_users|default:"0" }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">New Users</h3>
+            <div class="mt-2 flex items-center gap-1 text-xs {% if new_users_growth > 0 %}text-emerald-600{% else %}text-red-500{% endif %}">
+                <i class="bi {% if new_users_growth > 0 %}bi-arrow-up{% else %}bi-arrow-down{% endif %}"></i>
+                <span>{{ new_users_growth|default:"0" }}% vs last period</span>
+            </div>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-success flex items-center justify-center">
+                    <i class="bi bi-file-earmark-text text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ new_posts|default:"0" }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">New Posts</h3>
+            <div class="mt-2 flex items-center gap-1 text-xs {% if new_posts_growth > 0 %}text-emerald-600{% else %}text-red-500{% endif %}">
+                <i class="bi {% if new_posts_growth > 0 %}bi-arrow-up{% else %}bi-arrow-down{% endif %}"></i>
+                <span>{{ new_posts_growth|default:"0" }}% vs last period</span>
+            </div>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-warning flex items-center justify-center">
+                    <i class="bi bi-check-circle text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ resolved_count|default:"0" }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Resolved</h3>
+            <div class="mt-2 flex items-center gap-1 text-xs {% if resolved_growth > 0 %}text-emerald-600{% else %}text-red-500{% endif %}">
+                <i class="bi {% if resolved_growth > 0 %}bi-arrow-up{% else %}bi-arrow-down{% endif %}"></i>
+                <span>{{ resolved_growth|default:"0" }}% vs last period</span>
+            </div>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-info flex items-center justify-center">
+                    <i class="bi bi-currency-dollar text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ period_revenue|default:"0"|floatformat:0 }} BDT</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Revenue</h3>
+            <div class="mt-2 flex items-center gap-1 text-xs {% if revenue_growth > 0 %}text-emerald-600{% else %}text-red-500{% endif %}">
+                <i class="bi {% if revenue_growth > 0 %}bi-arrow-up{% else %}bi-arrow-down{% endif %}"></i>
+                <span>{{ revenue_growth|default:"0" }}% vs last period</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Tables -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Posts by Category -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="bi bi-pie-chart text-indigo-500"></i> Posts by Category
+            </h3>
+            <div class="space-y-3">
+                {% for item in posts_by_category %}
+                <div class="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                            <i class="bi bi-tag text-sm"></i>
+                        </div>
+                        <span class="text-sm text-gray-700">{{ item.category__name|default:'Uncategorized' }}</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-24 h-2 rounded-full bg-gray-100">
+                            <div class="h-full rounded-full gradient-primary" style="width: {% widthratio item.count category_max 100 %}%"></div>
+                        </div>
+                        <span class="text-sm font-semibold text-gray-700 min-w-[3rem] text-right">{{ item.count }}</span>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-6 text-gray-400 text-sm">No data available</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Posts by Location -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="bi bi-geo-alt text-indigo-500"></i> Posts by Location
+            </h3>
+            <div class="space-y-3">
+                {% for item in posts_by_location %}
+                <div class="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
+                            <i class="bi bi-geo-alt text-sm"></i>
+                        </div>
+                        <span class="text-sm text-gray-700">{{ item.location__name|default:'Unknown' }}</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-24 h-2 rounded-full bg-gray-100">
+                            <div class="h-full rounded-full gradient-success" style="width: {% widthratio item.count location_max 100 %}%"></div>
+                        </div>
+                        <span class="text-sm font-semibold text-gray-700 min-w-[3rem] text-right">{{ item.count }}</span>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-6 text-gray-400 text-sm">No data available</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- User Growth & Activity -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- User Registration Trend -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="bi bi-graph-up-arrow text-indigo-500"></i> User Registration Trend
+            </h3>
+            <div class="space-y-2">
+                {% for item in user_registration_trend %}
+                <div class="flex items-center gap-4">
+                    <span class="text-xs text-gray-500 w-24 flex-shrink-0">{{ item.date|date:"M d" }}</span>
+                    <div class="flex-1 h-6 rounded-lg bg-gray-100 overflow-hidden">
+                        <div class="h-full rounded-lg gradient-info" style="width: {% widthratio item.count reg_max 100 %}%"></div>
+                    </div>
+                    <span class="text-xs font-medium text-gray-600 min-w-[2rem] text-right">{{ item.count }}</span>
+                </div>
+                {% empty %}
+                <div class="text-center py-6 text-gray-400 text-sm">No data available</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Daily Post Trend -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="bi bi-bar-chart text-indigo-500"></i> Daily Post Trend
+            </h3>
+            <div class="space-y-2">
+                {% for item in daily_post_trend %}
+                <div class="flex items-center gap-4">
+                    <span class="text-xs text-gray-500 w-24 flex-shrink-0">{{ item.date|date:"M d" }}</span>
+                    <div class="flex-1 h-6 rounded-lg bg-gray-100 overflow-hidden">
+                        <div class="h-full rounded-lg gradient-warning" style="width: {% widthratio item.count post_max 100 %}%"></div>
+                    </div>
+                    <span class="text-xs font-medium text-gray-600 min-w-[2rem] text-right">{{ item.count }}</span>
+                </div>
+                {% empty %}
+                <div class="text-center py-6 text-gray-400 text-sm">No data available</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Report Table -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="bi bi-table text-indigo-500"></i> Detailed Breakdown
+        </h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-100">
+                        <th class="pb-3 font-medium">Metric</th>
+                        <th class="pb-3 font-medium">Current Period</th>
+                        <th class="pb-3 font-medium">Previous Period</th>
+                        <th class="pb-3 font-medium">Growth</th>
+                        <th class="pb-3 font-medium">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3 text-sm text-gray-700 font-medium">New Users</td>
+                        <td class="py-3 text-sm text-gray-800">{{ new_users|default:"0" }}</td>
+                        <td class="py-3 text-sm text-gray-500">{{ prev_new_users|default:"0" }}</td>
+                        <td class="py-3 text-sm {% if new_users_growth > 0 %}text-emerald-600{% else %}text-red-500{% endif %}">{{ new_users_growth|default:"0" }}%</td>
+                        <td class="py-3">{% if new_users_growth > 0 %}<i class="bi bi-arrow-up-circle-fill text-emerald-500"></i>{% else %}<i class="bi bi-arrow-down-circle-fill text-red-500"></i>{% endif %}</td>
+                    </tr>
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3 text-sm text-gray-700 font-medium">New Posts</td>
+                        <td class="py-3 text-sm text-gray-800">{{ new_posts|default:"0" }}</td>
+                        <td class="py-3 text-sm text-gray-500">{{ prev_new_posts|default:"0" }}</td>
+                        <td class="py-3 text-sm {% if new_posts_growth > 0 %}text-emerald-600{% else %}text-red-500{% endif %}">{{ new_posts_growth|default:"0" }}%</td>
+                        <td class="py-3">{% if new_posts_growth > 0 %}<i class="bi bi-arrow-up-circle-fill text-emerald-500"></i>{% else %}<i class="bi bi-arrow-down-circle-fill text-red-500"></i>{% endif %}</td>
+                    </tr>
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3 text-sm text-gray-700 font-medium">Resolved Posts</td>
+                        <td class="py-3 text-sm text-gray-800">{{ resolved_count|default:"0" }}</td>
+                        <td class="py-3 text-sm text-gray-500">{{ prev_resolved|default:"0" }}</td>
+                        <td class="py-3 text-sm {% if resolved_growth > 0 %}text-emerald-600{% else %}text-red-500{% endif %}">{{ resolved_growth|default:"0" }}%</td>
+                        <td class="py-3">{% if resolved_growth > 0 %}<i class="bi bi-arrow-up-circle-fill text-emerald-500"></i>{% else %}<i class="bi bi-arrow-down-circle-fill text-red-500"></i>{% endif %}</td>
+                    </tr>
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3 text-sm text-gray-700 font-medium">Revenue</td>
+                        <td class="py-3 text-sm text-gray-800">{{ period_revenue|default:"0"|floatformat:0 }} BDT</td>
+                        <td class="py-3 text-sm text-gray-500">{{ prev_revenue|default:"0"|floatformat:0 }} BDT</td>
+                        <td class="py-3 text-sm {% if revenue_growth > 0 %}text-emerald-600{% else %}text-red-500{% endif %}">{{ revenue_growth|default:"0" }}%</td>
+                        <td class="py-3">{% if revenue_growth > 0 %}<i class="bi bi-arrow-up-circle-fill text-emerald-500"></i>{% else %}<i class="bi bi-arrow-down-circle-fill text-red-500"></i>{% endif %}</td>
+                    </tr>
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3 text-sm text-gray-700 font-medium">Avg. Resolution Time</td>
+                        <td class="py-3 text-sm text-gray-800">{{ avg_resolution_time|default:"--" }} days</td>
+                        <td class="py-3 text-sm text-gray-500">{{ prev_avg_resolution_time|default:"--" }} days</td>
+                        <td class="py-3 text-sm {% if resolution_improvement > 0 %}text-emerald-600{% else %}text-red-500{% endif %}">{{ resolution_improvement|default:"0" }}%</td>
+                        <td class="py-3">{% if resolution_improvement > 0 %}<i class="bi bi-arrow-up-circle-fill text-emerald-500"></i>{% else %}<i class="bi bi-arrow-down-circle-fill text-red-500"></i>{% endif %}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

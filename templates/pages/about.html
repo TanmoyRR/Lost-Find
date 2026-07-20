@@ -1,0 +1,130 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}About Us - IUBAT Lost & Find{% endblock %}
+
+{% block content %}
+<section class="bg-gradient-to-br from-indigo-50 via-purple-50 to-indigo-100 min-h-screen">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 animate-fade-in">
+        <!-- Header -->
+        <div class="text-center mb-16">
+            <span class="inline-flex items-center gap-2 gradient-primary text-white px-4 py-1.5 rounded-full text-sm font-medium mb-4">
+                <i class="bi bi-info-circle"></i> About Us
+            </span>
+            <h1 class="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">About IUBAT Lost & Find</h1>
+            <p class="text-gray-500 text-lg max-w-2xl mx-auto">
+                Dedicated to reuniting students and staff with their lost belongings through technology and community spirit.
+            </p>
+        </div>
+
+        <!-- Mission Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
+            <div class="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+                <div class="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20">
+                    <i class="bi bi-bullseye text-white text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Our Mission</h2>
+                <p class="text-gray-500 leading-relaxed">
+                    To provide a reliable, AI-powered platform that makes it easy for the IUBAT community to report lost and found items, 
+                    increasing the chances of reuniting people with their valuables while fostering a culture of honesty and helpfulness on campus.
+                </p>
+            </div>
+            <div class="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+                <div class="w-14 h-14 rounded-2xl gradient-success flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20">
+                    <i class="bi bi-eye text-white text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Our Vision</h2>
+                <p class="text-gray-500 leading-relaxed">
+                    To become the standard for lost and found management across universities in Bangladesh, 
+                    leveraging artificial intelligence to create smarter, faster, and more effective item recovery for everyone.
+                </p>
+            </div>
+        </div>
+
+        <!-- Story Section -->
+        <div class="glass rounded-2xl p-8 sm:p-12 mb-16 shadow-xl shadow-indigo-500/5">
+            <div class="flex items-center gap-4 mb-6">
+                <div class="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center">
+                    <i class="bi bi-book text-2xl text-indigo-500"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900">Our Story</h2>
+            </div>
+            <div class="space-y-4 text-gray-600 leading-relaxed">
+                <p>
+                    IUBAT Lost & Find was born from a simple observation: every semester, countless valuable items go unclaimed 
+                    because there was no centralized system to connect those who lost items with those who found them.
+                </p>
+                <p>
+                    What started as a student project quickly grew into a campus-wide initiative. With the support of the university 
+                    administration and the enthusiasm of the student body, we developed a platform that combines traditional lost and 
+                    found reporting with cutting-edge AI semantic matching technology.
+                </p>
+                <p>
+                    Today, our platform serves thousands of IUBAT students and staff, helping reunite people with their lost phones, 
+                    wallets, books, ID cards, and more. Every successful reunion is a testament to the power of community and technology working together.
+                </p>
+            </div>
+        </div>
+
+        <!-- Team Section -->
+        <div class="text-center mb-12">
+            <span class="inline-flex items-center gap-2 gradient-primary text-white px-4 py-1.5 rounded-full text-sm font-medium mb-4">
+                <i class="bi bi-people"></i> Our Team
+            </span>
+            <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Meet the Team</h2>
+            <p class="text-gray-500 text-lg">The people behind IUBAT Lost & Find.</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm text-center">
+                <div class="w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/20">
+                    <span class="text-white text-3xl font-bold">JD</span>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">John Doe</h3>
+                <p class="text-sm text-indigo-500 font-medium mb-2">Lead Developer</p>
+                <p class="text-gray-500 text-sm">Full-stack developer and AI engineer behind the platform.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm text-center">
+                <div class="w-20 h-20 rounded-2xl gradient-success flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20">
+                    <span class="text-white text-3xl font-bold">JS</span>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">Jane Smith</h3>
+                <p class="text-sm text-indigo-500 font-medium mb-2">UI/UX Designer</p>
+                <p class="text-gray-500 text-sm">Designs intuitive and accessible user experiences.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm text-center">
+                <div class="w-20 h-20 rounded-2xl gradient-warning flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/20">
+                    <span class="text-white text-3xl font-bold">AK</span>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">Ahmed Khan</h3>
+                <p class="text-sm text-indigo-500 font-medium mb-2">Project Manager</p>
+                <p class="text-gray-500 text-sm">Coordinates development and community outreach.</p>
+            </div>
+        </div>
+
+        <!-- Values -->
+        <div class="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm text-center">
+                <div class="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center mx-auto mb-4">
+                    <i class="bi bi-heart text-xl text-indigo-500"></i>
+                </div>
+                <h3 class="font-bold text-gray-800 mb-2">Community First</h3>
+                <p class="text-gray-500 text-sm">Built by students, for students.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm text-center">
+                <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mx-auto mb-4">
+                    <i class="bi bi-shield-check text-xl text-purple-500"></i>
+                </div>
+                <h3 class="font-bold text-gray-800 mb-2">Trust & Safety</h3>
+                <p class="text-gray-500 text-sm">Verified users, secure interactions.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm text-center">
+                <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                    <i class="bi bi-lightbulb text-xl text-emerald-500"></i>
+                </div>
+                <h3 class="font-bold text-gray-800 mb-2">Innovation</h3>
+                <p class="text-gray-500 text-sm">AI-powered matching technology.</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

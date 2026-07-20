@@ -1,0 +1,115 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Membership{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="relative overflow-hidden rounded-2xl gradient-primary p-8 text-white">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+        <div class="relative z-10">
+            <h1 class="text-2xl font-bold mb-2">Membership Plans</h1>
+            <p class="text-white/80">Unlock premium features with an annual membership.</p>
+        </div>
+    </div>
+
+    <!-- Current Membership -->
+    {% if membership and membership.is_active %}
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                    <i class="bi bi-gem text-2xl text-emerald-600"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-gray-800">{{ membership.plan.name|default:"Annual" }} Plan</h3>
+                    <p class="text-sm text-gray-500">Your membership is active</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-gray-500">Expires in</p>
+                <p class="text-xl font-bold text-gray-800">{{ membership.days_remaining }} days</p>
+                {% if membership.expires_at %}
+                <p class="text-xs text-gray-400">{{ membership.expires_at|date:"M d, Y" }}</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="mt-4 w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+            <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" style="width: {{ membership.days_remaining }}%"></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Plans Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+        {% for plan in plans %}
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+            <div class="p-6">
+                <div class="w-12 h-12 rounded-xl {% if plan.price > 0 %}gradient-primary{% else %}bg-gray-100{% endif %} flex items-center justify-center mb-4">
+                    <i class="bi {% if plan.price > 0 %}bi-gem text-white{% else %}bi-person text-gray-600{% endif %} text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">{{ plan.name }}</h3>
+                <p class="text-3xl font-bold text-gray-800 mt-2">{{ plan.price|floatformat:0 }} <span class="text-base font-normal text-gray-400">BDT</span></p>
+                <p class="text-sm text-gray-500 mt-1">{{ plan.duration_days }} days</p>
+                {% if plan.description %}
+                <p class="text-sm text-gray-600 mt-3">{{ plan.description }}</p>
+                {% endif %}
+            </div>
+            <div class="px-6 pb-6">
+                {% if membership and membership.plan == plan and membership.is_active %}
+                <div class="block w-full py-2.5 rounded-xl text-sm font-medium text-center bg-emerald-100 text-emerald-700 cursor-default">Current Plan</div>
+                {% else %}
+                <a href="{% url 'membership:purchase' plan.pk %}" class="block w-full py-2.5 rounded-xl text-sm font-medium text-center {% if plan.price > 0 %}gradient-primary text-white hover:shadow-lg hover:shadow-indigo-500/25{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %} transition">
+                    {% if plan.price > 0 %}Purchase{% else %}Free{% endif %}
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full text-center py-12 text-gray-400">
+            <i class="bi bi-credit-card-2-front text-4xl block mb-3"></i>
+            <p>No membership plans available at the moment.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Features -->
+    {% if membership and membership.is_active %}
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Membership Benefits</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <i class="bi bi-telephone"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-800">View Contact Info</p>
+                    <p class="text-xs text-gray-500">See contact details of post owners</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <i class="bi bi-robot"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-800">AI Matches</p>
+                    <p class="text-xs text-gray-500">Get automatic match suggestions</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <i class="bi bi-megaphone"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-800">Priority Support</p>
+                    <p class="text-xs text-gray-500">Get help faster when you need it</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

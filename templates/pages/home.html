@@ -1,0 +1,254 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}IUBAT Lost & Find - Find What You Lost, Return What You Found{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800 min-h-screen flex items-center">
+    <div class="absolute inset-0 opacity-10">
+        <div class="absolute top-20 left-10 w-72 h-72 bg-white rounded-full blur-3xl"></div>
+        <div class="absolute bottom-20 right-10 w-96 h-96 bg-purple-300 rounded-full blur-3xl"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-indigo-300 rounded-full blur-3xl"></div>
+    </div>
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 text-center">
+        <div class="animate-fade-in">
+            <div class="inline-flex items-center gap-2 glass text-white/90 px-4 py-2 rounded-full text-sm font-medium mb-8">
+                <i class="bi bi-shield-check"></i> Trusted by IUBAT Campus Community
+            </div>
+            <h1 class="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white leading-tight mb-6">
+                Find What You Lost,<br>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-200 to-indigo-200">Return What You Found</span>
+            </h1>
+            <p class="text-lg sm:text-xl text-indigo-100 max-w-2xl mx-auto mb-10 leading-relaxed">
+                The official IUBAT lost and found platform. Report lost items, browse found items, and let our AI match what belongs together.
+            </p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <a href="{% url 'posts:create' %}" class="gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-semibold shadow-2xl shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:scale-105 transition-all duration-300 inline-flex items-center gap-3">
+                    <i class="bi bi-plus-circle text-xl"></i> Report Lost Item
+                </a>
+                <a href="{% url 'posts:browse' %}" class="glass text-white px-8 py-4 rounded-2xl text-lg font-semibold hover:bg-white/20 transition-all duration-300 inline-flex items-center gap-3">
+                    <i class="bi bi-search text-xl"></i> Browse Items
+                </a>
+                {% if not user.is_authenticated %}
+                <a href="{% url 'accounts:register' %}" class="text-white/80 hover:text-white px-8 py-4 rounded-2xl text-lg font-semibold transition-all duration-300 inline-flex items-center gap-3">
+                    <i class="bi bi-person-plus text-xl"></i> Join Now
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="absolute bottom-0 left-0 right-0">
+        <svg viewBox="0 0 1440 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 100V0C240 40 480 60 720 50C960 40 1200 20 1440 30V100H0Z" fill="#f8fafc" opacity="0.15"/>
+        </svg>
+    </div>
+</section>
+
+<!-- Stats Section -->
+<section class="relative -mt-16 z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+        <div class="stat-card bg-white rounded-2xl p-6 sm:p-8 border border-gray-100 shadow-xl text-center">
+            <div class="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/20">
+                <i class="bi bi-file-earmark-text text-white text-2xl"></i>
+            </div>
+            <p class="text-3xl sm:text-4xl font-extrabold text-gray-800">{{ total_posts|default:"0" }}</p>
+            <p class="text-sm text-gray-500 mt-1 font-medium">Total Reports</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 sm:p-8 border border-gray-100 shadow-xl text-center">
+            <div class="w-14 h-14 rounded-2xl gradient-success flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20">
+                <i class="bi bi-check-circle text-white text-2xl"></i>
+            </div>
+            <p class="text-3xl sm:text-4xl font-extrabold text-gray-800">{{ resolved_posts|default:"0" }}</p>
+            <p class="text-sm text-gray-500 mt-1 font-medium">Resolved</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 sm:p-8 border border-gray-100 shadow-xl text-center">
+            <div class="w-14 h-14 rounded-2xl gradient-warning flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/20">
+                <i class="bi bi-people text-white text-2xl"></i>
+            </div>
+            <p class="text-3xl sm:text-4xl font-extrabold text-gray-800">{{ total_users|default:"0" }}</p>
+            <p class="text-sm text-gray-500 mt-1 font-medium">Community Members</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 sm:p-8 border border-gray-100 shadow-xl text-center">
+            <div class="w-14 h-14 rounded-2xl gradient-info flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
+                <i class="bi bi-robot text-white text-2xl"></i>
+            </div>
+            <p class="text-3xl sm:text-4xl font-extrabold text-gray-800">{{ ai_matches|default:"0" }}</p>
+            <p class="text-sm text-gray-500 mt-1 font-medium">AI Matches</p>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works -->
+<section class="py-20 sm:py-28 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+            <span class="inline-flex items-center gap-2 gradient-primary text-white px-4 py-1.5 rounded-full text-sm font-medium mb-4">
+                <i class="bi bi-lightbulb"></i> How It Works
+            </span>
+            <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Three Simple Steps</h2>
+            <p class="text-gray-500 text-lg">Getting your items back or helping others has never been easier.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="card-hover bg-white rounded-2xl p-8 border border-gray-100 shadow-sm text-center relative">
+                <div class="absolute -top-4 -left-4 w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-500/20">
+                    1
+                </div>
+                <div class="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-6">
+                    <i class="bi bi-megaphone text-3xl text-indigo-500"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-3">Report an Item</h3>
+                <p class="text-gray-500">Lost something or found an item? Create a post with details, images, and location instantly.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-8 border border-gray-100 shadow-sm text-center relative">
+                <div class="absolute -top-4 -left-4 w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-500/20">
+                    2
+                </div>
+                <div class="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-6">
+                    <i class="bi bi-robot text-3xl text-purple-500"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-3">AI Matches</h3>
+                <p class="text-gray-500">Our AI engine automatically compares descriptions and suggests potential matches for lost items.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-8 border border-gray-100 shadow-sm text-center relative">
+                <div class="absolute -top-4 -left-4 w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-500/20">
+                    3
+                </div>
+                <div class="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-6">
+                    <i class="bi bi-hand-index-thumb text-3xl text-emerald-500"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-3">Reunite & Resolve</h3>
+                <p class="text-gray-500">Connect with the finder or owner, verify ownership, and mark the item as resolved.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section (moved up) -->
+<section class="py-20 sm:py-28">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div class="relative overflow-hidden rounded-3xl gradient-primary p-12 sm:p-16 shadow-2xl shadow-indigo-500/25">
+            <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+            <div class="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+            <div class="relative z-10">
+                <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">Ready to Get Started?</h2>
+                <p class="text-indigo-100 text-lg mb-8 max-w-2xl mx-auto">
+                    Join the IUBAT community in making lost items find their way home. Sign up now and start helping others.
+                </p>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'dashboard:home' %}" class="bg-white text-indigo-600 px-8 py-4 rounded-2xl text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all duration-300 inline-flex items-center gap-3">
+                        <i class="bi bi-grid-1x2 text-xl"></i> Go to Dashboard
+                    </a>
+                    <a href="{% url 'posts:create' %}" class="glass text-white px-8 py-4 rounded-2xl text-lg font-semibold hover:bg-white/20 transition-all duration-300 inline-flex items-center gap-3">
+                        <i class="bi bi-plus-circle text-xl"></i> Report an Item
+                    </a>
+                    {% else %}
+                    <a href="{% url 'accounts:register' %}" class="bg-white text-indigo-600 px-8 py-4 rounded-2xl text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all duration-300 inline-flex items-center gap-3">
+                        <i class="bi bi-person-plus text-xl"></i> Create Account
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features -->
+<section class="py-20 sm:py-28 bg-gradient-to-br from-indigo-50 via-purple-50 to-indigo-100">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+            <span class="inline-flex items-center gap-2 gradient-primary text-white px-4 py-1.5 rounded-full text-sm font-medium mb-4">
+                <i class="bi bi-stars"></i> Features
+            </span>
+            <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Why Choose IUBAT Lost & Find?</h2>
+            <p class="text-gray-500 text-lg">Everything you need to manage lost and found items on campus.</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/20">
+                    <i class="bi bi-robot text-white text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2">AI-Powered Matching</h3>
+                <p class="text-gray-500 text-sm leading-relaxed">Semantic search automatically matches lost items with found reports using advanced AI embeddings.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <div class="w-12 h-12 rounded-xl gradient-success flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20">
+                    <i class="bi bi-camera text-white text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2">Image Uploads</h3>
+                <p class="text-gray-500 text-sm leading-relaxed">Attach clear photos of items to help identify and match them more effectively.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <div class="w-12 h-12 rounded-xl gradient-warning flex items-center justify-center mb-4 shadow-lg shadow-amber-500/20">
+                    <i class="bi bi-bell text-white text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2">Instant Notifications</h3>
+                <p class="text-gray-500 text-sm leading-relaxed">Get real-time alerts when a potential match is found for your lost or found items.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <div class="w-12 h-12 rounded-xl gradient-info flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
+                    <i class="bi bi-map text-white text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2">Location Tagging</h3>
+                <p class="text-gray-500 text-sm leading-relaxed">Tag precise campus locations to narrow down where items were lost or found.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <div class="w-12 h-12 rounded-xl gradient-danger flex items-center justify-center mb-4 shadow-lg shadow-red-500/20">
+                    <i class="bi bi-shield-check text-white text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2">Verified Community</h3>
+                <p class="text-gray-500 text-sm leading-relaxed">Only verified IUBAT students and staff can post and claim items for trusted interactions.</p>
+            </div>
+            <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/20">
+                    <i class="bi bi-graph-up text-white text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2">Analytics Dashboard</h3>
+                <p class="text-gray-500 text-sm leading-relaxed">Track your reports, resolution rates, and community impact with a personal dashboard.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="bg-gray-900 text-gray-400 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div class="md:col-span-2">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                        <i class="bi bi-shield text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold text-white">IUBAT Lost & Find</span>
+                </div>
+                <p class="text-sm leading-relaxed max-w-md">
+                    The official lost and found platform for International University of Business, Agriculture and Technology. Helping students and staff reunite with their belongings.
+                </p>
+            </div>
+            <div>
+                <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Quick Links</h4>
+                <ul class="space-y-2 text-sm">
+                    <li><a href="#" class="hover:text-white transition">Browse Items</a></li>
+                    <li><a href="#" class="hover:text-white transition">Report Lost</a></li>
+                    <li><a href="#" class="hover:text-white transition">Report Found</a></li>
+                    <li><a href="#" class="hover:text-white transition">AI Search</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Support</h4>
+                <ul class="space-y-2 text-sm">
+                    <li><a href="#" class="hover:text-white transition">About Us</a></li>
+                    <li><a href="#" class="hover:text-white transition">Contact</a></li>
+                    <li><a href="#" class="hover:text-white transition">FAQ</a></li>
+                    <li><a href="#" class="hover:text-white transition">Privacy Policy</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
+            <p>&copy; {% now "Y" %} IUBAT Lost & Find. All rights reserved.</p>
+        </div>
+    </div>
+</footer>
+{% endblock %}

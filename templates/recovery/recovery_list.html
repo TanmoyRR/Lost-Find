@@ -1,0 +1,74 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+
+{% block page_title %}Recovery Sessions{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Recovery Sessions</h1>
+            <p class="text-gray-600 mt-1">Track and manage your item recovery requests</p>
+        </div>
+    </div>
+
+    {% if sessions %}
+    <div class="grid gap-4">
+        {% for session in sessions %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium
+                            {% if session.status == 'completed' %}bg-green-100 text-green-800
+                            {% elif session.status == 'pending' %}bg-yellow-100 text-yellow-800
+                            {% elif session.status == 'cancelled' or session.status == 'expired' %}bg-red-100 text-red-800
+                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ session.get_status_display }}
+                        </span>
+                        <span class="text-sm text-gray-500">{{ session.created_at|date:"M d, Y H:i" }}</span>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">{{ session.post.title }}</h3>
+                    <p class="text-sm text-gray-600 mt-1">
+                        {% if session.claimant == request.user %}
+                            Claiming from <strong>{{ session.owner.get_full_name|default:session.owner.username }}</strong>
+                        {% else %}
+                            Claimed by <strong>{{ session.claimant.get_full_name|default:session.claimant.username }}</strong>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="px-3 py-1 rounded-full text-xs font-medium
+                        {% if session.status == 'completed' %}bg-green-100 text-green-800
+                        {% elif session.status == 'pending' %}bg-yellow-100 text-yellow-800
+                        {% elif session.status == 'cancelled' or session.status == 'expired' %}bg-red-100 text-red-800
+                        {% else %}bg-blue-100 text-blue-800{% endif %}">
+                        {{ session.get_status_display }}
+                    </span>
+                </div>
+            </div>
+            <div class="mt-3 flex items-center gap-4 text-sm text-gray-500">
+                <span>{{ session.created_at|date:"M d, Y H:i" }}</span>
+                <span>{{ session.post.get_post_type_display }}</span>
+            </div>
+            <div class="mt-4">
+                <a href="{% url 'recovery:detail' uid=session.uid %}" class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                    View Details <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 bg-white rounded-xl border border-gray-200">
+        <i class="bi bi-shield-check text-5xl text-gray-300"></i>
+        <h3 class="mt-4 text-lg font-semibold text-gray-900">No Recovery Sessions</h3>
+        <p class="text-gray-500 mt-2">You haven't initiated any recovery sessions yet.</p>
+        <a href="{% url 'posts:my_posts' %}" class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
+            <i class="bi bi-search"></i> Browse Items
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

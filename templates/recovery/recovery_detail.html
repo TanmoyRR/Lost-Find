@@ -1,0 +1,47 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+
+{% block page_title %}Recovery Session Details{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Recovery Session</h1>
+            <p class="text-gray-500 text-sm mt-1">UID: {{ session.uid }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+            {% if session.status != 'completed' and session.status != 'cancelled' and session.status != 'expired' %}
+            <form method="post" action="{% url 'recovery:cancel' uid=session.uid %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Item Details</h2>
+                <div class="flex items-start gap-4">
+                    {% if session.post.image %}
+                    <img src="{{ session.post.image.url }}" alt="{{ session.post.title }}" class="w-24 h-24 rounded-lg object-cover">
+                    {% endif %}
+                    <div>
+                        <h3 class="font-semibold text-gray-900">{{ session.post.title }}</h3>
+                        <p class="text-sm text-gray-600 mt-1">{{ session.post.description|truncatewords:30 }}</p>
+                        <div class="flex items-center gap-3 mt-2 text-sm text-gray-500">
+                            <span class="px-2 py-0.5 rounded bg-gray-100">{{ session.post.get_post_type_display }}</span>
+                            {% if session.post.category %}<span>{{ session.post.category.name }}</span>{% endif %}
+                            {% if session.post.location %}<span>{{ session.post.location.name }}</span>{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

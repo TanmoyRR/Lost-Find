@@ -1,0 +1,257 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Admin Dashboard{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                    <i class="bi bi-people text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ total_users }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Total Users</h3>
+            <div class="mt-2 flex gap-2 text-xs">
+                <span class="text-emerald-600">{{ active_users }} active</span>
+                <span class="text-gray-300">|</span>
+                <span class="text-red-500">{{ inactive_users }} inactive</span>
+            </div>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                    <i class="bi bi-file-earmark-text text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ total_posts }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Total Posts</h3>
+            <div class="mt-2 flex gap-2 text-xs">
+                <span class="text-amber-600">{{ open_posts }} open</span>
+                <span class="text-gray-300">|</span>
+                <span class="text-emerald-600">{{ resolved_posts }} resolved</span>
+            </div>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-success flex items-center justify-center">
+                    <i class="bi bi-currency-dollar text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ total_revenue|floatformat:0 }} BDT</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Total Revenue</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-warning flex items-center justify-center">
+                    <i class="bi bi-hourglass-split text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ pending_payments }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Pending Payments</h3>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Monthly Registrations</h3>
+            <div class="space-y-3">
+                {% for item in monthly_registrations %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">{{ item.month|date:"M Y" }}</span>
+                    <div class="flex items-center gap-3">
+                        <div class="w-32 h-2 rounded-full bg-gray-100">
+                            <div class="h-full rounded-full gradient-primary" style="width: {% widthratio item.count monthly_registrations.0.count 100 %}%"></div>
+                        </div>
+                        <span class="text-sm font-medium text-gray-700">{{ item.count }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Monthly Revenue</h3>
+            <div class="space-y-3">
+                {% for item in monthly_revenue %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">{{ item.month|date:"M Y" }}</span>
+                    <div class="flex items-center gap-3">
+                        <div class="w-32 h-2 rounded-full bg-gray-100">
+                            <div class="h-full rounded-full gradient-success" style="width: {% widthratio item.total monthly_revenue.0.total 100 %}%"></div>
+                        </div>
+                        <span class="text-sm font-medium text-gray-700">{{ item.total|floatformat:0 }} BDT</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Posts by Category and Location -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Posts by Category</h3>
+            <div class="space-y-3">
+                {% for item in posts_by_category %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">{{ item.category__name|default:'Uncategorized' }}</span>
+                    <div class="flex items-center gap-3">
+                        <div class="w-32 h-2 rounded-full bg-gray-100">
+                            <div class="h-full rounded-full gradient-primary" style="width: {% widthratio item.count total_posts 100 %}%"></div>
+                        </div>
+                        <span class="text-sm font-medium text-gray-700">{{ item.count }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Posts by Location</h3>
+            <div class="space-y-3">
+                {% for item in posts_by_location %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">{{ item.location__name|default:'Unknown' }}</span>
+                    <div class="flex items-center gap-3">
+                        <div class="w-32 h-2 rounded-full bg-gray-100">
+                            <div class="h-full rounded-full gradient-success" style="width: {% widthratio item.count total_posts 100 %}%"></div>
+                        </div>
+                        <span class="text-sm font-medium text-gray-700">{{ item.count }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activities -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Recent Activities</h3>
+        <div class="space-y-3">
+            {% for activity in recent_activities %}
+            <div class="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 transition">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                    <i class="bi bi-activity"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-700">{{ activity.description }}</p>
+                    <p class="text-xs text-gray-400">{{ activity.user.username }} - {{ activity.created_at|timesince }} ago</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800">Recent Users</h3>
+            <a href="{% url 'dashboard:admin_users' %}" class="text-indigo-500 text-sm font-medium hover:underline">View All</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-100">
+                        <th class="pb-3 font-medium">User</th>
+                        <th class="pb-3 font-medium">Role</th>
+                        <th class="pb-3 font-medium">Status</th>
+                        <th class="pb-3 font-medium">Joined</th>
+                        <th class="pb-3 font-medium">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-medium">{{ u.get_full_name|default:u.username|first|upper }}</div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-800">{{ u.get_full_name|default:u.username }}</p>
+                                    <p class="text-xs text-gray-400">{{ u.email }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3"><span class="text-xs font-medium px-2 py-1 rounded-lg {% if u.role == 'admin' %}bg-purple-100 text-purple-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ u.get_role_display }}</span></td>
+                        <td class="py-3">
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg {% if u.is_suspended %}bg-red-100 text-red-700{% elif u.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                                {% if u.is_suspended %}Suspended{% elif u.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
+                        </td>
+                        <td class="py-3 text-sm text-gray-500">{{ u.date_joined|date:"M d, Y" }}</td>
+                        <td class="py-3">
+                            <a href="{% url 'dashboard:admin_user_detail' u.pk %}" class="text-indigo-500 hover:text-indigo-700 text-sm font-medium">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recent Posts -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800">Recent Posts</h3>
+            <a href="{% url 'dashboard:admin_posts' %}" class="text-indigo-500 text-sm font-medium hover:underline">View All</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-100">
+                        <th class="pb-3 font-medium">Title</th>
+                        <th class="pb-3 font-medium">User</th>
+                        <th class="pb-3 font-medium">Type</th>
+                        <th class="pb-3 font-medium">Status</th>
+                        <th class="pb-3 font-medium">Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in posts %}
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3"><a href="{% url 'posts:detail' p.pk %}" class="text-sm font-medium text-gray-800 hover:text-indigo-600">{{ p.title|truncatechars:40 }}</a></td>
+                        <td class="py-3 text-sm text-gray-500">{{ p.user.get_full_name|default:p.user.username }}</td>
+                        <td class="py-3"><span class="text-xs font-medium px-2 py-1 rounded-lg {% if p.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ p.get_post_type_display }}</span></td>
+                        <td class="py-3"><span class="text-xs font-medium px-2 py-1 rounded-lg {% if p.status == 'open' %}bg-amber-100 text-amber-700{% elif p.status == 'resolved' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ p.get_status_display }}</span></td>
+                        <td class="py-3 text-sm text-gray-500">{{ p.created_at|date:"M d, Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recent Payments -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800">Recent Payments</h3>
+            <a href="{% url 'dashboard:admin_payments' %}" class="text-indigo-500 text-sm font-medium hover:underline">View All</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-100">
+                        <th class="pb-3 font-medium">User</th>
+                        <th class="pb-3 font-medium">Amount</th>
+                        <th class="pb-3 font-medium">Status</th>
+                        <th class="pb-3 font-medium">Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3 text-sm text-gray-700">{{ p.user.get_full_name|default:p.user.username }}</td>
+                        <td class="py-3 text-sm font-medium text-gray-800">{{ p.amount }} BDT</td>
+                        <td class="py-3"><span class="text-xs font-medium px-2 py-1 rounded-lg {% if p.status == 'completed' %}bg-emerald-100 text-emerald-700{% elif p.status == 'pending' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">{{ p.get_status_display }}</span></td>
+                        <td class="py-3 text-sm text-gray-500">{{ p.created_at|date:"M d, Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

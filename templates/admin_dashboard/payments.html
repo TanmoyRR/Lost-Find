@@ -1,0 +1,175 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Payment Management{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                    <i class="bi bi-currency-dollar text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ total_revenue|floatformat:0|intcomma }} BDT</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Total Revenue</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-success flex items-center justify-center">
+                    <i class="bi bi-check-circle text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ completed_payments }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Completed</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-warning flex items-center justify-center">
+                    <i class="bi bi-hourglass-split text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ pending_payments }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Pending</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-danger flex items-center justify-center">
+                    <i class="bi bi-x-circle text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ failed_payments }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Failed</h3>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <i class="bi bi-funnel text-indigo-500"></i> Filters
+            </h3>
+            <div class="flex flex-wrap items-center gap-3">
+                <select class="px-4 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
+                    <option value="">All Statuses</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                    <option value="refunded">Refunded</option>
+                </select>
+                <select class="px-4 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
+                    <option value="">All Types</option>
+                    <option value="membership">Membership</option>
+                    <option value="reward">Reward</option>
+                </select>
+                <input type="text" placeholder="Search by user or transaction..." class="px-4 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm w-64">
+                <button class="gradient-primary text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition">Filter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments Table -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-gray-800">All Payments</h3>
+            <span class="text-sm text-gray-400">{{ total_payments }} payments</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-100">
+                        <th class="pb-3 font-medium">Transaction ID</th>
+                        <th class="pb-3 font-medium">User</th>
+                        <th class="pb-3 font-medium">Amount</th>
+                        <th class="pb-3 font-medium">Type</th>
+                        <th class="pb-3 font-medium">Method</th>
+                        <th class="pb-3 font-medium">Status</th>
+                        <th class="pb-3 font-medium">Date</th>
+                        <th class="pb-3 font-medium">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in payments %}
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3">
+                            <span class="text-sm font-mono text-gray-500">{{ payment.transaction_id|default:'N/A'|truncatechars:16 }}</span>
+                        </td>
+                        <td class="py-3">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-medium">{{ payment.user.get_full_name|default:payment.user.username|first|upper }}</div>
+                                <span class="text-sm text-gray-700">{{ payment.user.get_full_name|default:payment.user.username }}</span>
+                            </div>
+                        </td>
+                        <td class="py-3">
+                            <span class="text-sm font-semibold text-gray-800">{{ payment.amount|floatformat:2 }} BDT</span>
+                        </td>
+                        <td class="py-3">
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg {% if payment.payment_type == 'membership' %}bg-purple-100 text-purple-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                                {{ payment.get_payment_type_display }}
+                            </span>
+                        </td>
+                        <td class="py-3 text-sm text-gray-500">{{ payment.payment_method|default:'N/A' }}</td>
+                        <td class="py-3">
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg
+                                {% if payment.status == 'completed' %}bg-emerald-100 text-emerald-700
+                                {% elif payment.status == 'pending' %}bg-amber-100 text-amber-700
+                                {% elif payment.status == 'failed' %}bg-red-100 text-red-700
+                                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                {{ payment.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="py-3 text-sm text-gray-500">{{ payment.created_at|date:"M d, Y" }}</td>
+                        <td class="py-3">
+                            <div class="flex items-center gap-2">
+                                <button class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-indigo-600" title="View Details">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                {% if payment.status == 'pending' %}
+                                <button class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-emerald-600" title="Mark Complete">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                                {% endif %}
+                                <button class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600" title="Refund">
+                                    <i class="bi bi-arrow-return-left"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="py-12 text-center text-gray-400">
+                            <div class="w-20 h-20 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                                <i class="bi bi-credit-card text-3xl text-gray-300"></i>
+                            </div>
+                            <p class="text-gray-500 font-medium mb-1">No payments found</p>
+                            <p class="text-gray-400 text-sm">Payment records will appear here once users start transacting.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div class="flex items-center justify-between mt-6 pt-6 border-t border-gray-100">
+            <p class="text-sm text-gray-500">Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</p>
+            <div class="flex gap-2">
+                {% if page_obj.has_previous %}
+                <a href="?page=1" class="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">&laquo;&laquo;</a>
+                <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">&laquo;</a>
+                {% endif %}
+                <span class="px-4 py-2 rounded-xl gradient-primary text-white text-sm font-medium">{{ page_obj.number }}</span>
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">&raquo;</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}" class="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">&raquo;&raquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

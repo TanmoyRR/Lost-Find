@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: 'Inter', Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafc;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 16px 16px 0 0; padding: 40px 40px 30px; text-align: center;">
+                            <div style="width: 56px; height: 56px; background: rgba(255,255,255,0.2); border-radius: 14px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+                                <span style="font-size: 28px; color: white;">🔒</span>
+                            </div>
+                            <h1 style="color: white; font-size: 22px; font-weight: 700; margin: 0;">Verify Your Email</h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 32px 40px;">
+                            <p style="color: #334155; font-size: 15px; line-height: 1.6; margin: 0 0 8px;">Hi <strong>{{ user.get_full_name|default:user.username }}</strong>,</p>
+                            <p style="color: #64748b; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">Thanks for joining {{ site_name }}! Please verify your email address to activate your account.</p>
+                            <table role="presentation" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td align="center" style="padding: 0 0 24px;">
+                                        <a href="{{ verify_url }}" style="display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; text-decoration: none; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: 0 4px 14px rgba(99,102,241,0.35);">Verify Email Address</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;">
+                            <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">If you didn't create an account, you can safely ignore this email. This link expires in 24 hours.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background: #f8fafc; border-radius: 0 0 16px 16px; padding: 20px 40px; text-align: center;">
+                            <p style="color: #94a3b8; font-size: 11px; margin: 0;">{{ site_name }} &bull; IUBAT University</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

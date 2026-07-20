@@ -1,0 +1,152 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}AI Search Results - IUBAT Lost & Find{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-indigo-100">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">AI Semantic Search</h1>
+            <p class="text-gray-500 mt-1">Find items using natural language descriptions</p>
+        </div>
+
+        <!-- Search Form -->
+        <div class="glass rounded-2xl p-6 mb-8 shadow-xl shadow-indigo-500/5">
+            <form method="GET" action="{% url 'ai:search' %}" class="flex gap-4">
+                <div class="relative flex-1">
+                    <i class="bi bi-robot absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400"></i>
+                    <input type="text" name="q" value="{{ query }}" placeholder='Try: "black Lenovo laptop left in library" or "blue water bottle near cafeteria"...'
+                        class="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 outline-none transition bg-white/80 text-sm">
+                </div>
+                <button type="submit" class="gradient-primary text-white px-8 py-3.5 rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-indigo-500/25 transition inline-flex items-center gap-2">
+                    <i class="bi bi-search"></i> Search
+                </button>
+            </form>
+        </div>
+
+        {% if query %}
+        <!-- Results Summary -->
+        <div class="mb-6">
+            <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl gradient-info flex items-center justify-center">
+                        <i class="bi bi-search text-white"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Results for</p>
+                        <p class="text-base font-semibold text-gray-800">"{{ query }}"</p>
+                    </div>
+                </div>
+                <span class="text-sm font-medium text-gray-500">{{ results|length }} result{{ results|length|pluralize }} found</span>
+            </div>
+        </div>
+
+        <!-- Results List -->
+        {% if results %}
+        <div class="space-y-4">
+            {% for post, score in results %}
+            <div class="card-hover bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <a href="{% url 'posts:detail' post.pk %}" class="flex flex-col sm:flex-row">
+                    <div class="sm:w-48 h-48 sm:h-auto bg-gray-100 flex-shrink-0 overflow-hidden">
+                        {% if post.image %}
+                        <img src="{{ post.image.url }}" alt="{{ post.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                        {% else %}
+                        <div class="w-full h-full flex items-center justify-center">
+                            <i class="bi bi-image text-4xl text-gray-300"></i>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 p-6">
+                        <div class="flex items-start justify-between mb-3">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 hover:text-indigo-600 transition">{{ post.title }}</h3>
+                                <div class="flex flex-wrap items-center gap-3 text-xs text-gray-400 mt-2">
+                                    <span class="px-2.5 py-1 rounded-lg text-xs font-semibold {% if post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                        {{ post.get_post_type_display }}
+                                    </span>
+                                    <span class="px-2.5 py-1 rounded-lg text-xs font-semibold {% if post.status == 'open' %}bg-amber-100 text-amber-700{% elif post.status == 'resolved' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                                        {{ post.get_status_display }}
+                                    </span>
+                                    {% if post.category %}
+                                    <span class="flex items-center gap-1"><i class="bi bi-tag text-indigo-400"></i> {{ post.category.name }}</span>
+                                    {% endif %}
+                                    {% if post.location %}
+                                    <span class="flex items-center gap-1"><i class="bi bi-geo-alt text-indigo-400"></i> {{ post.location.name }}</span>
+                                    {% endif %}
+                                    <span class="flex items-center gap-1"><i class="bi bi-calendar text-indigo-400"></i> {{ post.created_at|date:"M d, Y" }}</span>
+                                </div>
+                            </div>
+                            <!-- Similarity Score Badge -->
+                            <div class="flex flex-col items-center ml-4">
+                                <div class="relative w-16 h-16">
+                                    <svg class="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
+                                        <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e5e7eb" stroke-width="2.5"></circle>
+                                        <circle cx="18" cy="18" r="15.5" fill="none"
+                                            stroke="{% if score > 0.8 %}#10b981{% elif score > 0.6 %}#f59e0b{% else %}#6366f1{% endif %}"
+                                            stroke-width="2.5" stroke-dasharray="{{ score|floatformat:2 }}, 100"
+                                            stroke-linecap="round"></circle>
+                                    </svg>
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <span class="text-sm font-bold {% if score > 0.8 %}text-emerald-600{% elif score > 0.6 %}text-amber-600{% else %}text-indigo-600{% endif %}">
+                                            {{ score|floatformat:1 }}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <span class="text-xs text-gray-400 mt-1">Match</span>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-500 line-clamp-2">{{ post.description|truncatechars:120 }}</p>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <!-- No Results -->
+        <div class="glass rounded-2xl p-12 text-center shadow-xl shadow-indigo-500/5">
+            <div class="w-20 h-20 rounded-2xl bg-indigo-100 flex items-center justify-center mx-auto mb-4">
+                <i class="bi bi-search text-3xl text-indigo-500"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">No matches found</h3>
+            <p class="text-gray-500 text-sm max-w-md mx-auto">
+                Try rephrasing your search with different keywords, or browse all items manually.
+            </p>
+            <a href="{% url 'posts:browse' %}" class="inline-flex items-center gap-2 mt-6 gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition">
+                <i class="bi bi-grid"></i> Browse All Items
+            </a>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <!-- Initial State -->
+        <div class="glass rounded-2xl p-16 text-center shadow-xl shadow-indigo-500/5">
+            <div class="w-24 h-24 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/20">
+                <i class="bi bi-robot text-white text-4xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">AI-Powered Semantic Search</h2>
+            <p class="text-gray-500 max-w-lg mx-auto leading-relaxed mb-8">
+                Describe what you're looking for in natural language. Our AI will find the most relevant items
+                by understanding the meaning behind your words, not just matching keywords.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                <div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                    <i class="bi bi-laptop text-indigo-500 text-xl mb-2"></i>
+                    <p class="text-xs text-gray-500">"Black laptop left in the library"</p>
+                </div>
+                <div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                    <i class="bi bi-water text-indigo-500 text-xl mb-2"></i>
+                    <p class="text-xs text-gray-500">"Blue water bottle near cafeteria"</p>
+                </div>
+                <div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                    <i class="bi bi-wallet2 text-indigo-500 text-xl mb-2"></i>
+                    <p class="text-xs text-gray-500">"Brown leather wallet, ID inside"</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

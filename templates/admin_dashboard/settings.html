@@ -1,0 +1,418 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+
+{% block page_title %}Site Settings{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in" x-data="{ activeSection: 'general' }">
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">Site Settings</h1>
+        <p class="text-sm text-gray-400 mt-1">Configure platform settings and preferences</p>
+    </div>
+
+    <!-- Settings Navigation -->
+    <div class="bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm inline-flex flex-wrap">
+        <button @click="activeSection = 'general'" :class="activeSection === 'general' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">General</button>
+        <button @click="activeSection = 'posting'" :class="activeSection === 'posting' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">Posting</button>
+        <button @click="activeSection = 'membership'" :class="activeSection === 'membership' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">Membership</button>
+        <button @click="activeSection = 'email'" :class="activeSection === 'email' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">Email</button>
+        <button @click="activeSection = 'moderation'" :class="activeSection === 'moderation' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">Moderation</button>
+        <button @click="activeSection = 'api'" :class="activeSection === 'api' ? 'gradient-primary text-white shadow-md' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">API</button>
+    </div>
+
+    <!-- General Settings -->
+    <div x-show="activeSection === 'general'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                <i class="bi bi-gear text-indigo-500"></i> General Settings
+            </h3>
+            <form class="space-y-6 max-w-2xl">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Site Name</label>
+                        <input type="text" value="IUBAT Lost & Find" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Site Email</label>
+                        <input type="email" value="noreply@iubat.edu" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Site Description</label>
+                    <textarea rows="3" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm resize-none">IUBAT Lost &amp; Found is a platform for students and staff to report and find lost items on campus.</textarea>
+                </div>
+                <div class="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Maintenance Mode</p>
+                        <p class="text-xs text-gray-400">Temporarily disable the platform for maintenance</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Allow Registration</p>
+                        <p class="text-xs text-gray-400">Allow new users to register on the platform</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Default User Role</label>
+                    <select class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
+                        <option>Student</option>
+                        <option>Faculty</option>
+                        <option>Staff</option>
+                    </select>
+                </div>
+                <button type="submit" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg transition">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Posting Settings -->
+    <div x-show="activeSection === 'posting'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                <i class="bi bi-file-earmark-text text-indigo-500"></i> Posting Settings
+            </h3>
+            <form class="space-y-6 max-w-2xl">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Max Posts Per User</label>
+                        <input type="number" value="10" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Post Expiry (Days)</label>
+                        <input type="number" value="30" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Require Image</p>
+                        <p class="text-xs text-gray-400">Require users to upload an image when creating a post</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Auto-approve Posts</p>
+                        <p class="text-xs text-gray-400">Automatically approve new posts without moderation</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Allowed Image Types</label>
+                    <div class="flex flex-wrap gap-2">
+                        <label class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                            <span class="text-sm text-gray-600">JPEG</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                            <span class="text-sm text-gray-600">PNG</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                            <span class="text-sm text-gray-600">WEBP</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-600">GIF</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Max Image Size (MB)</label>
+                        <input type="number" value="5" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Images Per Post</label>
+                        <input type="number" value="3" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                    </div>
+                </div>
+                <button type="submit" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg transition">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Membership Settings -->
+    <div x-show="activeSection === 'membership'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                <i class="bi bi-gem text-indigo-500"></i> Membership Settings
+            </h3>
+            <form class="space-y-6 max-w-2xl">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Free Tier Posts</label>
+                        <input type="number" value="3" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                        <p class="text-xs text-gray-400 mt-1">Max posts for free users</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Premium Price (BDT)</label>
+                        <input type="number" value="199" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                    </div>
+                </div>
+                <div class="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Premium Features</p>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-3">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                            <span class="text-sm text-gray-600">Unlimited posts</span>
+                        </label>
+                        <label class="flex items-center gap-3">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                            <span class="text-sm text-gray-600">Priority support</span>
+                        </label>
+                        <label class="flex items-center gap-3">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                            <span class="text-sm text-gray-600">Advanced analytics</span>
+                        </label>
+                        <label class="flex items-center gap-3">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-600">Featured posts</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Premium Duration Options</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <input type="radio" name="duration" class="border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                <span class="text-sm text-gray-700">Monthly - 199 BDT</span>
+                            </div>
+                        </label>
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <input type="radio" name="duration" class="border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700">Quarterly - 499 BDT <span class="text-xs text-emerald-600 font-medium">(Save 16%)</span></span>
+                            </div>
+                        </label>
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <input type="radio" name="duration" class="border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700">Yearly - 1499 BDT <span class="text-xs text-emerald-600 font-medium">(Save 37%)</span></span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg transition">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Email Settings -->
+    <div x-show="activeSection === 'email'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                <i class="bi bi-envelope text-indigo-500"></i> Email Settings
+            </h3>
+            <form class="space-y-6 max-w-2xl">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">SMTP Host</label>
+                        <input type="text" value="smtp.gmail.com" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">SMTP Port</label>
+                        <input type="number" value="587" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">SMTP Username</label>
+                        <input type="text" value="noreply@iubat.edu" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">SMTP Password</label>
+                        <input type="password" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm" placeholder="••••••••">
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Use SSL</p>
+                        <p class="text-xs text-gray-400">Use SSL for secure email transmission</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Email Notifications</label>
+                    <div class="space-y-3">
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <span class="text-sm text-gray-700">New user registration</span>
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                        </label>
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <span class="text-sm text-gray-700">Post resolved notification</span>
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                        </label>
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <span class="text-sm text-gray-700">Payment confirmation</span>
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                        </label>
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <span class="text-sm text-gray-700">Membership expiry alert</span>
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg transition">Save Changes</button>
+                <button type="button" class="ml-2 px-6 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">Test Email</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Moderation Settings -->
+    <div x-show="activeSection === 'moderation'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                <i class="bi bi-shield-check text-indigo-500"></i> Moderation Settings
+            </h3>
+            <form class="space-y-6 max-w-2xl">
+                <div class="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Content Moderation</p>
+                        <p class="text-xs text-gray-400">Review all posts before they go live</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Banned Keywords</label>
+                    <textarea rows="4" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm" placeholder="Enter comma-separated keywords to block..."></textarea>
+                    <p class="text-xs text-gray-400 mt-1">Posts containing these keywords will be flagged for review</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Report Reasons</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                            <span class="text-sm text-gray-600">Spam or misleading</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                            <span class="text-sm text-gray-600">Inappropriate content</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                            <span class="text-sm text-gray-600">Harassment or hate speech</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-600">Copyright violation</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Auto-suspend on Report</p>
+                        <p class="text-xs text-gray-400">Automatically suspend users after multiple reports</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="number" value="3" class="w-16 px-3 py-1.5 rounded-lg border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm text-center">
+                        <span class="text-sm text-gray-500">reports</span>
+                    </div>
+                </div>
+                <button type="submit" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg transition">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- API Settings -->
+    <div x-show="activeSection === 'api'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                <i class="bi bi-code-slash text-indigo-500"></i> API Settings
+            </h3>
+
+            <!-- API Status -->
+            <div class="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 border border-gray-100 mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                        <i class="bi bi-shield-check text-white"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">API Status</p>
+                        <p class="text-xs text-gray-400">Your API key for integrating with external services</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <code class="px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-mono text-gray-700">sk_live_••••••••••••••••</code>
+                    <button class="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-indigo-600 transition" title="Copy">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-amber-600 transition" title="Regenerate">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </div>
+
+            <form class="space-y-6 max-w-2xl">
+                <div class="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Enable API</p>
+                        <p class="text-xs text-gray-400">Allow external applications to access the platform API</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Rate Limit (Requests/Hour)</label>
+                    <input type="number" value="1000" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Allowed Origins (CORS)</label>
+                    <div class="space-y-2">
+                        <textarea rows="3" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm" placeholder="https://app.iubat.edu&#10;https://*.iubat.edu">https://app.iubat.edu
+https://*.iubat.edu</textarea>
+                        <p class="text-xs text-gray-400">One origin per line. Use * for wildcard.</p>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">API Permissions</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <span class="text-sm text-gray-700">Read posts</span>
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                        </label>
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <span class="text-sm text-gray-700">Create posts</span>
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        </label>
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <span class="text-sm text-gray-700">Read users</span>
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                        </label>
+                        <label class="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+                            <span class="text-sm text-gray-700">Manage payments</span>
+                            <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg transition">Save Changes</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

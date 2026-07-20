@@ -1,0 +1,260 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Profile{% endblock %}
+
+{% block dashboard_content %}
+<div class="animate-fade-in" x-data="{ activeTab: 'overview' }">
+    <!-- Profile Banner -->
+    <div class="relative overflow-hidden rounded-2xl gradient-primary mb-8">
+        <div class="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+        <div class="absolute top-1/2 left-1/2 w-48 h-48 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+        <div class="relative z-10 px-8 py-8 flex flex-col sm:flex-row items-start sm:items-center gap-6">
+            <div class="w-24 h-24 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-4xl font-bold border-2 border-white/30 shadow-xl flex-shrink-0">
+                {{ user.get_full_name|default:user.username|first|upper }}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <h1 class="text-2xl sm:text-3xl font-bold text-white">{{ user.get_full_name|default:user.username }}</h1>
+                    {% if membership and membership.is_active %}
+                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 w-fit">
+                        <i class="bi bi-gem text-xs"></i> Premium Member
+                    </span>
+                    {% endif %}
+                </div>
+                <p class="text-white/70 text-sm mt-1">{{ user.student_id|default:"Student ID not set" }} &bull; {{ user.department|default:"Department not set" }}</p>
+                {% if user.bio %}<p class="text-white/60 text-sm mt-2 max-w-lg">{{ user.bio }}</p>{% endif %}
+                <div class="flex flex-wrap items-center gap-4 mt-2 text-white/50 text-xs">
+                    <span class="flex items-center gap-1.5"><i class="bi bi-envelope"></i> {{ user.email }}</span>
+                    <span class="flex items-center gap-1.5"><i class="bi bi-calendar3"></i> Joined {{ user.date_joined|date:"F Y" }}</span>
+                    {% if user.reputation_score > 0 %}
+                    <span class="flex items-center gap-1.5"><i class="bi bi-star-fill text-amber-300"></i> {{ user.reputation_score }} Reputation</span>
+                    {% endif %}
+                </div>
+            </div>
+            <a href="{% url 'accounts:edit_profile' %}" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/15 backdrop-blur-sm text-white text-sm font-medium hover:bg-white/25 transition-all duration-200 border border-white/20 shadow-lg flex-shrink-0">
+                <i class="bi bi-pencil"></i> Edit Profile
+            </a>
+        </div>
+    </div>
+
+    <!-- Pill Tabs -->
+    <div class="flex flex-wrap items-center gap-2 mb-8 bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm w-fit">
+        <button @click="activeTab = 'overview'" :class="activeTab === 'overview' ? 'tab-pill active' : 'tab-pill text-gray-500'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2">
+            <i class="bi bi-grid"></i> Overview
+        </button>
+        <button @click="activeTab = 'posts'" :class="activeTab === 'posts' ? 'tab-pill active' : 'tab-pill text-gray-500'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2">
+            <i class="bi bi-file-earmark-text"></i> Posts
+        </button>
+        <button @click="activeTab = 'activity'" :class="activeTab === 'activity' ? 'tab-pill active' : 'tab-pill text-gray-500'" class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2">
+            <i class="bi bi-clock-history"></i> Activity
+        </button>
+        <a href="{% url 'accounts:settings' %}" class="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-all duration-200 flex items-center gap-2">
+            <i class="bi bi-gear"></i> Settings
+        </a>
+    </div>
+
+    <!-- Overview Tab -->
+    <div x-show="activeTab === 'overview'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="w-11 h-11 rounded-xl gradient-primary flex items-center justify-center shadow-md shadow-indigo-500/10">
+                        <i class="bi bi-file-earmark-text text-white text-lg"></i>
+                    </div>
+                    <span class="text-2xl font-bold text-gray-800">{{ total_posts|default:"0" }}</span>
+                </div>
+                <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Total Posts</p>
+            </div>
+            <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center shadow-md shadow-amber-500/10">
+                        <i class="bi bi-clock-history text-amber-600 text-lg"></i>
+                    </div>
+                    <span class="text-2xl font-bold text-gray-800">{{ open_posts|default:"0" }}</span>
+                </div>
+                <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Open Posts</p>
+            </div>
+            <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center shadow-md shadow-emerald-500/10">
+                        <i class="bi bi-check-circle text-emerald-600 text-lg"></i>
+                    </div>
+                    <span class="text-2xl font-bold text-gray-800">{{ resolved_posts|default:"0" }}</span>
+                </div>
+                <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Resolved</p>
+            </div>
+            <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center shadow-md shadow-purple-500/10">
+                        <i class="bi bi-award text-purple-600 text-lg"></i>
+                    </div>
+                    <span class="text-2xl font-bold text-gray-800">{{ membership_days|default:"--" }}</span>
+                </div>
+                <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Membership Days</p>
+            </div>
+        </div>
+
+        <!-- Recent Activity Timeline -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+                    <i class="bi bi-activity text-indigo-500"></i> Recent Activity
+                </h3>
+                <button @click="activeTab = 'activity'" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition">View All</button>
+            </div>
+            <div class="space-y-0">
+                {% for activity in recent_activities %}
+                <div class="timeline-line flex items-start gap-4 pb-6 last:pb-0">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm z-10
+                        {% if activity.activity_type == 'post_created' %}bg-emerald-100 text-emerald-600
+                        {% elif activity.activity_type == 'post_resolved' %}bg-blue-100 text-blue-600
+                        {% elif activity.activity_type == 'membership_purchased' %}bg-purple-100 text-purple-600
+                        {% elif activity.activity_type == 'profile_updated' %}bg-indigo-100 text-indigo-600
+                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                        <i class="bi {% if activity.activity_type == 'post_created' %}bi-plus-circle
+                                  {% elif activity.activity_type == 'post_resolved' %}bi-check-circle
+                                  {% elif activity.activity_type == 'membership_purchased' %}bi-gem
+                                  {% elif activity.activity_type == 'profile_updated' %}bi-person
+                                  {% else %}bi-arrow-right-circle{% endif %}"></i>
+                    </div>
+                    <div class="flex-1 min-w-0 pt-1">
+                        <p class="text-sm text-gray-700">{{ activity.description }}</p>
+                        <p class="text-xs text-gray-400 mt-0.5">{{ activity.created_at|timesince }} ago</p>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-12">
+                    <div class="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                        <i class="bi bi-clock-history text-2xl text-gray-300"></i>
+                    </div>
+                    <p class="text-gray-400 text-sm">No recent activity</p>
+                    <p class="text-gray-300 text-xs mt-1">Your actions will appear here</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Posts Tab -->
+    <div x-show="activeTab === 'posts'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 flex items-center justify-between border-b border-gray-100">
+                <h3 class="text-base font-semibold text-gray-800">My Posts</h3>
+                <a href="{% url 'posts:create' %}" class="gradient-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition flex items-center gap-2">
+                    <i class="bi bi-plus-lg"></i> New Post
+                </a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-400 border-b border-gray-50 bg-gray-50/50">
+                            <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider">Post</th>
+                            <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider">Date</th>
+                            <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for post in user_posts %}
+                        <tr class="border-b border-gray-50 hover:bg-indigo-50/30 transition">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                                        {% if post.image %}
+                                        <img src="{{ post.image.url }}" alt="" class="w-full h-full object-cover">
+                                        {% else %}
+                                        <div class="w-full h-full flex items-center justify-center">
+                                            <i class="bi bi-image text-gray-300 text-xs"></i>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <a href="{% url 'posts:detail' post.pk %}" class="text-sm font-medium text-gray-800 hover:text-indigo-600 transition">{{ post.title|truncatechars:35 }}</a>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="text-xs font-semibold px-2.5 py-1 rounded-lg {% if post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                    {{ post.get_post_type_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="text-xs font-semibold px-2.5 py-1 rounded-lg {% if post.status == 'open' %}bg-amber-100 text-amber-700{% elif post.status == 'resolved' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                                    {{ post.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ post.created_at|date:"M d, Y" }}</td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="flex items-center justify-end gap-1">
+                                    <a href="{% url 'posts:edit' post.pk %}" class="p-2 rounded-lg hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 transition" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'posts:delete' post.pk %}" class="p-2 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-600 transition" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-12 text-center">
+                                <div class="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                                    <i class="bi bi-inbox text-gray-300"></i>
+                                </div>
+                                <p class="text-gray-400 text-sm">No posts yet</p>
+                                <a href="{% url 'posts:create' %}" class="inline-block mt-2 text-sm font-medium text-indigo-600 hover:text-indigo-700">Create your first post</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Tab -->
+    <div x-show="activeTab === 'activity'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h3 class="text-base font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                <i class="bi bi-clock-history text-indigo-500"></i> Full Activity Log
+            </h3>
+            <div class="space-y-0">
+                {% for activity in all_activities %}
+                <div class="timeline-line flex items-start gap-4 pb-6 last:pb-0">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm z-10
+                        {% if activity.activity_type == 'post_created' %}bg-emerald-100 text-emerald-600
+                        {% elif activity.activity_type == 'post_resolved' %}bg-blue-100 text-blue-600
+                        {% elif activity.activity_type == 'membership_purchased' %}bg-purple-100 text-purple-600
+                        {% elif activity.activity_type == 'profile_updated' %}bg-indigo-100 text-indigo-600
+                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                        <i class="bi {% if activity.activity_type == 'post_created' %}bi-plus-circle
+                                  {% elif activity.activity_type == 'post_resolved' %}bi-check-circle
+                                  {% elif activity.activity_type == 'membership_purchased' %}bi-gem
+                                  {% elif activity.activity_type == 'profile_updated' %}bi-person
+                                  {% else %}bi-arrow-right-circle{% endif %}"></i>
+                    </div>
+                    <div class="flex-1 min-w-0 pt-1">
+                        <p class="text-sm text-gray-700">{{ activity.description }}</p>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-xs text-gray-400">{{ activity.created_at|timesince }} ago</span>
+                            <span class="text-xs text-gray-300">&bull;</span>
+                            <span class="text-xs text-gray-400">{{ activity.created_at|date:"M d, Y h:i A" }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-12">
+                    <div class="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                        <i class="bi bi-clock-history text-2xl text-gray-300"></i>
+                    </div>
+                    <p class="text-gray-400 text-sm">No activity recorded yet</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
