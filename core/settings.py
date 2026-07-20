@@ -174,8 +174,9 @@ AWS_QUERYSTRING_AUTH = False
 AWS_S3_FILE_OVERWRITE = False
 AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
 
-# Local settings override (for demo/dev - not committed)
-try:
-    from local_settings import *  # noqa
-except ImportError:
-    pass
+# Local settings override (for demo/dev - only in local env)
+if os.environ.get('DJANGO_LOCAL', '').lower() in ('1', 'true', 'yes'):
+    try:
+        from local_settings import *  # noqa
+    except ImportError:
+        pass
