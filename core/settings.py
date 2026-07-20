@@ -117,7 +117,7 @@ STORAGES = {
     },
 }
 
-MEDIA_URL = f'{config("SUPABASE_S3_ENDPOINT")}/{config("SUPABASE_BUCKET")}/'
+MEDIA_URL = f'{config("SUPABASE_S3_ENDPOINT", default="https://localhost:8000")}/{config("SUPABASE_BUCKET", default="lostfind-media")}/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
