@@ -1,14 +1,14 @@
 <a href="/dashboard/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/dashboard/">
     <i class="bi bi-grid-1x2 text-lg" style="min-width:20px;"></i> <span>Dashboard</span>
 </a>
-<a href="/browse/?type=lost" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/browse/">
+<a href="/browse/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/browse/">
+    <i class="bi bi-collection text-lg" style="min-width:20px;"></i> <span>Browse Posts</span>
+</a>
+<a href="/browse/?type=lost" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/browse/?type=lost">
     <i class="bi bi-search text-lg" style="min-width:20px;"></i> <span>Lost Items</span>
 </a>
-<a href="/browse/?type=found" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/browse/">
+<a href="/browse/?type=found" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/browse/?type=found">
     <i class="bi bi-hand-index-thumb text-lg" style="min-width:20px;"></i> <span>Found Items</span>
-</a>
-<a href="/browse/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/browse/">
-    <i class="bi bi-collection text-lg" style="min-width:20px;"></i> <span>Browse All</span>
 </a>
 <a href="/post/create/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/post/create/">
     <i class="bi bi-plus-circle text-lg" style="min-width:20px;"></i> <span>Create Post</span>
@@ -19,8 +19,18 @@
 <a href="/notifications/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/notifications/">
     <i class="bi bi-bell text-lg" style="min-width:20px;"></i> <span>Notifications</span>
 </a>
-<a href="/membership/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/membership/">
+<a href="/messages/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/messages/">
+    <i class="bi bi-chat-dots text-lg" style="min-width:20px;"></i> <span>Messages</span>
+</a>
+{% if user.is_authenticated and user.role == 'admin' %}
+<a href="/dashboard/admin/memberships/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/dashboard/admin/memberships/">
+{% else %}
+<a href="/membership/manage/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/membership/manage/">
+{% endif %}
     <i class="bi bi-gem text-lg" style="min-width:20px;"></i> <span>Membership</span>
+</a>
+<a href="/recovery/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/recovery/">
+    <i class="bi bi-shield-check text-lg" style="min-width:20px;"></i> <span>Recovery</span>
 </a>
 <a href="/settings/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/settings/">
     <i class="bi bi-gear text-lg" style="min-width:20px;"></i> <span>Settings</span>
@@ -28,10 +38,13 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    var path = window.location.pathname;
+    var current = window.location.pathname + window.location.search;
     document.querySelectorAll('[data-url]').forEach(function(el) {
         var url = el.getAttribute('data-url');
-        if (path === url || (path.startsWith(url) && url !== '/')) {
+        var base = url.split('?')[0];
+        if (current === url) {
+            el.classList.add('text-white', 'bg-white/5');
+        } else if (base === current && base !== '/') {
             el.classList.add('text-white', 'bg-white/5');
         }
     });

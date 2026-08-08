@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'apps.notifications',
     'apps.pages',
     'apps.recovery',
+    'apps.messaging',
     'storages',
 ]
 

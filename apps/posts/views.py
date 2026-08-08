@@ -7,6 +7,7 @@ from django.core.paginator import Paginator
 from .models import Post, Category, CampusLocation
 from .forms import PostForm
 from apps.accounts.models import UserActivity
+from apps.accounts.decorators import membership_required
 from apps.ai_engine.utils import find_matches_for_post
 
 
@@ -57,6 +58,16 @@ def post_detail(request, pk):
     post = get_object_or_404(Post, pk=pk)
     post.views_count += 1
     post.save()
+    can_view_full = False
+    if request.user.is_authenticated:
+        if request.user == post.user:
+            can_view_full = True
+        elif request.user.is_superuser or request.user.is_staff:
+            can_view_full = True
+        else:
+            membership = getattr(request.user, 'membership', None)
+            if membership and membership.is_active:
+                can_view_full = True
     related_posts = Post.objects.filter(category=post.category).exclude(pk=post.pk)[:4]
     from apps.ai_engine.models import MatchSuggestion
     ai_matches_qs = MatchSuggestion.objects.filter(
@@ -70,10 +81,11 @@ def post_detail(request, pk):
         'post': post,
         'related_posts': related_posts,
         'ai_matches': ai_matches,
+        'can_view_full': can_view_full,
     })
 
 
-@login_required
+@membership_required
 def create_post(request):
     if request.method == 'POST':
         form = PostForm(request.POST, request.FILES)
@@ -92,7 +104,7 @@ def create_post(request):
     return render(request, 'posts/create.html', {'form': form, 'is_edit': False})
 
 
-@login_required
+@membership_required
 def edit_post(request, pk):
     post = get_object_or_404(Post, pk=pk, user=request.user)
     if request.method == 'POST':
@@ -107,7 +119,7 @@ def edit_post(request, pk):
     return render(request, 'posts/create.html', {'form': form, 'is_edit': True, 'post': post})
 
 
-@login_required
+@membership_required
 def delete_post(request, pk):
     post = get_object_or_404(Post, pk=pk, user=request.user)
     if request.method == 'POST':
@@ -118,7 +130,7 @@ def delete_post(request, pk):
     return render(request, 'posts/confirm_delete.html', {'post': post})
 
 
-@login_required
+@membership_required
 def mark_resolved(request, pk):
     post = get_object_or_404(Post, pk=pk, user=request.user)
     post.status = 'resolved'

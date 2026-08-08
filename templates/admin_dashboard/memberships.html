@@ -1,0 +1,93 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Membership Management{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                    <i class="bi bi-people text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ total_members }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Total Memberships</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-success flex items-center justify-center">
+                    <i class="bi bi-gem text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ active_members }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Active</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-danger flex items-center justify-center">
+                    <i class="bi bi-x-circle text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ expired_members }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Inactive / Expired</h3>
+        </div>
+    </div>
+
+    <!-- Memberships Table -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-gray-800">All Memberships</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-100">
+                        <th class="pb-3 font-medium">User</th>
+                        <th class="pb-3 font-medium">Plan</th>
+                        <th class="pb-3 font-medium">Status</th>
+                        <th class="pb-3 font-medium">Started</th>
+                        <th class="pb-3 font-medium">Expires</th>
+                        <th class="pb-3 font-medium">Days Left</th>
+                        <th class="pb-3 font-medium">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in memberships %}
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-medium">{{ m.user.get_full_name|default:m.user.username|first|upper }}</div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-800">{{ m.user.get_full_name|default:m.user.username }}</p>
+                                    <p class="text-xs text-gray-400">{{ m.user.email }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3 text-sm text-gray-600">{{ m.plan.name|default:'—' }}</td>
+                        <td class="py-3">
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg {% if m.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                                {% if m.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
+                        </td>
+                        <td class="py-3 text-sm text-gray-500">{{ m.started_at|date:"M d, Y"|default:'—' }}</td>
+                        <td class="py-3 text-sm text-gray-500">{{ m.expires_at|date:"M d, Y"|default:'—' }}</td>
+                        <td class="py-3 text-sm font-medium {% if m.days_remaining <= 0 %}text-red-600{% else %}text-gray-700{% endif %}">{{ m.days_remaining }}</td>
+                        <td class="py-3">
+                            <a href="{% url 'dashboard:admin_user_detail' m.user.pk %}" class="text-indigo-500 hover:text-indigo-700 text-sm font-medium">Manage</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-gray-400">No memberships found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

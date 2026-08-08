@@ -51,7 +51,7 @@ def user_dashboard(request):
             {'url': '/my-posts/', 'label': 'My Posts', 'icon': 'bi bi-file-earmark-text'},
             {'url': '/post/create/', 'label': 'Create Post', 'icon': 'bi bi-plus-circle'},
             {'url': '/ai/matches/', 'label': 'AI Matches', 'icon': 'bi bi-robot'},
-            {'url': '/membership/', 'label': 'Membership', 'icon': 'bi bi-gem'},
+            {'url': '/membership/manage/', 'label': 'Membership', 'icon': 'bi bi-gem'},
             {'url': '/notifications/', 'label': 'Notifications', 'icon': 'bi bi-bell'},
             {'url': '/profile/', 'label': 'Profile', 'icon': 'bi bi-person'},
             {'url': '/settings/', 'label': 'Settings', 'icon': 'bi bi-gear'},
@@ -123,6 +123,7 @@ ADMIN_SIDEBAR = [
     {'url': '/dashboard/admin/posts/', 'label': 'Posts', 'icon': 'bi bi-file-earmark-text'},
     {'url': '/dashboard/admin/categories/', 'label': 'Categories', 'icon': 'bi bi-tags'},
     {'url': '/dashboard/admin/locations/', 'label': 'Locations', 'icon': 'bi bi-geo-alt'},
+    {'url': '/dashboard/admin/memberships/', 'label': 'Memberships', 'icon': 'bi bi-gem'},
     {'url': '/dashboard/admin/payments/', 'label': 'Payments', 'icon': 'bi bi-credit-card'},
     {'url': '/dashboard/admin/reports/', 'label': 'Reports', 'icon': 'bi bi-bar-chart'},
     {'url': '/dashboard/admin/analytics/', 'label': 'Analytics', 'icon': 'bi bi-graph-up'},
@@ -153,6 +154,7 @@ def admin_users(request):
 @user_passes_test(is_admin)
 def admin_user_detail(request, pk):
     from apps.payments.models import Payment
+    from apps.membership.models import MembershipPlan
     user = get_object_or_404(User, pk=pk)
     user_posts = Post.objects.filter(user=user)
     user_payments = Payment.objects.filter(user=user)
@@ -171,6 +173,7 @@ def admin_user_detail(request, pk):
         'resolved_posts': resolved_posts,
         'payment_count': payment_count,
         'total_posts': user_posts.count(),
+        'plans': MembershipPlan.objects.filter(is_active=True),
         'sidebar_items': ADMIN_SIDEBAR,
     })
 
@@ -381,6 +384,63 @@ def admin_analytics(request):
 @user_passes_test(is_admin)
 def admin_settings(request):
     return render(request, 'admin_dashboard/settings.html', {'sidebar_items': ADMIN_SIDEBAR})
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_memberships(request):
+    from django.db.models import Count
+    memberships = Membership.objects.select_related('user', 'plan').order_by('-created_at')
+    total_members = memberships.count()
+    active_members = memberships.filter(is_active=True).count()
+    expired_members = total_members - active_members
+    return render(request, 'admin_dashboard/memberships.html', {
+        'memberships': memberships,
+        'total_members': total_members,
+        'active_members': active_members,
+        'expired_members': expired_members,
+        'sidebar_items': ADMIN_SIDEBAR,
+    })
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_update_membership(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    membership = getattr(user, 'membership', None)
+    from apps.membership.models import MembershipPlan
+
+    if request.method == 'POST':
+        is_active = request.POST.get('is_active') == 'on'
+        plan_id = request.POST.get('plan')
+        started_at_str = request.POST.get('started_at')
+        expires_at_str = request.POST.get('expires_at')
+
+        plan = MembershipPlan.objects.filter(pk=plan_id).first() if plan_id else None
+        if is_active and not plan:
+            messages.error(request, 'Please select a plan for active membership.')
+            return redirect('dashboard:admin_user_detail', pk=pk)
+
+        started_at = timezone.datetime.strptime(started_at_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone()) if started_at_str else None
+        expires_at = timezone.datetime.strptime(expires_at_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone()) if expires_at_str else None
+
+        if is_active and (not started_at or not expires_at):
+            messages.error(request, 'Start and expiry dates are required for active membership.')
+            return redirect('dashboard:admin_user_detail', pk=pk)
+
+        if membership:
+            membership.plan = plan
+            membership.is_active = is_active
+            membership.started_at = started_at
+            membership.expires_at = expires_at
+            membership.save()
+        else:
+            Membership.objects.create(
+                user=user, plan=plan, is_active=is_active,
+                started_at=started_at, expires_at=expires_at
+            )
+        messages.success(request, f'Membership updated for {user.username}.')
+    return redirect('dashboard:admin_user_detail', pk=pk)
 
 
 @login_required

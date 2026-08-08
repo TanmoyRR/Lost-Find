@@ -4,6 +4,7 @@ import base64
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from apps.accounts.decorators import membership_required
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
@@ -71,7 +72,7 @@ def recovery_detail(request, uid):
         'sidebar_items': get_sidebar(request.user),
     })
 
-@login_required
+@membership_required
 def initiate_recovery(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
     if post.user == request.user:

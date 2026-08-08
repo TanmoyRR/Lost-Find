@@ -64,44 +64,54 @@
     </div>
 
     <!-- Desktop sidebar: expands on hover -->
-    <div class="fixed left-0 top-0 h-screen flex flex-col bg-[#0b1120] z-30"
-         x-data="{ expanded: false }"
-         @mouseenter="expanded = true"
-         @mouseleave="expanded = false"
+    <div class="sd fixed left-0 top-0 h-screen flex flex-col bg-[#0b1120] z-30"
+         x-data="{ expanded: false, hoverTimer: null }"
+         @mouseenter="hoverTimer = setTimeout(() => { expanded = true }, 150)"
+         @mouseleave="clearTimeout(hoverTimer); expanded = false"
+         :class="expanded ? 'sd-expanded' : ''"
          :style="expanded ? 'width: 260px;' : 'width: 72px;'"
-         style="width: 72px; transition: width 250ms cubic-bezier(0.4, 0, 0.2, 1);">
+         style="width: 72px;">
 
         <style>
-            .sd { transition: width 250ms cubic-bezier(0.4, 0, 0.2, 1); }
-            .sd-expanded .nl { opacity: 1; transform: translateX(0); }
-            .sd-expanded .ni { margin-right: 12px; }
-            .sd-expanded .pi { margin-right: 12px; }
-            .nl { opacity: 0; transform: translateX(-10px); transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap; }
-            .ni { transition: margin-right 250ms cubic-bezier(0.4, 0, 0.2, 1); }
-            .pi { transition: margin-right 250ms cubic-bezier(0.4, 0, 0.2, 1); min-width: 20px; display: flex; justify-content: center; }
-            .si { display: flex; align-items: center; width: 100%; padding: 9px 14px; border-radius: 10px; transition: all 200ms ease; color: #64748b; text-decoration: none; position: relative; overflow: hidden; margin: 1px 0; }
+            .sd { transition: width 280ms cubic-bezier(0.4, 0, 0.2, 1); }
+
+            /* Label – slide + fade: enters with delay, exits instantly */
+            .nl { opacity: 0; transform: translateX(-10px); transition: opacity 280ms cubic-bezier(0.4, 0, 0.2, 1), transform 280ms cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap; }
+            .sd-expanded .nl { opacity: 1; transform: translateX(0); transition-delay: 80ms; }
+
+            /* Nav item */
+            .si { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 14px; border-radius: 10px; color: #64748b; text-decoration: none; position: relative; overflow: hidden; margin: 1px 0; transition: background 200ms ease, color 200ms ease; }
             .si:hover { background: rgba(255,255,255,0.05); color: #e2e8f0; }
             .si:hover .sii { color: #a5b4fc; }
-            .sii { transition: color 200ms ease; min-width: 20px; display: flex; justify-content: center; font-size: 1.125rem; }
+
+            .sii { min-width: 20px; display: flex; justify-content: center; font-size: 1.125rem; transition: color 200ms ease; }
             .sil { transition: color 200ms ease; }
+
+            /* Active nav item */
             .si.active { background: linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.10) 100%); color: #e0e7ff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); }
-            .si.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: linear-gradient(180deg, #6366f1, #8b5cf6); box-shadow: 0 0 12px rgba(99,102,241,0.5); }
             .si.active .sii { color: #a5b4fc; }
             .si.active .sil { color: #e0e7ff; font-weight: 500; }
+
+            /* Active indicator bar – fades in/out smoothly */
+            .si::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: linear-gradient(180deg, #6366f1, #8b5cf6); box-shadow: 0 0 12px rgba(99,102,241,0.5); opacity: 0; transition: opacity 200ms ease; }
+            .si.active::before { opacity: 1; }
         </style>
 
         <!-- Logo Section -->
         <div class="flex items-center flex-shrink-0 h-16 px-0 border-b border-white/[0.06]"
              :style="expanded ? 'padding-left: 18px; padding-right: 18px;' : 'justify-content: center;'">
             <a href="{% url 'dashboard:home' %}" class="flex items-center gap-3 overflow-hidden"
-               :style="expanded ? 'width: auto;' : 'justify-content: center; width: 72px;'"
+               :style="expanded ? 'justify-content: flex-start;' : 'justify-content: center; width: 72px;'"
                style="justify-content: center; width: 72px;">
                 <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20">
                     <i class="bi bi-shield-check text-white text-sm"></i>
                 </div>
-                <div class="overflow-hidden" :style="expanded ? 'width: auto;' : 'width: 0;'" style="width: 0;">
-                    <p class="text-white font-bold text-sm leading-tight" :class="expanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'" style="transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap;">CampusFind</p>
-                    <p class="text-gray-500 text-[11px]" :class="expanded ? 'opacity-100' : 'opacity-0'" style="transition: opacity 250ms ease-out 50ms; white-space: nowrap;">Lost & Found</p>
+                <div class="overflow-hidden"
+                     :style="expanded ? 'max-width: 160px; opacity: 1;' : 'max-width: 0; opacity: 0;'"
+                     style="max-width: 0; opacity: 0; transition: all 280ms cubic-bezier(0.4, 0, 0.2, 1);">
+                    <p class="text-white font-bold text-sm leading-tight whitespace-nowrap">CampusFind</p>
+                    <p class="text-gray-500 text-[11px] whitespace-nowrap"
+                       style="transition: opacity 200ms ease; transition-delay: 100ms;">Lost & Found</p>
                 </div>
             </a>
         </div>
@@ -118,7 +128,9 @@
                     </div>
                     <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#0b1120]"></span>
                 </div>
-                <div class="overflow-hidden min-w-0" :style="expanded ? 'width: auto; opacity: 1;' : 'width: 0; opacity: 0;'" style="width: 0; opacity: 0; transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);">
+                <div class="overflow-hidden min-w-0"
+                     :style="expanded ? 'max-width: 180px; opacity: 1;' : 'max-width: 0; opacity: 0;'"
+                     style="max-width: 0; opacity: 0; transition: all 280ms cubic-bezier(0.4, 0, 0.2, 1);">
                     <p class="text-white text-sm font-semibold truncate">{{ user.get_full_name|default:user.username }}</p>
                     <div class="flex items-center gap-2 mt-0.5">
                         <span class="text-gray-400 text-[11px]">{{ user.get_role_display }}</span>
@@ -145,17 +157,17 @@
                 <i class="bi bi-grid-1x2 sii"></i>
                 <span class="sil nl text-sm font-medium">Dashboard</span>
             </a>
-            <a href="/browse/?type=lost" class="si" data-url="/browse/">
+            <a href="/browse/" class="si" data-url="/browse/">
+                <i class="bi bi-collection sii"></i>
+                <span class="sil nl text-sm font-medium">Browse Posts</span>
+            </a>
+            <a href="/browse/?type=lost" class="si" data-url="/browse/?type=lost">
                 <i class="bi bi-search sii"></i>
                 <span class="sil nl text-sm font-medium">Lost Items</span>
             </a>
-            <a href="/browse/?type=found" class="si" data-url="/browse/">
+            <a href="/browse/?type=found" class="si" data-url="/browse/?type=found">
                 <i class="bi bi-hand-index-thumb sii"></i>
                 <span class="sil nl text-sm font-medium">Found Items</span>
-            </a>
-            <a href="/browse/" class="si" data-url="/browse/">
-                <i class="bi bi-collection sii"></i>
-                <span class="sil nl text-sm font-medium">Browse All</span>
             </a>
             <a href="/post/create/" class="si" data-url="/post/create/">
                 <i class="bi bi-plus-circle sii"></i>
@@ -169,9 +181,21 @@
                 <i class="bi bi-bell sii"></i>
                 <span class="sil nl text-sm font-medium">Notifications</span>
             </a>
-            <a href="/membership/" class="si" data-url="/membership/">
+            <a href="/messages/" class="si" data-url="/messages/">
+                <i class="bi bi-chat-dots sii"></i>
+                <span class="sil nl text-sm font-medium">Messages</span>
+            </a>
+            {% if user.is_authenticated and user.role == 'admin' %}
+            <a href="/dashboard/admin/memberships/" class="si" data-url="/dashboard/admin/memberships/">
+            {% else %}
+            <a href="/membership/manage/" class="si" data-url="/membership/manage/">
+            {% endif %}
                 <i class="bi bi-gem sii"></i>
                 <span class="sil nl text-sm font-medium">Membership</span>
+            </a>
+            <a href="/recovery/" class="si" data-url="/recovery/">
+                <i class="bi bi-shield-check sii"></i>
+                <span class="sil nl text-sm font-medium">Recovery</span>
             </a>
             <a href="/settings/" class="si" data-url="/settings/">
                 <i class="bi bi-gear sii"></i>
@@ -180,13 +204,13 @@
         </nav>
 
         <!-- Logout -->
-        <div class="flex-shrink-0 border-t border-white/[0.06] px-3 py-2">
+        <div class="flex-shrink-0 border-t border-white/[0.06] px-3 pt-1 pb-2">
             <a href="{% url 'accounts:logout' %}"
-               class="flex items-center rounded-xl transition-all duration-200 hover:bg-red-500/10"
-               :style="expanded ? 'padding: 10px 14px; gap: 12px;' : 'padding: 10px; justify-content: center;'"
-               style="padding: 10px; justify-content: center;">
-                <i class="bi bi-box-arrow-right sii text-red-400/70" style="min-width: 20px; display: flex; justify-content: center; font-size: 1.125rem;"></i>
-                <span class="nl text-sm font-medium text-red-400/70" :class="expanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'" style="transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap;">Log Out</span>
+               class="si"
+               :style="expanded ? 'gap: 12px;' : 'justify-content: center; gap: 0;'"
+               style="justify-content: center; gap: 0;">
+                <i class="bi bi-box-arrow-right sii text-red-400/70"></i>
+                <span class="sil nl text-sm font-medium text-red-400/70" :class="expanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'">Log Out</span>
             </a>
         </div>
     </div>
@@ -199,10 +223,13 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    var path = window.location.pathname;
+    var current = window.location.pathname + window.location.search;
     document.querySelectorAll('.si[data-url]').forEach(function(el) {
         var url = el.getAttribute('data-url');
-        if (path === url || (path.startsWith(url) && url !== '/')) {
+        var base = url.split('?')[0];
+        if (current === url) {
+            el.classList.add('active');
+        } else if (base === current && base !== '/') {
             el.classList.add('active');
         }
     });

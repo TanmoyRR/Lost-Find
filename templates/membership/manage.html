@@ -1,0 +1,167 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Manage Membership{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <div class="relative overflow-hidden rounded-2xl gradient-primary p-8 text-white">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+        <div class="relative z-10">
+            <h1 class="text-2xl font-bold mb-2">Manage Membership</h1>
+            <p class="text-white/80">
+                {% if membership and membership.is_active %}
+                    View and manage your active membership.
+                {% else %}
+                    You don't have an active membership. Explore plans below.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    {% if membership and membership.is_active %}
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                    <i class="bi bi-gem text-2xl text-emerald-600"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-gray-800">{{ membership.plan.name|default:"Annual" }} Plan</h3>
+                    <p class="text-sm text-gray-500">Your membership is active</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-gray-500">Expires in</p>
+                <p class="text-xl font-bold text-gray-800">{{ membership.days_remaining }} days</p>
+                {% if membership.expires_at %}
+                <p class="text-xs text-gray-400">{{ membership.expires_at|date:"M d, Y" }}</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="mt-4 w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+            <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" style="width: {{ membership.days_remaining }}%"></div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                    <i class="bi bi-calendar-check"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500">Started</p>
+                    <p class="text-sm font-semibold text-gray-800">{{ membership.started_at|date:"M d, Y" }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500">Days Remaining</p>
+                    <p class="text-sm font-semibold text-gray-800">{{ membership.days_remaining }} days</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500">Status</p>
+                    <p class="text-sm font-semibold text-emerald-600">Active</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Your Membership Benefits</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <i class="bi bi-telephone"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-800">View Contact Info</p>
+                    <p class="text-xs text-gray-500">See contact details of post owners</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <i class="bi bi-robot"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-800">AI Matches</p>
+                    <p class="text-xs text-gray-500">Get automatic match suggestions</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <i class="bi bi-megaphone"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-800">Priority Support</p>
+                    <p class="text-xs text-gray-500">Get help faster when you need it</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- No membership - show plans -->
+    <div class="text-center py-8">
+        <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <i class="bi bi-gem text-3xl text-gray-400"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-800 mb-2">No Active Membership</h3>
+        <p class="text-sm text-gray-500 mb-6">Purchase a membership to unlock all premium features.</p>
+        <a href="{% url 'membership:index' %}" class="inline-flex items-center gap-2 gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-200">
+            <i class="bi bi-gem"></i> View Membership Plans
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Payment History -->
+    {% if payments %}
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Payment History</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-100">
+                        <th class="pb-3 font-medium">Date</th>
+                        <th class="pb-3 font-medium">Amount</th>
+                        <th class="pb-3 font-medium">Status</th>
+                        <th class="pb-3 font-medium">Transaction</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in payments %}
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3 text-gray-600">{{ payment.created_at|date:"M d, Y" }}</td>
+                        <td class="py-3 font-medium text-gray-800">{{ payment.amount }} BDT</td>
+                        <td class="py-3">
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg {% if payment.status == 'completed' %}bg-emerald-100 text-emerald-700{% elif payment.status == 'pending' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
+                                {{ payment.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="py-3 text-gray-500 font-mono text-xs">{{ payment.transaction_id|truncatechars:16|default:'—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

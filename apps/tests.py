@@ -133,6 +133,11 @@ class TestPostLifecycle(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(username='poster', password='testpass')
+        from apps.membership.models import Membership, MembershipPlan
+        plan = MembershipPlan.objects.create(name='Annual Membership', price=100, duration_days=365)
+        Membership.objects.create(user=self.user, plan=plan, is_active=True,
+                                  started_at=timezone.now(),
+                                  expires_at=timezone.now() + timedelta(days=365))
         self.client.login(username='poster', password='testpass')
         from apps.posts.models import Category, CampusLocation
         self.category = Category.objects.create(name='Electronics', slug='electronics')
@@ -356,7 +361,7 @@ class TestMembership(TestCase):
     def test_membership_page_loads(self):
         response = self.client.get(reverse('membership:index'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Premium Monthly')
+        self.assertContains(response, 'Annual Membership')
 
     def test_purchase_initiation_creates_membership(self):
         response = self.client.get(reverse('membership:purchase', kwargs={'plan_id': self.plan.pk}))
@@ -585,6 +590,14 @@ class TestRecoverySystem(TestCase):
         self.client = Client()
         self.owner = User.objects.create_user(username='owner', password='testpass')
         self.claimant = User.objects.create_user(username='claimant', password='testpass')
+        from apps.membership.models import Membership, MembershipPlan
+        plan = MembershipPlan.objects.create(name='Annual Membership', price=100, duration_days=365)
+        Membership.objects.create(user=self.owner, plan=plan, is_active=True,
+                                  started_at=timezone.now(),
+                                  expires_at=timezone.now() + timedelta(days=365))
+        Membership.objects.create(user=self.claimant, plan=plan, is_active=True,
+                                  started_at=timezone.now(),
+                                  expires_at=timezone.now() + timedelta(days=365))
         from apps.posts.models import Post
         self.post = Post.objects.create(
             user=self.owner, title='Recoverable Item', description='Test',
@@ -614,3 +627,134 @@ class TestRecoverySystem(TestCase):
         self.client.login(username='owner', password='testpass')
         response = self.client.get(reverse('recovery:list'))
         self.assertEqual(response.status_code, 200)
+
+
+# ========================
+# MEMBERSHIP GATING
+# ========================
+
+class TestMembershipGating(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.member = User.objects.create_user(username='member', password='testpass', email='member@test.com')
+        self.non_member = User.objects.create_user(username='nonmember', password='testpass', email='nonmember@test.com')
+        self.admin = User.objects.create_superuser(username='admin', password='testpass', email='admin@test.com')
+        from apps.membership.models import Membership, MembershipPlan
+        plan = MembershipPlan.objects.create(name='Annual Membership', price=100, duration_days=365)
+        Membership.objects.create(user=self.member, plan=plan, is_active=True,
+                                  started_at=timezone.now(),
+                                  expires_at=timezone.now() + timedelta(days=365))
+        from apps.posts.models import Post, Category, CampusLocation
+        self.category = Category.objects.create(name='Electronics', slug='electronics')
+        self.location = CampusLocation.objects.create(name='Library', slug='library')
+        self.post = Post.objects.create(
+            user=self.member, title='Test Item', description='Test',
+            post_type='lost', category=self.category, location=self.location,
+            date_lost_found=timezone.now().date()
+        )
+
+    def test_non_member_cannot_create_post(self):
+        self.client.login(username='nonmember', password='testpass')
+        response = self.client.get(reverse('posts:create'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_member_can_create_post(self):
+        self.client.login(username='member', password='testpass')
+        response = self.client.get(reverse('posts:create'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_admin_bypasses_membership_check(self):
+        self.client.login(username='admin', password='testpass')
+        response = self.client.get(reverse('posts:create'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_non_member_cannot_initiate_recovery(self):
+        self.client.login(username='nonmember', password='testpass')
+        response = self.client.get(reverse('recovery:initiate', args=[self.post.pk]))
+        self.assertEqual(response.status_code, 302)
+
+    def test_member_cannot_claim_own_post(self):
+        self.client.login(username='member', password='testpass')
+        response = self.client.get(reverse('recovery:initiate', args=[self.post.pk]))
+        msgs = list(response.wsgi_request._messages)
+        self.assertTrue(any('cannot claim' in str(m).lower() for m in msgs))
+
+    def test_non_member_gets_limited_post_detail(self):
+        response = self.client.get(reverse('posts:detail', args=[self.post.pk]))
+        self.assertContains(response, 'Full Details Hidden')
+
+    def test_member_sees_full_post_detail(self):
+        self.client.login(username='member', password='testpass')
+        response = self.client.get(reverse('posts:detail', args=[self.post.pk]))
+        self.assertNotContains(response, 'Full Details Hidden')
+
+
+# ========================
+# DIRECT MESSAGING
+# ========================
+
+class TestMessaging(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user1 = User.objects.create_user(username='user1', password='testpass', email='user1@test.com')
+        self.user2 = User.objects.create_user(username='user2', password='testpass', email='user2@test.com')
+        from apps.posts.models import Post, Category, CampusLocation
+        from apps.membership.models import Membership, MembershipPlan
+        self.category = Category.objects.create(name='Electronics', slug='electronics')
+        self.location = CampusLocation.objects.create(name='Library', slug='library')
+        self.post = Post.objects.create(
+            user=self.user1, title='Test Item', description='Test',
+            post_type='lost', category=self.category, location=self.location,
+            date_lost_found=timezone.now().date()
+        )
+        plan = MembershipPlan.objects.create(name='Annual Membership', price=100, duration_days=365)
+        Membership.objects.create(user=self.user2, plan=plan, is_active=True,
+                                  started_at=timezone.now(),
+                                  expires_at=timezone.now() + timedelta(days=365))
+        Membership.objects.create(user=self.user1, plan=plan, is_active=True,
+                                  started_at=timezone.now(),
+                                  expires_at=timezone.now() + timedelta(days=365))
+
+    def test_inbox_requires_login(self):
+        response = self.client.get(reverse('messaging:inbox'))
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_inbox_shows_no_conversations(self):
+        self.client.login(username='user1', password='testpass')
+        response = self.client.get(reverse('messaging:inbox'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'No conversations yet')
+
+    def test_start_conversation_creates_conv(self):
+        self.client.login(username='user2', password='testpass')
+        response = self.client.get(reverse('messaging:start', args=[self.post.pk, self.user1.pk]))
+        self.assertEqual(response.status_code, 302)
+        from apps.messaging.models import Conversation
+        self.assertTrue(Conversation.objects.filter(participants=self.user1).filter(participants=self.user2).exists())
+
+    def test_send_message(self):
+        self.client.login(username='user2', password='testpass')
+        response = self.client.get(reverse('messaging:start', args=[self.post.pk, self.user1.pk]))
+        from apps.messaging.models import Conversation
+        conv = Conversation.objects.filter(participants=self.user1).filter(participants=self.user2).first()
+        response = self.client.post(reverse('messaging:detail', args=[conv.pk]), {'body': 'Hello!'})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(conv.messages.count(), 1)
+        self.assertEqual(conv.messages.first().body, 'Hello!')
+
+    def test_self_conversation_not_allowed(self):
+        self.client.login(username='user1', password='testpass')
+        response = self.client.get(reverse('messaging:start', args=[self.post.pk, self.user1.pk]))
+        msgs = list(response.wsgi_request._messages)
+        self.assertTrue(any('yourself' in str(m).lower() for m in msgs))
+
+    def test_messages_marked_read(self):
+        self.client.login(username='user2', password='testpass')
+        self.client.get(reverse('messaging:start', args=[self.post.pk, self.user1.pk]))
+        from apps.messaging.models import Conversation, Message
+        conv = Conversation.objects.filter(participants=self.user1).filter(participants=self.user2).first()
+        Message.objects.create(conversation=conv, sender=self.user1, body='Test message')
+        self.client.login(username='user2', password='testpass')
+        response = self.client.get(reverse('messaging:detail', args=[conv.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(conv.messages.filter(is_read=False).exclude(sender=self.user2).count(), 0)

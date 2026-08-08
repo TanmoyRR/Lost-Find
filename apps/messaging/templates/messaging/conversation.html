@@ -1,0 +1,51 @@
+{% extends 'base/base.html' %}{% load static %}
+{% block title %}Conversation - IUBAT Lost & Find{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+  <div class="mb-4">
+    <a href="{% url 'messaging:inbox' %}" class="text-sm text-blue-600 hover:text-blue-700">&larr; Back to Inbox</a>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+          <span class="text-blue-600 font-semibold">{{ other.get_full_name|default:other.username|first|upper }}</span>
+        </div>
+        <div>
+          <h2 class="font-semibold text-gray-900">{{ other.get_full_name|default:other.username }}</h2>
+          {% if conversation.subject %}
+            <p class="text-xs text-gray-400">{{ conversation.subject }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="px-6 py-4 h-96 overflow-y-auto space-y-4" id="message-list">
+      {% for msg in messages %}
+        <div class="flex {% if msg.sender == request.user %}justify-end{% endif %}">
+          <div class="max-w-[75%] {% if msg.sender == request.user %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-800{% endif %} rounded-2xl px-4 py-2.5">
+            <p class="text-sm">{{ msg.body }}</p>
+            <p class="text-xs mt-1 opacity-70">{{ msg.created_at|time:"g:i A" }}</p>
+          </div>
+        </div>
+      {% empty %}
+        <div class="text-center py-8 text-gray-400">
+          <p>No messages yet. Say hello!</p>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="px-6 py-4 border-t border-gray-100">
+      <form method="POST" class="flex gap-3">
+        {% csrf_token %}
+        <input type="text" name="body" required placeholder="Type a message..." class="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+        <button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">Send</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+  const list = document.getElementById('message-list');
+  if (list) list.scrollTop = list.scrollHeight;
+</script>
+{% endblock %}

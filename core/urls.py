@@ -14,6 +14,7 @@ urlpatterns = [
     path('', include('apps.pages.urls', namespace='pages')),
     path('', include('apps.accounts.dashboard_urls', namespace='dashboard')),
     path('recovery/', include('apps.recovery.urls', namespace='recovery')),
+    path('messages/', include('apps.messaging.urls', namespace='messaging')),
 ]
 
 if settings.DEBUG:

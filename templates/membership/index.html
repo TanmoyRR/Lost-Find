@@ -43,38 +43,55 @@
     </div>
     {% endif %}
 
-    <!-- Plans Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-        {% for plan in plans %}
+    <!-- Annual Membership Plan -->
+    {% with annual_plan=plans|dictsort:"price"|last %}
+    <div class="max-w-md mx-auto">
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
             <div class="p-6">
-                <div class="w-12 h-12 rounded-xl {% if plan.price > 0 %}gradient-primary{% else %}bg-gray-100{% endif %} flex items-center justify-center mb-4">
-                    <i class="bi {% if plan.price > 0 %}bi-gem text-white{% else %}bi-person text-gray-600{% endif %} text-xl"></i>
+                <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center mb-4">
+                    <i class="bi bi-gem text-white text-xl"></i>
                 </div>
-                <h3 class="text-lg font-bold text-gray-800">{{ plan.name }}</h3>
-                <p class="text-3xl font-bold text-gray-800 mt-2">{{ plan.price|floatformat:0 }} <span class="text-base font-normal text-gray-400">BDT</span></p>
-                <p class="text-sm text-gray-500 mt-1">{{ plan.duration_days }} days</p>
-                {% if plan.description %}
-                <p class="text-sm text-gray-600 mt-3">{{ plan.description }}</p>
+                <h3 class="text-lg font-bold text-gray-800">Annual Membership</h3>
+                <p class="text-sm text-gray-500 mt-1">Full access to all features for one year</p>
+                {% if annual_plan %}
+                <p class="text-3xl font-bold text-gray-800 mt-4">{{ annual_plan.price|floatformat:0 }} <span class="text-base font-normal text-gray-400">BDT</span></p>
+                <p class="text-sm text-gray-500 mt-1">{{ annual_plan.duration_days }} days validity</p>
                 {% endif %}
+                <ul class="mt-6 space-y-3">
+                    <li class="flex items-center gap-3 text-sm text-gray-600">
+                        <i class="bi bi-check-circle text-emerald-500"></i> Create and manage lost & found posts
+                    </li>
+                    <li class="flex items-center gap-3 text-sm text-gray-600">
+                        <i class="bi bi-check-circle text-emerald-500"></i> View full contact details
+                    </li>
+                    <li class="flex items-center gap-3 text-sm text-gray-600">
+                        <i class="bi bi-check-circle text-emerald-500"></i> Direct messaging with other users
+                    </li>
+                    <li class="flex items-center gap-3 text-sm text-gray-600">
+                        <i class="bi bi-check-circle text-emerald-500"></i> Initiate recovery sessions
+                    </li>
+                    <li class="flex items-center gap-3 text-sm text-gray-600">
+                        <i class="bi bi-check-circle text-emerald-500"></i> AI-powered match suggestions
+                    </li>
+                    <li class="flex items-center gap-3 text-sm text-gray-600">
+                        <i class="bi bi-check-circle text-emerald-500"></i> Priority support
+                    </li>
+                </ul>
             </div>
             <div class="px-6 pb-6">
-                {% if membership and membership.plan == plan and membership.is_active %}
-                <div class="block w-full py-2.5 rounded-xl text-sm font-medium text-center bg-emerald-100 text-emerald-700 cursor-default">Current Plan</div>
-                {% else %}
-                <a href="{% url 'membership:purchase' plan.pk %}" class="block w-full py-2.5 rounded-xl text-sm font-medium text-center {% if plan.price > 0 %}gradient-primary text-white hover:shadow-lg hover:shadow-indigo-500/25{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %} transition">
-                    {% if plan.price > 0 %}Purchase{% else %}Free{% endif %}
+                {% if membership and membership.is_active %}
+                <div class="block w-full py-2.5 rounded-xl text-sm font-medium text-center bg-emerald-100 text-emerald-700 cursor-default">
+                    <i class="bi bi-check"></i> Active — {{ membership.days_remaining }} days remaining
+                </div>
+                {% elif annual_plan %}
+                <a href="{% url 'membership:purchase' annual_plan.pk %}" class="block w-full py-2.5 rounded-xl text-sm font-medium text-center gradient-primary text-white hover:shadow-lg hover:shadow-indigo-500/25 transition">
+                    <i class="bi bi-gem"></i> Purchase Annual Membership
                 </a>
                 {% endif %}
             </div>
         </div>
-        {% empty %}
-        <div class="col-span-full text-center py-12 text-gray-400">
-            <i class="bi bi-credit-card-2-front text-4xl block mb-3"></i>
-            <p>No membership plans available at the moment.</p>
-        </div>
-        {% endfor %}
     </div>
+    {% endwith %}
 
     <!-- Features -->
     {% if membership and membership.is_active %}
