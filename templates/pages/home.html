@@ -125,6 +125,58 @@
     </div>
 </section>
 
+<!-- Recent Lost Items -->
+<section class="py-20 sm:py-28 bg-gradient-to-br from-indigo-50 via-purple-50 to-indigo-100">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+            <span class="inline-flex items-center gap-2 gradient-primary text-white px-4 py-1.5 rounded-full text-sm font-medium mb-4">
+                <i class="bi bi-search"></i> Recently Reported
+            </span>
+            <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Latest Lost & Found Items</h2>
+            <p class="text-gray-500 text-lg">Check out the items most recently reported on campus.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for post in recent_posts %}
+            <a href="{% url 'posts:detail' post.pk %}" class="block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 card-hover">
+                {% if post.image %}
+                <div class="h-48 bg-gray-100 overflow-hidden">
+                    <img src="{{ post.image.url }}" alt="{{ post.title }}" class="w-full h-full object-cover">
+                </div>
+                {% else %}
+                <div class="h-48 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center">
+                    <i class="bi bi-image text-4xl text-gray-300"></i>
+                </div>
+                {% endif %}
+                <div class="p-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-full {% if post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ post.get_post_type_display }}</span>
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-full {% if post.status == 'open' %}bg-amber-100 text-amber-700{% elif post.status == 'resolved' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ post.get_status_display }}</span>
+                    </div>
+                    <h3 class="font-semibold text-gray-800 text-sm mb-1">{{ post.title|truncatechars:50 }}</h3>
+                    <p class="text-xs text-gray-500 line-clamp-2">{{ post.description|truncatechars:100 }}</p>
+                    <div class="flex items-center gap-3 mt-3 text-xs text-gray-400">
+                        <span><i class="bi bi-geo-alt mr-1"></i>{{ post.location.name|default:'N/A' }}</span>
+                        <span><i class="bi bi-calendar mr-1"></i>{{ post.created_at|date:"M d, Y" }}</span>
+                    </div>
+                </div>
+            </a>
+            {% empty %}
+            <div class="col-span-full text-center py-12">
+                <div class="w-20 h-20 rounded-2xl bg-indigo-100 flex items-center justify-center mx-auto mb-4">
+                    <i class="bi bi-inbox text-3xl text-indigo-500"></i>
+                </div>
+                <p class="text-gray-500 text-sm">No items reported yet. Be the first to post!</p>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="text-center mt-12">
+            <a href="{% url 'posts:browse' %}" class="inline-flex items-center gap-2 gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-semibold hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-300">
+                <i class="bi bi-grid-3x3-gap text-xl"></i> Browse All Items
+            </a>
+        </div>
+    </div>
+</section>
+
 <!-- CTA Section (moved up) -->
 <section class="py-20 sm:py-28">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

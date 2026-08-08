@@ -1,18 +1,12 @@
-import random
-import io
-import base64
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from apps.accounts.decorators import membership_required
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
-from django.views.decorators.http import require_POST
-from django.core.mail import send_mail
-from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
-from .models import RecoverySession, RecoveryOTP, RecoveryVerificationLog, RecoveryConfirmation
+from .models import RecoverySession, RecoveryVerificationLog, RecoveryConfirmation
 from apps.posts.models import Post
 from apps.accounts.models import User, UserActivity
 from apps.notifications.models import Notification
@@ -67,8 +61,19 @@ def recovery_detail(request, uid):
     if request.user not in [session.claimant, session.owner]:
         messages.error(request, 'You do not have access to this recovery session.')
         return redirect('recovery:list')
+    order = ['pending', 'qr_generated', 'qr_scanned', 'handover_verified', 'completed']
+    idx = order.index(session.status) if session.status in order else 0
+    flow = [
+        ('Claimed', 'bi-person-check'),
+        ('QR Generated', 'bi-qr-code'),
+        ('QR Scanned', 'bi-qr-code-scan'),
+        ('Handover Verified', 'bi-check2-circle'),
+        ('Completed', 'bi-flag'),
+    ]
+    steps = [{'label': label, 'icon': icon, 'done': i < idx or session.status == 'completed'} for i, (label, icon) in enumerate(flow)]
     return render(request, 'recovery/recovery_detail.html', {
         'session': session,
+        'steps': steps,
         'sidebar_items': get_sidebar(request.user),
     })
 
@@ -78,7 +83,7 @@ def initiate_recovery(request, post_id):
     if post.user == request.user:
         messages.error(request, 'You cannot claim your own post.')
         return redirect('posts:detail', pk=post_id)
-    if RecoverySession.objects.filter(post=post, claimant=request.user, status__in=['pending', 'otp_sent', 'otp_verified', 'qr_generated']).exists():
+    if RecoverySession.objects.filter(post=post, claimant=request.user, status__in=['pending', 'qr_generated']).exists():
         messages.warning(request, 'You already have an active recovery session for this item.')
         return redirect('recovery:list')
     session = RecoverySession.objects.create(
@@ -99,71 +104,14 @@ def initiate_recovery(request, post_id):
         message=f'{request.user.get_full_name() or request.user.username} has initiated a recovery session for your item: {post.title}',
         link=f'/recovery/{session.uid}/',
     )
-    messages.success(request, 'Recovery session initiated. Please verify your identity.')
+    messages.success(request, 'Recovery session initiated. The owner will generate a QR code for verification.')
     return redirect('recovery:detail', uid=session.uid)
-
-@login_required
-def send_otp(request, uid):
-    session = get_object_or_404(RecoverySession, uid=uid, claimant=request.user)
-    if session.status not in ['pending', 'otp_sent']:
-        messages.error(request, 'Invalid session state for OTP request.')
-        return redirect('recovery:detail', uid=uid)
-    otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-    otp = RecoveryOTP.objects.create(
-        session=session,
-        otp_code=otp_code,
-        expires_at=timezone.now() + timezone.timedelta(minutes=10)
-    )
-    session.status = 'otp_sent'
-    session.save(update_fields=['status'])
-    RecoveryVerificationLog.objects.create(
-        session=session, action='otp_sent',
-        performed_by=request.user,
-        details={'otp_id': otp.id},
-        ip_address=request.META.get('REMOTE_ADDR')
-    )
-    try:
-        send_mail(
-            subject='Your Lost & Found Recovery OTP',
-            message=f'Your OTP for item recovery is: {otp_code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this, please ignore this email.',
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[request.user.email],
-            fail_silently=False,
-        )
-    except Exception:
-        pass
-    messages.success(request, 'OTP sent to your email.')
-    return redirect('recovery:detail', uid=uid)
-
-@login_required
-@require_POST
-def verify_otp(request, uid):
-    session = get_object_or_404(RecoverySession, uid=uid, claimant=request.user)
-    otp_code = request.POST.get('otp_code', '').strip()
-    if not otp_code:
-        messages.error(request, 'Please enter the OTP code.')
-        return redirect('recovery:detail', uid=uid)
-    otp = RecoveryOTP.objects.filter(session=session, is_used=False).order_by('-created_at').first()
-    if not otp:
-        messages.error(request, 'No valid OTP found. Please request a new one.')
-        return redirect('recovery:detail', uid=uid)
-    success, message = otp.verify(otp_code)
-    if success:
-        RecoveryVerificationLog.objects.create(
-            session=session, action='otp_verified',
-            performed_by=request.user,
-            ip_address=request.META.get('REMOTE_ADDR')
-        )
-        messages.success(request, message)
-    else:
-        messages.error(request, message)
-    return redirect('recovery:detail', uid=uid)
 
 @login_required
 def generate_qr(request, uid):
     session = get_object_or_404(RecoverySession, uid=uid, owner=request.user)
-    if session.status != 'otp_verified':
-        messages.error(request, 'OTP must be verified before generating QR code.')
+    if session.status not in ['pending', 'qr_generated']:
+        messages.error(request, 'QR code can only be generated while the session is active.')
         return redirect('recovery:detail', uid=uid)
     token = session.generate_qr_token()
     import qrcode

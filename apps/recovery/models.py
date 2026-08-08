@@ -11,8 +11,6 @@ import time
 class RecoverySession(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
-        ('otp_sent', 'OTP Sent'),
-        ('otp_verified', 'OTP Verified'),
         ('qr_generated', 'QR Generated'),
         ('qr_scanned', 'QR Scanned'),
         ('handover_verified', 'Handover Verified'),

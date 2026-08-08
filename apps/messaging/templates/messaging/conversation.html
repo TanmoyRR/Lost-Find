@@ -1,6 +1,6 @@
-{% extends 'base/base.html' %}{% load static %}
-{% block title %}Conversation - IUBAT Lost & Find{% endblock %}
-{% block content %}
+{% extends 'base/dashboard_base.html' %}{% load static %}
+{% block page_title %}Conversation{% endblock %}
+{% block dashboard_content %}
 <div class="max-w-4xl mx-auto py-8 px-4">
   <div class="mb-4">
     <a href="{% url 'messaging:inbox' %}" class="text-sm text-blue-600 hover:text-blue-700">&larr; Back to Inbox</a>
@@ -42,7 +42,7 @@
     </div>
   </div>
 </div>
-{% endblock %}
+{% endblock dashboard_content %}
 {% block extra_js %}
 <script>
   const list = document.getElementById('message-list');

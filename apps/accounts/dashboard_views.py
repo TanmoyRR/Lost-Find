@@ -30,15 +30,15 @@ def user_dashboard(request):
     from apps.notifications.models import Notification
     unread_notifications = Notification.objects.filter(user=user, is_read=False).count()
     from apps.recovery.models import RecoverySession
-    active_recoveries = RecoverySession.objects.filter(Q(claimant=user)|Q(owner=user), status__in=['pending','otp_sent','otp_verified','qr_generated','qr_scanned','handover_verified']).count()
+    active_recoveries = RecoverySession.objects.filter(Q(claimant=user)|Q(owner=user), status__in=['pending','qr_generated','qr_scanned','handover_verified']).count()
     recovery_rate = round((user.resolved_posts() / user.total_posts() * 100) if user.total_posts() > 0 else 0, 1)
 
     context = {
-        'total_posts': user.total_posts(),
-        'open_posts': user.open_posts(),
-        'resolved_posts': user.resolved_posts(),
-        'lost_posts': user.lost_posts(),
-        'found_posts': user.found_posts(),
+        'total_posts': Post.objects.count(),
+        'open_posts': Post.objects.filter(status='open').count(),
+        'resolved_posts': Post.objects.filter(status='resolved').count(),
+        'lost_posts': Post.objects.filter(post_type='lost').count(),
+        'found_posts': Post.objects.filter(post_type='found').count(),
         'recovery_rate': recovery_rate,
         'unread_notifications': unread_notifications,
         'active_recoveries': active_recoveries,
@@ -69,6 +69,8 @@ def admin_dashboard(request):
     total_posts = Post.objects.count()
     open_posts = Post.objects.filter(status='open').count()
     resolved_posts = Post.objects.filter(status='resolved').count()
+    lost_posts = Post.objects.filter(post_type='lost').count()
+    found_posts = Post.objects.filter(post_type='found').count()
     total_revenue = Payment.objects.filter(status='completed').aggregate(Sum('amount'))['amount__sum'] or 0
     pending_payments = Payment.objects.filter(status='pending').count()
 
@@ -86,7 +88,7 @@ def admin_dashboard(request):
     from apps.recovery.models import RecoverySession
     recovery_sessions = RecoverySession.objects.count()
     completed_recoveries = RecoverySession.objects.filter(status='completed').count()
-    pending_recoveries = RecoverySession.objects.filter(status__in=['pending', 'otp_sent', 'otp_verified', 'qr_generated', 'qr_scanned', 'handover_verified']).count()
+    pending_recoveries = RecoverySession.objects.filter(status__in=['pending', 'qr_generated', 'qr_scanned', 'handover_verified']).count()
     recent_activities = UserActivity.objects.all()[:20]
     users = User.objects.all().order_by('-date_joined')[:10]
     posts = Post.objects.all().order_by('-created_at')[:10]
@@ -99,6 +101,8 @@ def admin_dashboard(request):
         'total_posts': total_posts,
         'open_posts': open_posts,
         'resolved_posts': resolved_posts,
+        'lost_posts': lost_posts,
+        'found_posts': found_posts,
         'total_revenue': total_revenue,
         'pending_payments': pending_payments,
         'recovery_sessions': recovery_sessions,

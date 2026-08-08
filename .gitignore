@@ -46,6 +46,7 @@ logs/
 # Uploads
 media/uploads/*
 !media/uploads/.gitkeep
+media/recovery_qr/
 
 # Celery
 celerybeat-schedule

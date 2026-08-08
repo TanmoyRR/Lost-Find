@@ -1,6 +1,6 @@
-{% extends 'base/base.html' %}{% load static %}
-{% block title %}Inbox - IUBAT Lost & Find{% endblock %}
-{% block content %}
+{% extends 'base/dashboard_base.html' %}{% load static %}
+{% block page_title %}Inbox{% endblock %}
+{% block dashboard_content %}
 <div class="max-w-4xl mx-auto py-8 px-4">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-800">Inbox</h1>
@@ -45,4 +45,4 @@
     </div>
   {% endif %}
 </div>
-{% endblock %}
+{% endblock dashboard_content %}
