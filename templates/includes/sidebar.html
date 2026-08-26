@@ -153,22 +153,28 @@
                 .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
             </style>
 
+            {% if user.role == 'admin' %}
+            <a href="/dashboard/admin/" class="si" data-url="/dashboard/admin/">
+                <i class="bi bi-grid-1x2 sii"></i>
+                <span class="sil nl text-sm font-medium">Dashboard</span>
+            </a>
+            {% else %}
             <a href="/dashboard/" class="si" data-url="/dashboard/">
                 <i class="bi bi-grid-1x2 sii"></i>
                 <span class="sil nl text-sm font-medium">Dashboard</span>
             </a>
+            {% endif %}
+            {% if user.role == 'admin' %}
+            <a href="/dashboard/admin/users/" class="si" data-url="/dashboard/admin/users/">
+                <i class="bi bi-people sii"></i>
+                <span class="sil nl text-sm font-medium">Users</span>
+            </a>
+            {% endif %}
             <a href="/browse/" class="si" data-url="/browse/">
                 <i class="bi bi-collection sii"></i>
                 <span class="sil nl text-sm font-medium">Browse Posts</span>
             </a>
-            <a href="/browse/?type=lost" class="si" data-url="/browse/?type=lost">
-                <i class="bi bi-search sii"></i>
-                <span class="sil nl text-sm font-medium">Lost Items</span>
-            </a>
-            <a href="/browse/?type=found" class="si" data-url="/browse/?type=found">
-                <i class="bi bi-hand-index-thumb sii"></i>
-                <span class="sil nl text-sm font-medium">Found Items</span>
-            </a>
+            {% if user.role != 'admin' %}
             <a href="/post/create/" class="si" data-url="/post/create/">
                 <i class="bi bi-plus-circle sii"></i>
                 <span class="sil nl text-sm font-medium">Create Post</span>
@@ -177,26 +183,37 @@
                 <i class="bi bi-file-earmark-text sii"></i>
                 <span class="sil nl text-sm font-medium">My Posts</span>
             </a>
+            {% endif %}
             <a href="/notifications/" class="si" data-url="/notifications/">
                 <i class="bi bi-bell sii"></i>
                 <span class="sil nl text-sm font-medium">Notifications</span>
             </a>
+            {% if user.role != 'admin' %}
             <a href="/messages/" class="si" data-url="/messages/">
                 <i class="bi bi-chat-dots sii"></i>
                 <span class="sil nl text-sm font-medium">Messages</span>
             </a>
+            {% endif %}
             {% if user.is_authenticated and user.role == 'admin' %}
             <a href="/dashboard/admin/memberships/" class="si" data-url="/dashboard/admin/memberships/">
             {% else %}
             <a href="/membership/manage/" class="si" data-url="/membership/manage/">
             {% endif %}
                 <i class="bi bi-gem sii"></i>
-                <span class="sil nl text-sm font-medium">Membership</span>
+                <span class="sil nl text-sm font-medium">Membership{% if user.role == 'admin' %}s{% endif %}</span>
             </a>
+            {% if user.role == 'admin' %}
+            <a href="/dashboard/admin/revenue/" class="si" data-url="/dashboard/admin/revenue/">
+                <i class="bi bi-currency-dollar sii"></i>
+                <span class="sil nl text-sm font-medium">Revenue</span>
+            </a>
+            {% endif %}
+            {% if user.role != 'admin' %}
             <a href="/recovery/" class="si" data-url="/recovery/">
                 <i class="bi bi-shield-check sii"></i>
                 <span class="sil nl text-sm font-medium">Recovery</span>
             </a>
+            {% endif %}
             <a href="/settings/" class="si" data-url="/settings/">
                 <i class="bi bi-gear sii"></i>
                 <span class="sil nl text-sm font-medium">Settings</span>

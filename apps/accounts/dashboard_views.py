@@ -1,12 +1,15 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Count, Q, Sum
-from django.db.models.functions import TruncMonth
+from django.db.models.functions import TruncMonth, TruncWeek, TruncDate
 from django.db import connection
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.utils import timezone
-from django.http import JsonResponse
-from datetime import timedelta
+from django.http import JsonResponse, HttpResponse
+from datetime import timedelta, datetime, time
+import json
 
 from .models import User, UserActivity
 from apps.posts.models import Post, Category, CampusLocation
@@ -17,31 +20,33 @@ from apps.notifications.models import Notification
 
 
 def is_admin(user):
-    return user.is_authenticated and user.role == 'admin'
+    return user.is_authenticated and (user.role == 'admin' or user.is_staff or user.is_superuser)
 
 
 @login_required
 def user_dashboard(request):
     user = request.user
-    posts = Post.objects.filter(user=user).order_by('-created_at')
+    posts = Post.objects.select_related('location', 'category').filter(user=user).order_by('-created_at')
     recent_activities = UserActivity.objects.filter(user=user)[:10]
     membership = getattr(user, 'membership', None)
-    matches = MatchSuggestion.objects.filter(post__user=user)[:5]
+    matches = MatchSuggestion.objects.select_related('post', 'matched_post').filter(post__user=user)[:5]
     from apps.notifications.models import Notification
     unread_notifications = Notification.objects.filter(user=user, is_read=False).count()
-    from apps.recovery.models import RecoverySession
-    active_recoveries = RecoverySession.objects.filter(Q(claimant=user)|Q(owner=user), status__in=['pending','qr_generated','qr_scanned','handover_verified']).count()
-    recovery_rate = round((user.resolved_posts() / user.total_posts() * 100) if user.total_posts() > 0 else 0, 1)
+    site_agg = Post.objects.aggregate(
+        total_posts=Count('id'),
+        open_posts=Count('id', filter=Q(status='open')),
+        resolved_posts=Count('id', filter=Q(status='resolved')),
+        lost_posts=Count('id', filter=Q(post_type='lost')),
+        found_posts=Count('id', filter=Q(post_type='found')),
+    )
 
     context = {
-        'total_posts': Post.objects.count(),
-        'open_posts': Post.objects.filter(status='open').count(),
-        'resolved_posts': Post.objects.filter(status='resolved').count(),
-        'lost_posts': Post.objects.filter(post_type='lost').count(),
-        'found_posts': Post.objects.filter(post_type='found').count(),
-        'recovery_rate': recovery_rate,
+        'total_posts': site_agg['total_posts'],
+        'open_posts': site_agg['open_posts'],
+        'resolved_posts': site_agg['resolved_posts'],
+        'lost_posts': site_agg['lost_posts'],
+        'found_posts': site_agg['found_posts'],
         'unread_notifications': unread_notifications,
-        'active_recoveries': active_recoveries,
         'posts': posts,
         'recent_activities': recent_activities,
         'membership': membership,
@@ -63,16 +68,31 @@ def user_dashboard(request):
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(request):
-    total_users = User.objects.count()
-    active_users = User.objects.filter(is_active=True, is_suspended=False).count()
+    users_agg = User.objects.aggregate(
+        total_users=Count('id'),
+        active_users=Count('id', filter=Q(is_active=True, is_suspended=False)),
+    )
+    total_users = users_agg['total_users']
+    active_users = users_agg['active_users']
     inactive_users = total_users - active_users
-    total_posts = Post.objects.count()
-    open_posts = Post.objects.filter(status='open').count()
-    resolved_posts = Post.objects.filter(status='resolved').count()
-    lost_posts = Post.objects.filter(post_type='lost').count()
-    found_posts = Post.objects.filter(post_type='found').count()
-    total_revenue = Payment.objects.filter(status='completed').aggregate(Sum('amount'))['amount__sum'] or 0
-    pending_payments = Payment.objects.filter(status='pending').count()
+    posts_agg = Post.objects.aggregate(
+        total_posts=Count('id'),
+        open_posts=Count('id', filter=Q(status='open')),
+        resolved_posts=Count('id', filter=Q(status='resolved')),
+        lost_posts=Count('id', filter=Q(post_type='lost')),
+        found_posts=Count('id', filter=Q(post_type='found')),
+    )
+    total_posts = posts_agg['total_posts']
+    open_posts = posts_agg['open_posts']
+    resolved_posts = posts_agg['resolved_posts']
+    lost_posts = posts_agg['lost_posts']
+    found_posts = posts_agg['found_posts']
+    payments_agg = Payment.objects.aggregate(
+        total_revenue=Sum('amount', filter=Q(status='completed')),
+        pending_payments=Count('id', filter=Q(status='pending')),
+    )
+    total_revenue = payments_agg['total_revenue'] or 0
+    pending_payments = payments_agg['pending_payments']
 
     posts_by_category = list(Post.objects.values('category__name').annotate(count=Count('id')))
     posts_by_location = list(Post.objects.values('location__name').annotate(count=Count('id')))
@@ -85,13 +105,14 @@ def admin_dashboard(request):
     except Exception:
         monthly_revenue = []
     from apps.recovery.models import RecoverySession
-    from apps.recovery.models import RecoverySession
-    recovery_sessions = RecoverySession.objects.count()
-    completed_recoveries = RecoverySession.objects.filter(status='completed').count()
-    pending_recoveries = RecoverySession.objects.filter(status__in=['pending', 'qr_generated', 'qr_scanned', 'handover_verified']).count()
+    recovery_agg = RecoverySession.objects.aggregate(
+        recovery_sessions=Count('id'),
+        completed_recoveries=Count('id', filter=Q(status='completed')),
+        pending_recoveries=Count('id', filter=Q(status__in=['pending', 'qr_generated', 'qr_scanned', 'handover_verified'])),
+    )
     recent_activities = UserActivity.objects.all()[:20]
-    users = User.objects.all().order_by('-date_joined')[:10]
-    posts = Post.objects.all().order_by('-created_at')[:10]
+    users = User.objects.exclude(pk=request.user.pk).order_by('-date_joined')[:10]
+    posts = Post.objects.select_related('location', 'category').order_by('-created_at')[:10]
     payments = Payment.objects.all().order_by('-created_at')[:10]
 
     context = {
@@ -105,9 +126,9 @@ def admin_dashboard(request):
         'found_posts': found_posts,
         'total_revenue': total_revenue,
         'pending_payments': pending_payments,
-        'recovery_sessions': recovery_sessions,
-        'completed_recoveries': completed_recoveries,
-        'pending_recoveries': pending_recoveries,
+        'recovery_sessions': recovery_agg['recovery_sessions'],
+        'completed_recoveries': recovery_agg['completed_recoveries'],
+        'pending_recoveries': recovery_agg['pending_recoveries'],
         'posts_by_category': posts_by_category,
         'posts_by_location': posts_by_location,
         'monthly_registrations': monthly_registrations,
@@ -124,15 +145,11 @@ def admin_dashboard(request):
 ADMIN_SIDEBAR = [
     {'url': '/dashboard/admin/', 'label': 'Dashboard', 'icon': 'bi bi-grid-1x2'},
     {'url': '/dashboard/admin/users/', 'label': 'Users', 'icon': 'bi bi-people'},
-    {'url': '/dashboard/admin/posts/', 'label': 'Posts', 'icon': 'bi bi-file-earmark-text'},
-    {'url': '/dashboard/admin/categories/', 'label': 'Categories', 'icon': 'bi bi-tags'},
-    {'url': '/dashboard/admin/locations/', 'label': 'Locations', 'icon': 'bi bi-geo-alt'},
+    {'url': '/browse/', 'label': 'Browse Posts', 'icon': 'bi bi-collection'},
+    {'url': '/notifications/', 'label': 'Notifications', 'icon': 'bi bi-bell'},
     {'url': '/dashboard/admin/memberships/', 'label': 'Memberships', 'icon': 'bi bi-gem'},
-    {'url': '/dashboard/admin/payments/', 'label': 'Payments', 'icon': 'bi bi-credit-card'},
-    {'url': '/dashboard/admin/reports/', 'label': 'Reports', 'icon': 'bi bi-bar-chart'},
-    {'url': '/dashboard/admin/analytics/', 'label': 'Analytics', 'icon': 'bi bi-graph-up'},
+    {'url': '/dashboard/admin/revenue/', 'label': 'Revenue', 'icon': 'bi bi-currency-dollar'},
     {'url': '/dashboard/admin/settings/', 'label': 'Settings', 'icon': 'bi bi-gear'},
-    {'url': '/profile/', 'label': 'Profile', 'icon': 'bi bi-person'},
 ]
 
 USER_SIDEBAR = [
@@ -150,7 +167,7 @@ USER_SIDEBAR = [
 @login_required
 @user_passes_test(is_admin)
 def admin_users(request):
-    users = User.objects.all().order_by('-date_joined')
+    users = User.objects.exclude(pk=request.user.pk).order_by('-date_joined')
     return render(request, 'admin_dashboard/users.html', {'users': users, 'sidebar_items': ADMIN_SIDEBAR})
 
 
@@ -308,25 +325,325 @@ def admin_locations(request):
 
 @login_required
 @user_passes_test(is_admin)
-def admin_payments(request):
-    from django.db.models import Sum, Count
-    payments = Payment.objects.all().order_by('-created_at')
-    total_revenue = Payment.objects.filter(status='completed').aggregate(Sum('amount'))['amount__sum'] or 0
-    pending_payments = Payment.objects.filter(status='pending').count()
-    completed_payments = Payment.objects.filter(status='completed').count()
-    failed_payments = Payment.objects.filter(status='failed').count()
-    monthly_revenue = list(Payment.objects.filter(status='completed')
-        .annotate(month=TruncMonth('created_at'))
-        .values('month').annotate(total=Sum('amount')).order_by('-month')[:12])
-    return render(request, 'admin_dashboard/payments.html', {
-        'payments': payments,
-        'total_revenue': total_revenue,
-        'pending_payments': pending_payments,
-        'completed_payments': completed_payments,
-        'failed_payments': failed_payments,
-        'monthly_revenue': monthly_revenue,
+def admin_revenue(request):
+    qs, params = _revenue_filters(request)
+
+    now = timezone.localtime()
+    tz = timezone.get_current_timezone()
+    today = now.date()
+    month_start = today.replace(day=1)
+    next_month = (month_start + timedelta(days=32)).replace(day=1)
+    year_start = today.replace(month=1, day=1)
+    next_year = year_start.replace(year=year_start.year + 1)
+
+    def local_midnight(day):
+        return timezone.make_aware(datetime.combine(day, time.min), tz)
+
+    stats = qs.aggregate(
+        total_revenue=Sum('amount', filter=Q(status='completed')),
+        month_revenue=Sum('amount', filter=Q(
+            status='completed',
+            created_at__gte=local_midnight(month_start),
+            created_at__lt=local_midnight(next_month),
+        )),
+        year_revenue=Sum('amount', filter=Q(
+            status='completed',
+            created_at__gte=local_midnight(year_start),
+            created_at__lt=local_midnight(next_year),
+        )),
+        successful_payments=Count('id', filter=Q(status='completed')),
+        pending_payments=Count('id', filter=Q(status='pending')),
+        failed_payments=Count('id', filter=Q(status='failed')),
+    )
+
+    chart_labels, chart_values = _revenue_chart_series(
+        qs, params['chart'], params['date_from'], params['date_to']
+    )
+
+    plan_names = _plan_name_map()
+    total_count = qs.count()
+    paginator = Paginator(qs, 20)
+    page = request.GET.get('page')
+    try:
+        page_obj = paginator.page(page)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    for p in page_obj.object_list:
+        p.plan_name = plan_names.get(str(p.reference_id), '—')
+        p.detail_json = json.dumps({
+            'transaction_id': p.transaction_id or 'N/A',
+            'user_name': p.user.get_full_name() or p.user.username,
+            'email': p.user.email or '—',
+            'membership': p.plan_name,
+            'amount': f'{p.amount:,.2f} BDT',
+            'status': p.get_status_display(),
+            'gateway': p.gateway,
+            'method': p.payment_method,
+            'sslcommerz_tran_id': p.sslcommerz_tran_id or 'N/A',
+            'payment_date': timezone.localtime(p.created_at).strftime('%b %d, %Y, %I:%M %p'),
+            'completion_date': timezone.localtime(p.completion_date).strftime('%b %d, %Y, %I:%M %p') if p.completion_date else '—',
+        })
+
+    from urllib.parse import urlencode
+    filter_qs = urlencode({k: v for k, v in params.items() if v})
+
+    return render(request, 'admin_dashboard/revenue.html', {
+        **params,
+        'stats': stats,
+        'total_count': total_count,
+        'payments': page_obj,
+        'chart_labels': json.dumps(chart_labels),
+        'chart_values': json.dumps(chart_values),
+        'chart_period': params['chart'],
+        'filter_qs': filter_qs,
+        'status_choices': Payment.PAYMENT_STATUS,
+        'type_choices': Payment.PAYMENT_TYPES,
         'sidebar_items': ADMIN_SIDEBAR,
     })
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_revenue_export(request):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    qs, params = _revenue_filters(request)
+
+    headers = [
+        'Transaction ID', 'User Name', 'User Email', 'Payment Type', 'Amount',
+        'Payment Status', 'Payment Gateway', 'Payment Method',
+        'SSLCommerz Transaction ID', 'Payment Date',
+    ]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Payment History'
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color='4F46E5', end_color='4F46E5', fill_type='solid')
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.alignment = Alignment(horizontal='center')
+
+    tz = timezone.get_current_timezone()
+    for p in qs.iterator():
+        ws.append([
+            p.transaction_id or 'N/A',
+            p.user.get_full_name() or p.user.username,
+            p.user.email or '',
+            p.get_payment_type_display(),
+            float(p.amount),
+            p.get_status_display(),
+            p.gateway,
+            p.payment_method,
+            p.sslcommerz_tran_id or 'N/A',
+            p.created_at.astimezone(tz).replace(tzinfo=None),
+        ])
+
+    for i, width in enumerate([22, 22, 26, 14, 12, 16, 16, 16, 24, 20], start=1):
+        ws.column_dimensions[get_column_letter(i)].width = width
+    for row in ws.iter_rows(min_row=2):
+        row[4].number_format = '"BDT "#,##0.00'
+        row[9].number_format = 'YYYY-MM-DD HH:MM'
+
+    ws.freeze_panes = 'A2'
+    ws.auto_filter.ref = ws.dimensions
+    ws.sheet_view.showGridLines = False
+
+    today = timezone.localtime().strftime('%Y-%m-%d')
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="payment_history_{today}.xlsx"'
+    wb.save(response)
+    return response
+
+
+def _plan_name_map():
+    return {str(plan.pk): plan.name for plan in MembershipPlan.objects.all()}
+
+
+def _revenue_filters(request):
+    """Build the filtered Payment queryset plus the applied filter params."""
+    q = request.GET.get('q', '').strip()
+    period = request.GET.get('period', 'all')
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+    status = request.GET.get('status', '')
+    payment_type = request.GET.get('payment_type', '')
+    chart = request.GET.get('chart', 'month')
+
+    if status not in [s[0] for s in Payment.PAYMENT_STATUS]:
+        status = ''
+    if payment_type not in [t[0] for t in Payment.PAYMENT_TYPES]:
+        payment_type = ''
+    if chart not in ('day', 'week', 'month'):
+        chart = 'month'
+
+    now = timezone.localtime()
+    tz = timezone.get_current_timezone()
+    today = now.date()
+
+    def local_midnight(day):
+        return timezone.make_aware(datetime.combine(day, time.min), tz)
+
+    qs = Payment.objects.select_related('user').order_by('-created_at')
+    if period == 'today':
+        qs = qs.filter(
+            created_at__gte=local_midnight(today),
+            created_at__lt=local_midnight(today + timedelta(days=1)),
+        )
+    elif period == '7d':
+        qs = qs.filter(created_at__gte=now - timedelta(days=7))
+    elif period == 'month':
+        month_start = today.replace(day=1)
+        next_month = (month_start + timedelta(days=32)).replace(day=1)
+        qs = qs.filter(
+            created_at__gte=local_midnight(month_start),
+            created_at__lt=local_midnight(next_month),
+        )
+    elif period == 'year':
+        year_start = today.replace(month=1, day=1)
+        next_year = year_start.replace(year=year_start.year + 1)
+        qs = qs.filter(
+            created_at__gte=local_midnight(year_start),
+            created_at__lt=local_midnight(next_year),
+        )
+    elif period == 'custom':
+        try:
+            d1 = datetime.strptime(date_from, '%Y-%m-%d').date() if date_from else None
+        except ValueError:
+            d1 = None
+        try:
+            d2 = datetime.strptime(date_to, '%Y-%m-%d').date() if date_to else None
+        except ValueError:
+            d2 = None
+        if d1:
+            qs = qs.filter(created_at__gte=local_midnight(d1))
+        if d2:
+            qs = qs.filter(created_at__lt=local_midnight(d2 + timedelta(days=1)))
+
+    if status:
+        qs = qs.filter(status=status)
+    if payment_type:
+        qs = qs.filter(payment_type=payment_type)
+
+    if q:
+        qs = qs.filter(
+            Q(transaction_id__icontains=q)
+            | Q(sslcommerz_tran_id__icontains=q)
+            | Q(user__username__icontains=q)
+            | Q(user__first_name__icontains=q)
+            | Q(user__last_name__icontains=q)
+            | Q(user__email__icontains=q)
+        )
+
+    return qs, {
+        'q': q,
+        'period': period,
+        'date_from': date_from,
+        'date_to': date_to,
+        'status': status,
+        'payment_type': payment_type,
+        'chart': chart,
+    }
+
+
+def _revenue_chart_series(qs, chart, date_from='', date_to=''):
+    """Aggregate completed payments into a zero-filled time series for the chart."""
+    from decimal import Decimal
+    rev = qs.filter(status='completed')
+    today = timezone.localtime().date()
+
+    try:
+        d_from = datetime.strptime(date_from, '%Y-%m-%d').date() if date_from else None
+    except (ValueError, TypeError):
+        d_from = None
+    try:
+        d_to = datetime.strptime(date_to, '%Y-%m-%d').date() if date_to else None
+    except (ValueError, TypeError):
+        d_to = None
+
+    if chart == 'day':
+        if d_from:
+            start = d_from
+        elif d_to:
+            start = d_to - timedelta(days=29)
+        else:
+            start = today - timedelta(days=29)
+        end = d_to or today
+        if end < start:
+            end = start
+        days = []
+        d = start
+        while d <= end and len(days) < 60:
+            days.append(d)
+            d += timedelta(days=1)
+        totals = {d: Decimal('0') for d in days}
+        for row in rev.annotate(day=TruncDate('created_at')).values('day').annotate(total=Sum('amount')):
+            if row['day'] in totals:
+                totals[row['day']] += row['total'] or Decimal('0')
+        return [d.strftime('%b %d') for d in days], [float(totals[d]) for d in days]
+
+    if chart == 'week':
+        this_week = today - timedelta(days=today.weekday())
+        if d_from:
+            weeks = []
+            w = d_from - timedelta(days=d_from.weekday())
+            end = d_to or today
+            while w <= end and len(weeks) < 26:
+                weeks.append(w)
+                w += timedelta(weeks=1)
+            if not weeks:
+                weeks = [this_week]
+        else:
+            weeks = [this_week - timedelta(weeks=i) for i in range(11, -1, -1)]
+        totals = {w.isocalendar()[:2]: Decimal('0') for w in weeks}
+        for row in rev.annotate(week=TruncWeek('created_at')).values('week').annotate(total=Sum('amount')):
+            if row['week']:
+                key = row['week'].isocalendar()[:2]
+                if key in totals:
+                    totals[key] += row['total'] or Decimal('0')
+        return [w.strftime('%b %d') for w in weeks], [float(totals[w.isocalendar()[:2]]) for w in weeks]
+
+    if d_from:
+        months = []
+        y, m = d_from.year, d_from.month
+        end = d_to or today
+        while (y, m) <= (end.year, end.month) and len(months) < 24:
+            months.append((y, m))
+            m += 1
+            if m > 12:
+                m = 1
+                y += 1
+        if not months:
+            months = [(today.year, today.month)]
+    else:
+        months = []
+        y, m = today.year, today.month
+        for _ in range(12):
+            months.append((y, m))
+            m -= 1
+            if m < 1:
+                m = 12
+                y -= 1
+        months.reverse()
+
+    from datetime import date as _date
+    totals = {f'{y}-{m:02d}': Decimal('0') for y, m in months}
+    for row in rev.annotate(month=TruncMonth('created_at')).values('month').annotate(total=Sum('amount')):
+        if row['month']:
+            key = f"{row['month'].year}-{row['month'].month:02d}"
+            if key in totals:
+                totals[key] += row['total'] or Decimal('0')
+    labels = [_date(y, m, 1).strftime('%b %Y') for y, m in months]
+    return labels, [float(totals[f'{y}-{m:02d}']) for y, m in months]
 
 
 @login_required
@@ -477,3 +794,98 @@ def admin_toggle_membership(request, pk):
             )
         messages.success(request, f'Membership granted to {user.username}.')
     return redirect('dashboard:admin_user_detail', pk=pk)
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_extend_membership(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    if request.method == 'POST':
+        try:
+            days = int(request.POST.get('days', 30))
+            days = max(1, min(days, 3650))
+        except (TypeError, ValueError):
+            days = 30
+        membership = getattr(user, 'membership', None)
+        if membership:
+            base = membership.expires_at if membership.expires_at and membership.expires_at > timezone.now() else timezone.now()
+            membership.expires_at = base + timedelta(days=days)
+            membership.is_active = True
+            if not membership.started_at:
+                membership.started_at = timezone.now()
+            membership.save()
+        else:
+            plan = MembershipPlan.objects.filter(is_active=True).first()
+            if not plan:
+                messages.error(request, 'No active membership plan found. Create one first.')
+                return redirect('dashboard:admin_user_detail', pk=pk)
+            Membership.objects.create(
+                user=user, plan=plan, is_active=True,
+                started_at=timezone.now(),
+                expires_at=timezone.now() + timedelta(days=days),
+            )
+        messages.success(request, f'Membership extended by {days} days for {user.username}.')
+    return redirect('dashboard:admin_user_detail', pk=pk)
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_delete_user(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    if user.pk == request.user.pk:
+        messages.error(request, 'You cannot delete your own account.')
+        return redirect('dashboard:admin_users')
+    if request.method == 'POST':
+        username = user.username
+        user.delete()
+        messages.success(request, f'User "{username}" deleted.')
+    return redirect('dashboard:admin_users')
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_update_user_info(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        student_id = request.POST.get('student_id', '').strip()
+        department = request.POST.get('department', '').strip()
+
+        valid_departments = [d[0] for d in User.DEPARTMENTS]
+        errors = []
+        if not username:
+            errors.append('Username is required.')
+        elif User.objects.exclude(pk=user.pk).filter(username__iexact=username).exists():
+            errors.append('That username is already taken.')
+        if not email:
+            errors.append('Email is required.')
+        elif User.objects.exclude(pk=user.pk).filter(email__iexact=email).exists():
+            errors.append('That email is already in use.')
+        if student_id and User.objects.exclude(pk=user.pk).filter(student_id__iexact=student_id).exists():
+            errors.append('That student ID is already in use.')
+        if department and department not in valid_departments:
+            department = ''
+
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+        else:
+            user.username = username
+            user.first_name = first_name
+            user.last_name = last_name
+            user.email = email
+            user.phone = phone or None
+            user.student_id = student_id or None
+            user.department = department or None
+            user.save()
+            UserActivity.objects.create(
+                user=user,
+                activity_type='profile_updated',
+                description=f'Information updated by admin {request.user.username}.',
+            )
+            messages.success(request, f'Information updated for {user.username}.')
+    return redirect(f"{reverse('dashboard:admin_user_detail', kwargs={'pk': pk})}?tab=info")

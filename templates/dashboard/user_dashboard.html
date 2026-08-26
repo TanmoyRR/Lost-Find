@@ -49,12 +49,12 @@
         </div>
         <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between mb-3">
-                <div class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center shadow-md shadow-amber-500/10">
-                    <i class="bi bi-clock-history text-amber-600 text-lg"></i>
+                <div class="w-11 h-11 rounded-xl bg-rose-100 flex items-center justify-center shadow-md shadow-rose-500/10">
+                    <i class="bi bi-bell text-rose-600 text-lg"></i>
                 </div>
-                <span class="text-2xl font-bold text-gray-800">{{ open_posts }}</span>
+                <span class="text-2xl font-bold text-gray-800">{{ unread_notifications }}</span>
             </div>
-            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Open Posts</p>
+            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Unread Notifications</p>
         </div>
         <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between mb-3">
@@ -85,45 +85,7 @@
         </div>
     </div>
 
-    <!-- Extended Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center shadow-md shadow-purple-500/10">
-                    <i class="bi bi-graph-up text-purple-600 text-lg"></i>
-                </div>
-                <span class="text-2xl font-bold text-gray-800">{{ recovery_rate }}%</span>
-            </div>
-            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Recovery Rate</p>
-        </div>
-        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-11 h-11 rounded-xl bg-rose-100 flex items-center justify-center shadow-md shadow-rose-500/10">
-                    <i class="bi bi-bell text-rose-600 text-lg"></i>
-                </div>
-                <span class="text-2xl font-bold text-gray-800">{{ unread_notifications }}</span>
-            </div>
-            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Unread Notifications</p>
-        </div>
-        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-11 h-11 rounded-xl bg-violet-100 flex items-center justify-center shadow-md shadow-violet-500/10">
-                    <i class="bi bi-arrow-repeat text-violet-600 text-lg"></i>
-                </div>
-                <span class="text-2xl font-bold text-gray-800">{{ active_recoveries }}</span>
-            </div>
-            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Active Recoveries</p>
-        </div>
-        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-11 h-11 rounded-xl bg-cyan-100 flex items-center justify-center shadow-md shadow-cyan-500/10">
-                    <i class="bi bi-star text-cyan-600 text-lg"></i>
-                </div>
-                <span class="text-2xl font-bold text-gray-800">{{ user.reputation_score }}</span>
-            </div>
-            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">Reputation</p>
-        </div>
-    </div>
+    <!-- Extended Stats (removed) -->
 
     <!-- Two Column Layout: AI Matches + Recent Activity -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

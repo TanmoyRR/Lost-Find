@@ -26,7 +26,7 @@ ADMIN_SIDEBAR = [
     {'name': 'Posts', 'url': 'dashboard:admin_posts', 'icon': 'bi-file-text'},
     {'name': 'Categories', 'url': 'dashboard:admin_categories', 'icon': 'bi-tags'},
     {'name': 'Locations', 'url': 'dashboard:admin_locations', 'icon': 'bi-geo-alt'},
-    {'name': 'Payments', 'url': 'dashboard:admin_payments', 'icon': 'bi-credit-card'},
+    {'name': 'Revenue', 'url': 'dashboard:admin_revenue', 'icon': 'bi-currency-dollar'},
     {'name': 'Reports', 'url': 'dashboard:admin_reports', 'icon': 'bi-bar-chart'},
     {'name': 'Analytics', 'url': 'dashboard:admin_analytics', 'icon': 'bi-graph-up'},
     {'name': 'Recovery Sessions', 'url': 'recovery:admin_list', 'icon': 'bi-shield-check'},

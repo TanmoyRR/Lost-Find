@@ -1,4 +1,5 @@
 import pytest
+import json
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -252,6 +253,7 @@ class TestBrowseAndSearch(TestCase):
         self.cat = Category.objects.create(name='Books', slug='books')
         self.loc = CampusLocation.objects.create(name='Library', slug='library')
         self.user = User.objects.create_user(username='browser', password='testpass')
+        self.client.login(username='browser', password='testpass')
         for i in range(15):
             Post.objects.create(
                 user=self.user, title=f'Test Post {i}', description=f'Description {i}',
@@ -269,6 +271,19 @@ class TestBrowseAndSearch(TestCase):
     def test_browse_filters_by_type(self):
         response = self.client.get(reverse('posts:browse') + '?type=lost')
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '>Test Post 0</h3>')
+        self.assertNotContains(response, '>Test Post 1</h3>')
+
+    def test_browse_type_filter_options_for_users(self):
+        response = self.client.get(reverse('posts:browse'))
+        self.assertContains(response, '<option value="">All Types</option>')
+        self.assertContains(response, 'value="lost"')
+        self.assertContains(response, 'value="found"')
+
+    def test_user_sidebar_hides_lost_found_items_links(self):
+        response = self.client.get(reverse('posts:browse'))
+        self.assertNotContains(response, '/browse/?type=lost')
+        self.assertNotContains(response, '/browse/?type=found')
 
     def test_browse_has_pagination(self):
         response = self.client.get(reverse('posts:browse'))
@@ -303,14 +318,30 @@ class TestMatchingEngine(TestCase):
         )
 
     @patch('apps.ai_engine.utils.generate_embedding')
-    @patch('apps.ai_engine.utils.compute_cosine_similarity')
-    def test_match_created_on_post_creation(self, mock_similarity, mock_embedding):
-        mock_embedding.return_value = [0.1] * 384
-        mock_similarity.return_value = 0.85
+    @patch('apps.ai_engine.utils._ranked_candidates')
+    def test_match_created_on_post_creation(self, mock_candidates, mock_embedding):
+        mock_embedding.return_value = [0.1] * 256
+        mock_candidates.return_value = [(self.found_post, 0.85)]
         from apps.ai_engine.utils import find_matches_for_post
         matches = find_matches_for_post(self.lost_post)
         self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0].similarity_score, 1.0)
+        self.assertEqual(matches[0].matched_post, self.found_post)
+        # 0.60*0.85 (semantic) + 0.15 (category) + 0.10 (location) + 0.10 (date) = 0.86
+        self.assertAlmostEqual(matches[0].similarity_score, 0.86, places=2)
+
+    def test_hybrid_scoring_prefers_structured_matches(self):
+        from datetime import timedelta
+        from apps.ai_engine.utils import hybrid_match_score
+        from apps.posts.models import Post
+        other_cat_post = Post.objects.create(
+            user=self.user, title='Found Wallet', description='Leather wallet',
+            post_type='found', date_lost_found=timezone.now().date() - timedelta(days=30),
+        )
+        same_attrs = hybrid_match_score(self.lost_post, self.found_post, 0.5)
+        diff_attrs = hybrid_match_score(self.lost_post, other_cat_post, 0.5)
+        self.assertGreater(same_attrs, diff_attrs)
+        # semantic weight = 60% of the semantic component (no aligned attributes)
+        self.assertAlmostEqual(hybrid_match_score(self.lost_post, other_cat_post, 1.0), 0.60, places=2)
 
     def test_match_suggestion_page_requires_login(self):
         response = self.client.get(reverse('ai:matches'))
@@ -427,6 +458,23 @@ class TestAdminModeration(TestCase):
         response = self.client.get(reverse('dashboard:admin_home'))
         self.assertEqual(response.status_code, 200)
 
+    def test_page_titles_match_sidebar(self):
+        pages = [
+            ('dashboard:admin_home', 'Dashboard'),
+            ('dashboard:admin_users', 'Users'),
+            ('posts:browse', 'Browse Posts'),
+            ('notifications:list', 'Notifications'),
+            ('dashboard:admin_memberships', 'Memberships'),
+            ('dashboard:admin_revenue', 'Revenue'),
+            ('accounts:settings', 'Settings'),
+        ]
+        for url_name, title in pages:
+            with self.subTest(page=url_name):
+                response = self.client.get(reverse(url_name))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, f'<title>{title} | IUBAT SmartFind</title>')
+                self.assertContains(response, f'<h2 class="text-lg font-semibold text-gray-800 pl-1">{title}</h2>')
+
     def test_admin_users_page(self):
         response = self.client.get(reverse('dashboard:admin_users'))
         self.assertEqual(response.status_code, 200)
@@ -443,8 +491,8 @@ class TestAdminModeration(TestCase):
         response = self.client.get(reverse('dashboard:admin_locations'))
         self.assertEqual(response.status_code, 200)
 
-    def test_admin_payments_page(self):
-        response = self.client.get(reverse('dashboard:admin_payments'))
+    def test_admin_revenue_page(self):
+        response = self.client.get(reverse('dashboard:admin_revenue'))
         self.assertEqual(response.status_code, 200)
 
     def test_admin_reports_page(self):
@@ -454,6 +502,36 @@ class TestAdminModeration(TestCase):
     def test_admin_analytics_page(self):
         response = self.client.get(reverse('dashboard:admin_analytics'))
         self.assertEqual(response.status_code, 200)
+
+    def test_admin_users_page_excludes_admin_self(self):
+        user = User.objects.create_user(username='regular', password='testpass')
+        response = self.client.get(reverse('dashboard:admin_users'))
+        self.assertContains(response, 'regular')
+        self.assertNotContains(response, '<p class="text-sm font-medium text-gray-800">admin</p>')
+
+    def test_admin_update_user_info(self):
+        user = User.objects.create_user(username='target', password='testpass')
+        url = reverse('dashboard:admin_update_user_info', kwargs={'pk': user.pk})
+        response = self.client.post(url, {
+            'username': 'updatedtarget',
+            'email': 'new@test.com',
+            'first_name': 'New',
+            'last_name': 'Name',
+            'phone': '01700000000',
+            'student_id': 'ID-1',
+            'department': '',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('dashboard:admin_user_detail', kwargs={'pk': user.pk}) + '?tab=info')
+        user.refresh_from_db()
+        self.assertEqual(user.username, 'updatedtarget')
+        self.assertEqual(user.email, 'new@test.com')
+        self.assertEqual(user.first_name, 'New')
+
+    def test_admin_cannot_change_own_password(self):
+        response = self.client.get(reverse('accounts:change_password'))
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('accounts:profile'))
 
     def test_admin_suspend_user(self):
         user = User.objects.create_user(username='suspendeduser', password='testpass')
@@ -473,6 +551,133 @@ class TestAdminModeration(TestCase):
 
 
 # ========================
+# ADMIN REVENUE
+# ========================
+
+class TestAdminRevenue(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_superuser(username='admin', email='admin@test.com', password='adminpass')
+        self.admin.role = 'admin'
+        self.admin.save()
+        self.student = User.objects.create_user(username='student1', email='student1@test.com', password='testpass')
+        self.student2 = User.objects.create_user(username='student2', email='student2@test.com', password='testpass')
+        from apps.payments.models import Payment
+        Payment.objects.create(user=self.student, transaction_id='TXN-COMP', amount=Decimal('100'),
+                               payment_type='membership', status='completed')
+        Payment.objects.create(user=self.student, transaction_id='TXN-PEND', amount=Decimal('200'),
+                               payment_type='membership', status='pending')
+        Payment.objects.create(user=self.student2, transaction_id='TXN-FAIL', amount=Decimal('300'),
+                               payment_type='membership', status='failed')
+        Payment.objects.create(user=self.student2, transaction_id='TXN-CANCEL', amount=Decimal('50'),
+                               payment_type='reward', status='cancelled')
+
+    def test_admin_can_access_revenue_page(self):
+        self.client.login(username='admin', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_revenue'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'admin_dashboard/revenue.html')
+
+    def test_student_cannot_access_revenue_page(self):
+        self.client.login(username='student1', password='testpass')
+        response = self.client.get(reverse('dashboard:admin_revenue'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_anonymous_cannot_access_revenue_page(self):
+        response = self.client.get(reverse('dashboard:admin_revenue'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_revenue_only_counts_completed_payments(self):
+        self.client.login(username='admin', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_revenue'))
+        stats = response.context['stats']
+        self.assertEqual(stats['total_revenue'], Decimal('100'))
+        self.assertEqual(stats['month_revenue'], Decimal('100'))
+        self.assertEqual(stats['year_revenue'], Decimal('100'))
+        self.assertEqual(stats['successful_payments'], 1)
+        self.assertEqual(stats['pending_payments'], 1)
+        self.assertEqual(stats['failed_payments'], 1)
+
+    def test_revenue_status_filter(self):
+        self.client.login(username='admin', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_revenue') + '?status=completed')
+        self.assertEqual(response.context['total_count'], 1)
+        payments = list(response.context['payments'])
+        self.assertEqual(len(payments), 1)
+        self.assertEqual(payments[0].status, 'completed')
+        stats = response.context['stats']
+        self.assertEqual(stats['total_revenue'], Decimal('100'))
+
+    def test_revenue_payment_type_filter(self):
+        self.client.login(username='admin', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_revenue') + '?payment_type=reward')
+        self.assertEqual(response.context['total_count'], 1)
+        payments = list(response.context['payments'])
+        self.assertEqual(payments[0].payment_type, 'reward')
+
+    def test_revenue_search(self):
+        self.client.login(username='admin', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_revenue') + '?q=TXN-COMP')
+        self.assertEqual(response.context['total_count'], 1)
+        response = self.client.get(reverse('dashboard:admin_revenue') + '?q=student2')
+        self.assertEqual(response.context['total_count'], 2)
+        response = self.client.get(reverse('dashboard:admin_revenue') + '?q=student1@test.com')
+        self.assertEqual(response.context['total_count'], 2)
+
+    def test_revenue_custom_date_filter(self):
+        self.client.login(username='admin', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_revenue') + '?period=custom&date_from=2000-01-01&date_to=2000-01-02')
+        self.assertEqual(response.context['total_count'], 0)
+        response = self.client.get(reverse('dashboard:admin_revenue') + '?period=custom&date_from=2000-01-01')
+        self.assertEqual(response.context['total_count'], 4)
+
+    def test_revenue_chart_data(self):
+        self.client.login(username='admin', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_revenue') + '?chart=month')
+        values = json.loads(response.context['chart_values'])
+        self.assertEqual(sum(values), 100)
+
+    def test_revenue_export_all(self):
+        self.client.login(username='admin', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_revenue_export'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', response['Content-Type'])
+        self.assertIn('attachment; filename="payment_history_', response['Content-Disposition'])
+        from openpyxl import load_workbook
+        from io import BytesIO
+        wb = load_workbook(BytesIO(response.content))
+        ws = wb.active
+        self.assertEqual(ws.title, 'Payment History')
+        headers = [cell.value for cell in ws[1]]
+        self.assertEqual(headers[:4], ['Transaction ID', 'User Name', 'User Email', 'Payment Type'])
+        self.assertIn('SSLCommerz Transaction ID', headers)
+        self.assertEqual(ws.max_row, 5)
+        self.assertEqual(ws.freeze_panes, 'A2')
+        self.assertIsNotNone(ws.auto_filter.ref)
+        self.assertEqual(ws['E3'].number_format, '"BDT "#,##0.00')
+
+    def test_revenue_export_respects_filters(self):
+        self.client.login(username='admin', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_revenue_export') + '?status=completed')
+        from openpyxl import load_workbook
+        from io import BytesIO
+        ws = load_workbook(BytesIO(response.content)).active
+        self.assertEqual(ws.max_row, 2)
+        self.assertEqual(ws['E2'].value, 100)
+        response = self.client.get(reverse('dashboard:admin_revenue_export') + '?payment_type=reward')
+        ws = load_workbook(BytesIO(response.content)).active
+        self.assertEqual(ws.max_row, 2)
+
+    def test_revenue_export_excludes_sensitive_data(self):
+        self.client.login(username='admin', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_revenue_export'))
+        self.assertNotIn(b'store_passwd', response.content)
+        self.assertNotIn(b'SSLCOMMERZ_STORE_PASS', response.content)
+        page = self.client.get(reverse('dashboard:admin_revenue')).content
+        self.assertNotIn(b'store_passwd', page)
+
+
+# ========================
 # API TESTS
 # ========================
 
@@ -481,6 +686,7 @@ class TestAPIs(TestCase):
         self.client = Client()
         from apps.posts.models import Post, Category
         self.user = User.objects.create_user(username='apiuser', password='testpass')
+        self.client.login(username='apiuser', password='testpass')
         self.cat = Category.objects.create(name='TestCat', slug='testcat')
         Post.objects.create(
             user=self.user, title='API Post', description='Test',
@@ -537,6 +743,7 @@ class TestSuccessStories(TestCase):
         self.client = Client()
         from apps.posts.models import Post, SuccessStory
         self.user = User.objects.create_user(username='storyuser', password='testpass')
+        self.client.login(username='storyuser', password='testpass')
         post = Post.objects.create(
             user=self.user, title='Story Post', description='Test',
             post_type='found', date_lost_found=timezone.now().date()
@@ -639,6 +846,8 @@ class TestMembershipGating(TestCase):
         self.member = User.objects.create_user(username='member', password='testpass', email='member@test.com')
         self.non_member = User.objects.create_user(username='nonmember', password='testpass', email='nonmember@test.com')
         self.admin = User.objects.create_superuser(username='admin', password='testpass', email='admin@test.com')
+        self.admin.role = 'admin'
+        self.admin.save()
         from apps.membership.models import Membership, MembershipPlan
         plan = MembershipPlan.objects.create(name='Annual Membership', price=100, duration_days=365)
         Membership.objects.create(user=self.member, plan=plan, is_active=True,
@@ -663,10 +872,11 @@ class TestMembershipGating(TestCase):
         response = self.client.get(reverse('posts:create'))
         self.assertEqual(response.status_code, 200)
 
-    def test_admin_bypasses_membership_check(self):
+    def test_admin_cannot_create_post(self):
         self.client.login(username='admin', password='testpass')
         response = self.client.get(reverse('posts:create'))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('dashboard:admin_home'))
 
     def test_non_member_cannot_initiate_recovery(self):
         self.client.login(username='nonmember', password='testpass')
@@ -680,6 +890,7 @@ class TestMembershipGating(TestCase):
         self.assertTrue(any('cannot claim' in str(m).lower() for m in msgs))
 
     def test_non_member_gets_limited_post_detail(self):
+        self.client.login(username='nonmember', password='testpass')
         response = self.client.get(reverse('posts:detail', args=[self.post.pk]))
         self.assertContains(response, 'Full Details Hidden')
 

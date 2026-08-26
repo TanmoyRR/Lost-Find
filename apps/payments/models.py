@@ -1,3 +1,5 @@
+import json
+
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -37,3 +39,27 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.amount} BDT - {self.status}"
+
+    @property
+    def gateway(self):
+        return 'SSLCommerz'
+
+    @property
+    def payment_method(self):
+        session = self.sslcommerz_session
+        if session:
+            try:
+                data = json.loads(session)
+            except (ValueError, TypeError):
+                return 'N/A'
+            card = (data.get('card_type')
+                    or data.get('card_brand')
+                    or data.get('card_issuer')
+                    or data.get('card_ref_id'))
+            if card:
+                return str(card).title()
+        return 'N/A'
+
+    @property
+    def completion_date(self):
+        return self.updated_at if self.status == 'completed' else None

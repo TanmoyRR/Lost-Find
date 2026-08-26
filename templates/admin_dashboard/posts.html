@@ -116,6 +116,9 @@
                                 <a href="{% url 'posts:detail' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-indigo-600" title="View">
                                     <i class="bi bi-eye"></i>
                                 </a>
+                                <a href="{% url 'posts:edit' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-indigo-600" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
                                 {% if post.status == 'open' %}
                                 <a href="{% url 'dashboard:admin_post_reject' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600" title="Reject" onclick="return confirm('Reject this post?')">
                                     <i class="bi bi-x-circle"></i>

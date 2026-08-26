@@ -84,14 +84,18 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='iubat_lostfind'),
+        'NAME': config('DB_NAME', default='iubat_smartfind'),
         'USER': config('DB_USER', default='postgres'),
         'PASSWORD': config('DB_PASSWORD', default='postgres'),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
+        'CONN_MAX_AGE': 60,
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
@@ -111,14 +115,14 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {
     'default': {
-        'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+        'BACKEND': 'core.storage.SupabasePublicStorage',
     },
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
     },
 }
 
-MEDIA_URL = f'{config("SUPABASE_S3_ENDPOINT", default="https://localhost:8000")}/{config("SUPABASE_BUCKET", default="lostfind-media")}/'
+MEDIA_URL = f'{config("SUPABASE_S3_ENDPOINT", default="https://localhost:8000")}/{config("SUPABASE_BUCKET", default="smartfind-media")}/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
@@ -143,12 +147,34 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Dhaka'
 
-# AI Model
-AI_MODEL_NAME = config('AI_MODEL_NAME', default='all-MiniLM-L6-v2')
-AI_MODEL_CACHE_DIR = config('AI_MODEL_CACHE_DIR', default=BASE_DIR / 'ai_cache')
+# --- Jina AI Embeddings (API-based, no local model) ---
+JINA_API_KEY = config('JINA_API_KEY', default='')
+JINA_EMBEDDING_MODEL = config('JINA_EMBEDDING_MODEL', default='jina-embeddings-v5-text-nano')
+JINA_API_BASE_URL = config('JINA_API_BASE_URL', default='https://api.jina.ai/v1/embeddings')
+JINA_TIMEOUT = config('JINA_TIMEOUT', default=30, cast=int)
+JINA_MAX_RETRIES = config('JINA_MAX_RETRIES', default=2, cast=int)
+JINA_RATE_LIMIT_DELAY = config('JINA_RATE_LIMIT_DELAY', default=0.3, cast=float)
+JINA_MAX_INPUT_CHARS = config('JINA_MAX_INPUT_CHARS', default=4000, cast=int)
+# Output dimension for the embedding vectors (must match the pgvector column size)
+JINA_EMBEDDING_DIMENSIONS = config('JINA_EMBEDDING_DIMENSIONS', default=256, cast=int)
+AI_EMBEDDING_DIMENSIONS = JINA_EMBEDDING_DIMENSIONS
+
+# --- AI Matching (hybrid scoring, weights sum to 1.0) ---
+AI_MATCH_WEIGHTS = {
+    'semantic': 0.60,
+    'category': 0.15,
+    'location': 0.10,
+    'date': 0.10,
+    'tags': 0.05,
+}
+AI_MATCH_THRESHOLD = config('AI_MATCH_THRESHOLD', default=0.35, cast=float)
+AI_MATCH_CANDIDATES = config('AI_MATCH_CANDIDATES', default=20, cast=int)
+AI_MATCH_RESULTS = config('AI_MATCH_RESULTS', default=5, cast=int)
+AI_SEARCH_RESULTS = config('AI_SEARCH_RESULTS', default=20, cast=int)
+AI_SEARCH_MIN_SCORE = config('AI_SEARCH_MIN_SCORE', default=0.25, cast=float)
 
 # Site
-SITE_NAME = config('SITE_NAME', default='IUBAT Lost & Find')
+SITE_NAME = config('SITE_NAME', default='IUBAT SmartFind')
 SITE_URL = config('SITE_URL', default='http://localhost:8000')
 
 # Email
@@ -158,10 +184,10 @@ EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@iubat-lostfind.com')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@iubat-smartfind.com')
 
 # Supabase Storage (S3-compatible)
-SUPABASE_BUCKET = config('SUPABASE_BUCKET', default='lostfind-media')
+SUPABASE_BUCKET = config('SUPABASE_BUCKET', default='smartfind-media')
 
 import storages.backends.s3boto3  # noqa - ensure storage backend is available
 

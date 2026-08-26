@@ -9,6 +9,7 @@ class Category(models.Model):
     slug = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
     icon = models.CharField(max_length=50, default='bi-tag')
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -26,6 +27,7 @@ class CampusLocation(models.Model):
     description = models.TextField(blank=True, null=True)
     building = models.CharField(max_length=100, blank=True, null=True)
     floor = models.CharField(max_length=50, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -60,6 +62,7 @@ class Post(models.Model):
     reward_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
     is_resolved = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
     views_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

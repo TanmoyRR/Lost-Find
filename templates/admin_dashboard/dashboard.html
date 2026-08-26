@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 
-{% block page_title %}Admin Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
 
 {% block dashboard_content %}
 <div class="space-y-6 animate-fade-in">
@@ -245,7 +245,7 @@
     <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-800">Recent Payments</h3>
-            <a href="{% url 'dashboard:admin_payments' %}" class="text-indigo-500 text-sm font-medium hover:underline">View All</a>
+            <a href="{% url 'dashboard:admin_revenue' %}" class="text-indigo-500 text-sm font-medium hover:underline">View All</a>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">

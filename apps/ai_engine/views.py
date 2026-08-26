@@ -3,52 +3,43 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Q
-from .models import PostEmbedding, MatchSuggestion
-from .utils import generate_embedding, compute_cosine_similarity, build_text_for_post
-from apps.posts.models import Post
+from .models import MatchSuggestion
+from .utils import (
+    generate_embedding,
+    semantic_search_posts,
+    keyword_search_posts,
+    vector_backend_available,
+)
 from apps.notifications.models import Notification
 
 
+@login_required
 def ai_search(request):
     query = request.GET.get('q', '').strip()
-    post_type = request.GET.get('type', '')
-    category_slug = request.GET.get('category', '')
-    location_slug = request.GET.get('location', '')
-    status = request.GET.get('status', '')
+    filters = {
+        'post_type': request.GET.get('type', ''),
+        'category_slug': request.GET.get('category', ''),
+        'location_slug': request.GET.get('location', ''),
+        'status': request.GET.get('status', ''),
+    }
 
     results = []
-    if query:
-        query_embedding = generate_embedding(query)
-        if query_embedding:
-            all_embeddings = PostEmbedding.objects.select_related('post', 'post__category', 'post__location').all()
-            scored = []
-            for pe in all_embeddings:
-                score = compute_cosine_similarity(query_embedding, pe.embedding)
-                if score > 0.3:
-                    scored.append((pe.post, score))
-            scored.sort(key=lambda x: x[1], reverse=True)
-            results = scored[:20]
+    used_fallback = False
 
-    posts_list = []
-    seen = set()
-    for post_obj, score in results:
-        if post_obj.pk in seen:
-            continue
-        seen.add(post_obj.pk)
-        if post_type and post_obj.post_type != post_type:
-            continue
-        if category_slug and (not post_obj.category or post_obj.category.slug != category_slug):
-            continue
-        if location_slug and (not post_obj.location or post_obj.location.slug != location_slug):
-            continue
-        if status and post_obj.status != status:
-            continue
-        posts_list.append(post_obj)
+    if query:
+        query_vector = generate_embedding(query) if vector_backend_available() else None
+        if query_vector:
+            scored = semantic_search_posts(query_vector, **filters)
+            results = [(post, score) for post, score in scored][:20]
+        else:
+            used_fallback = True
+            results = [(post, 0.0) for post in keyword_search_posts(query, **filters)]
 
     return render(request, 'ai_engine/search_results.html', {
-        'results': posts_list,
+        'results': results,
         'query': query,
-        'result_count': len(posts_list),
+        'used_fallback': used_fallback,
+        'result_count': len(results),
     })
 
 

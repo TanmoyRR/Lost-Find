@@ -2,11 +2,11 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15
+    image: pgvector/pgvector:pg15
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=iubat_lostfind
+      - POSTGRES_DB=iubat_smartfind
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     healthcheck:

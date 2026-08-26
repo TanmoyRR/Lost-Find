@@ -1,7 +1,7 @@
 {% extends 'base/dashboard_base.html' %}
 {% load static %}
 
-{% block page_title %}User Management{% endblock %}
+{% block page_title %}Users{% endblock %}
 
 {% block dashboard_content %}
 <div class="space-y-6 animate-fade-in">
@@ -49,10 +49,17 @@
                         <td class="py-3">
                             <div class="flex items-center gap-2">
                                 <a href="{% url 'dashboard:admin_user_detail' u.pk %}" class="text-indigo-500 hover:text-indigo-700 text-sm font-medium">View</a>
+                                <a href="{% url 'dashboard:admin_user_detail' u.pk %}?tab=info" class="text-amber-600 hover:text-amber-700 text-sm font-medium">Edit Info</a>
                                 {% if u.is_suspended %}
                                 <a href="{% url 'dashboard:admin_activate_user' u.pk %}" class="text-emerald-500 hover:text-emerald-700 text-sm font-medium">Activate</a>
                                 {% else %}
                                 <a href="{% url 'dashboard:admin_suspend_user' u.pk %}" class="text-red-500 hover:text-red-700 text-sm font-medium">Suspend</a>
+                                {% endif %}
+                                {% if u.pk != request.user.pk %}
+                                <form method="POST" action="{% url 'dashboard:admin_delete_user' u.pk %}" class="inline" onsubmit="return confirm('Delete this user permanently? All their posts and data will be removed.')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-red-500 hover:text-red-700 text-sm font-medium bg-transparent border-0 cursor-pointer p-0">Delete</button>
+                                </form>
                                 {% endif %}
                             </div>
                         </td>

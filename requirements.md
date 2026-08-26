@@ -1,4 +1,4 @@
-\# Lost \& Found Board System
+\# IUBAT SmartFind: AI-Powered Lost \& Found System (SRS)
 
 
 

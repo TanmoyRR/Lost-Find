@@ -37,7 +37,7 @@ def _send_verification_email(user):
     verify_url = f'{settings.SITE_URL}/accounts/verify-email/{token}/'
     context = {'user': user, 'verify_url': verify_url, 'site_name': settings.SITE_NAME}
     _send_email(
-        subject='Verify your email - IUBAT Lost & Find',
+        subject='Verify your email - IUBAT SmartFind',
         template='accounts/emails/email_verification.html',
         context=context,
         recipient=user.email,
@@ -62,6 +62,8 @@ def register(request):
 
 def user_login(request):
     if request.user.is_authenticated:
+        if request.user.role == 'admin':
+            return redirect('dashboard:admin_home')
         return redirect('dashboard:home')
     if request.method == 'POST':
         form = LoginForm(request, data=request.POST)
@@ -72,8 +74,12 @@ def user_login(request):
                 return render(request, 'accounts/login.html', {'form': form})
             login(request, user)
             UserActivity.objects.create(user=user, activity_type='login', description='User logged in')
-            next_url = request.GET.get('next', 'dashboard:home')
-            return redirect(next_url)
+            next_url = request.GET.get('next', None)
+            if next_url:
+                return redirect(next_url)
+            if user.role == 'admin':
+                return redirect('dashboard:admin_home')
+            return redirect('dashboard:home')
     else:
         form = LoginForm()
     return render(request, 'accounts/login.html', {'form': form})
@@ -102,7 +108,7 @@ def forgot_password(request):
                 user.save()
                 reset_url = request.build_absolute_uri(reverse('accounts:reset_password', args=[token]))
                 _send_email(
-                    'Password Reset - IUBAT Lost & Find',
+                    'Password Reset - IUBAT SmartFind',
                     'accounts/emails/password_reset.html',
                     {'user': user, 'reset_url': reset_url},
                     user.email
@@ -187,6 +193,9 @@ def profile_edit(request):
 
 @login_required
 def change_password(request):
+    if request.user.role == 'admin':
+        messages.error(request, 'Admin passwords can only be changed through the backend.')
+        return redirect('accounts:profile')
     if request.method == 'POST':
         form = PasswordChangeForm(request.user, request.POST)
         if form.is_valid():

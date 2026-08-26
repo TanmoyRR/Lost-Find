@@ -5,7 +5,7 @@
 {% block page_title %}{{ profile_user.get_full_name|default:profile_user.username }} - User Details{% endblock %}
 
 {% block dashboard_content %}
-<div class="space-y-6 animate-fade-in" x-data="{ activeTab: 'posts' }">
+<div class="space-y-6 animate-fade-in" x-data="{ activeTab: new URLSearchParams(window.location.search).get('tab') || 'posts' }">
     <!-- User Profile Header -->
     <div class="relative overflow-hidden rounded-2xl gradient-primary p-8 text-white">
         <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
@@ -42,12 +42,20 @@
                     <i class="bi bi-ban"></i> Suspend
                 </a>
                 {% endif %}
+                {% if profile_user.pk != request.user.pk %}
+                <form method="POST" action="{% url 'dashboard:admin_delete_user' profile_user.pk %}" onsubmit="return confirm('Delete this user permanently? All their posts and data will be removed.')">
+                    {% csrf_token %}
+                    <button type="submit" class="glass px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-red-600/40 transition flex items-center gap-2">
+                        <i class="bi bi-trash3"></i> Delete
+                    </button>
+                </form>
+                {% endif %}
             </div>
         </div>
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between mb-4">
                 <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
@@ -56,15 +64,6 @@
                 <span class="text-3xl font-bold text-gray-800">{{ total_posts|default:"0" }}</span>
             </div>
             <h3 class="text-gray-500 text-sm font-medium">Total Posts</h3>
-        </div>
-        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-            <div class="flex items-center justify-between mb-4">
-                <div class="w-12 h-12 rounded-xl gradient-warning flex items-center justify-center">
-                    <i class="bi bi-clock-history text-white text-xl"></i>
-                </div>
-                <span class="text-3xl font-bold text-gray-800">{{ open_posts|default:"0" }}</span>
-            </div>
-            <h3 class="text-gray-500 text-sm font-medium">Open Posts</h3>
         </div>
         <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between mb-4">
@@ -133,6 +132,7 @@
                             <td class="py-3 text-sm text-gray-500">{{ post.created_at|date:"M d, Y" }}</td>
                             <td class="py-3">
                                 <a href="{% url 'posts:detail' post.pk %}" class="text-indigo-500 hover:text-indigo-700 text-sm font-medium">View</a>
+                                <a href="{% url 'posts:edit' post.pk %}" class="text-indigo-500 hover:text-indigo-700 text-sm font-medium ml-2">Edit</a>
                             </td>
                         </tr>
                         {% empty %}
@@ -296,6 +296,57 @@
                 </div>
             </div>
         </div>
+
+        <!-- Edit User Info -->
+        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm mt-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                <i class="bi bi-pencil-square text-indigo-500"></i> Edit User Info
+            </h3>
+            <p class="text-sm text-gray-400 mb-5">Update the account details below. Password cannot be changed here.</p>
+            <form method="POST" action="{% url 'dashboard:admin_update_user_info' profile_user.pk %}" class="space-y-4">
+                {% csrf_token %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                        <input type="text" name="username" value="{{ profile_user.username }}" required class="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" name="email" value="{{ profile_user.email }}" required class="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                        <input type="text" name="first_name" value="{{ profile_user.first_name }}" class="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                        <input type="text" name="last_name" value="{{ profile_user.last_name }}" class="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
+                        <input type="text" name="student_id" value="{{ profile_user.student_id|default:'' }}" class="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                        <select name="department" class="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm">
+                            <option value="">— Select department —</option>
+                            {% for value, label in profile_user.DEPARTMENTS %}
+                            <option value="{{ value }}" {% if profile_user.department == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input type="text" name="phone" value="{{ profile_user.phone|default:'' }}" class="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm">
+                    </div>
+                </div>
+                <div class="pt-2">
+                    <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 bg-indigo-600 text-white hover:bg-indigo-700">
+                        <i class="bi bi-check-circle"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Membership Tab -->
@@ -349,6 +400,13 @@
                         <i class="bi {% if membership and membership.is_active %}bi-x-circle{% else %}bi-gem{% endif %}"></i>
                         {% if membership and membership.is_active %}Revoke Membership{% else %}Grant Membership{% endif %}
                     </a>
+                    <form method="POST" action="{% url 'dashboard:admin_extend_membership' profile_user.pk %}" class="flex items-center gap-2">
+                        {% csrf_token %}
+                        <input type="number" name="days" value="30" min="1" max="3650" class="w-20 px-2 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm">
+                        <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200">
+                            <i class="bi bi-calendar-plus"></i> Extend (days)
+                        </button>
+                    </form>
                 </div>
             </form>
             {% endwith %}

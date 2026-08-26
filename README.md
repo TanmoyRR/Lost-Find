@@ -1,12 +1,12 @@
-# IUBAT Lost & Found Management System with AI Features
+# IUBAT SmartFind: AI-Powered Lost & Found System
 
-A production-ready Django web application for managing lost and found items at IUBAT University, featuring AI-powered semantic search and automatic matching.
+A production-ready Django web application for managing lost and found items at IUBAT University, featuring AI-powered smart search (Jina API embeddings) and automatic matching (Supabase PostgreSQL + pgvector).
 
 ## Features
 
 - **Lost & Found Posting**: Create, edit, and manage lost/found posts with images
-- **AI Semantic Search**: Natural language search (e.g., "lost samsung phone" finds "found android mobile")
-- **Automatic AI Matching**: Auto-match lost with found items using sentence-transformers
+- **Smart Search (AI Semantic Search)**: Natural language search (e.g., "lost samsung phone" finds "found android mobile") via the Jina Embeddings API
+- **Automatic AI Matching**: Auto-match lost with found items using pgvector cosine search + hybrid scoring; keyword search always works as fallback
 - **Membership System**: Annual membership (100 BDT) via SSLCommerz
 - **User Roles**: Guest, Student/User, Admin with full RBAC
 - **Custom Admin Dashboard**: Full admin panel (no Django admin UI)
@@ -16,12 +16,12 @@ A production-ready Django web application for managing lost and found items at I
 
 - **Backend**: Django 5.0, Gunicorn
 - **Frontend**: Tailwind CSS, Alpine.js, Bootstrap Icons
-- **Database**: PostgreSQL 15+
-- **AI**: sentence-transformers (all-MiniLM-L6-v2) + cosine similarity
+- **Database**: Supabase PostgreSQL 15+ with the pgvector extension
+- **AI**: Jina Embeddings API (jina-embeddings-v5-text-nano) - no local model, no GPU
 - **Payment**: SSLCommerz
 - **Task Queue**: Celery + Redis (optional)
 - **Proxy**: Nginx
-- **Deployment**: Docker, Heroku, or bare-metal
+- **Deployment**: Docker, Heroku, Railway, or bare-metal
 
 ---
 
@@ -29,7 +29,7 @@ A production-ready Django web application for managing lost and found items at I
 
 ```bash
 # 1. Clone
-git clone <repo-url> && cd LostFind
+git clone <repo-url> && cd SmartFind
 
 # 2. Virtual environment
 python -m venv venv
@@ -43,12 +43,10 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your database credentials
 
-# 5. Create database
-createdb iubat_lostfind
-
-# 6. Run migrations & seed
+# 5. Run migrations, seed, and generate AI embeddings
 python manage.py migrate
 python manage.py seed_data
+python manage.py generate_embeddings   # backfills embeddings via the Jina API
 python manage.py createsuperuser
 
 # 7. Run dev server
@@ -84,8 +82,8 @@ sudo apt update
 sudo apt install -y python3.11 python3.11-venv python3.11-dev postgresql postgresql-contrib nginx git
 
 # 3. Clone the project
-git clone <your-repo-url> /var/www/lostfind
-cd /var/www/lostfind
+git clone <your-repo-url> /var/www/smartfind
+cd /var/www/smartfind
 
 # 4. Set up Python environment
 python3.11 -m venv venv
@@ -93,12 +91,12 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 5. Configure PostgreSQL
-sudo -u postgres psql -c "CREATE DATABASE iubat_lostfind;"
-sudo -u postgres psql -c "CREATE USER lostfind_user WITH PASSWORD 'your_strong_password';"
-sudo -u postgres psql -c "ALTER ROLE lostfind_user SET client_encoding TO 'utf8';"
-sudo -u postgres psql -c "ALTER ROLE lostfind_user SET default_transaction_isolation TO 'read committed';"
-sudo -u postgres psql -c "ALTER ROLE lostfind_user SET timezone TO 'Asia/Dhaka';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE iubat_lostfind TO lostfind_user;"
+sudo -u postgres psql -c "CREATE DATABASE iubat_smartfind;"
+sudo -u postgres psql -c "CREATE USER smartfind_user WITH PASSWORD 'your_strong_password';"
+sudo -u postgres psql -c "ALTER ROLE smartfind_user SET client_encoding TO 'utf8';"
+sudo -u postgres psql -c "ALTER ROLE smartfind_user SET default_transaction_isolation TO 'read committed';"
+sudo -u postgres psql -c "ALTER ROLE smartfind_user SET timezone TO 'Asia/Dhaka';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE iubat_smartfind TO smartfind_user;"
 
 # 6. Environment
 cp .env.example .env
@@ -121,7 +119,7 @@ gunicorn core.wsgi:application --workers 4 --bind 0.0.0.0:8000 --daemon
 
 ```bash
 # 1. Clone and configure
-git clone <repo-url> && cd LostFind
+git clone <repo-url> && cd SmartFind
 cp .env.example .env
 nano .env   # Set your values
 
@@ -159,8 +157,8 @@ sudo apt update
 sudo apt install -y python3.11 python3.11-venv python3.11-dev postgresql postgresql-contrib nginx git
 
 # 2. Clone project
-git clone <repo-url> /var/www/lostfind
-cd /var/www/lostfind
+git clone <repo-url> /var/www/smartfind
+cd /var/www/smartfind
 
 # 3. Python setup
 python3.11 -m venv venv
@@ -168,12 +166,12 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 4. Database
-sudo -u postgres psql -c "CREATE DATABASE iubat_lostfind;"
-sudo -u postgres psql -c "CREATE USER lostfind_user WITH PASSWORD 'your_password';"
-sudo -u postgres psql -c "ALTER ROLE lostfind_user SET client_encoding TO 'utf8';"
-sudo -u postgres psql -c "ALTER ROLE lostfind_user SET default_transaction_isolation TO 'read committed';"
-sudo -u postgres psql -c "ALTER ROLE lostfind_user SET timezone TO 'Asia/Dhaka';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE iubat_lostfind TO lostfind_user;"
+sudo -u postgres psql -c "CREATE DATABASE iubat_smartfind;"
+sudo -u postgres psql -c "CREATE USER smartfind_user WITH PASSWORD 'your_password';"
+sudo -u postgres psql -c "ALTER ROLE smartfind_user SET client_encoding TO 'utf8';"
+sudo -u postgres psql -c "ALTER ROLE smartfind_user SET default_transaction_isolation TO 'read committed';"
+sudo -u postgres psql -c "ALTER ROLE smartfind_user SET timezone TO 'Asia/Dhaka';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE iubat_smartfind TO smartfind_user;"
 
 # 5. Environment
 cp .env.example .env
@@ -186,21 +184,21 @@ python manage.py collectstatic --noinput
 python manage.py createsuperuser
 
 # 7. Gunicorn systemd service
-sudo nano /etc/systemd/system/lostfind.service
+sudo nano /etc/systemd/system/smartfind.service
 ```
 
 Create the systemd service file:
 
 ```ini
 [Unit]
-Description=IUBAT Lost & Find Gunicorn Service
+Description=IUBAT SmartFind Gunicorn Service
 After=network.target postgresql.service
 
 [Service]
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/lostfind
-ExecStart=/var/www/lostfind/venv/bin/gunicorn core.wsgi:application --workers 4 --bind unix:/var/www/lostfind/lostfind.sock --timeout 120
+WorkingDirectory=/var/www/smartfind
+ExecStart=/var/www/smartfind/venv/bin/gunicorn core.wsgi:application --workers 4 --bind unix:/var/www/smartfind/smartfind.sock --timeout 120
 Restart=always
 
 [Install]
@@ -209,11 +207,11 @@ WantedBy=multi-user.target
 
 ```bash
 # Enable and start
-sudo systemctl enable lostfind
-sudo systemctl start lostfind
+sudo systemctl enable smartfind
+sudo systemctl start smartfind
 
 # 8. Nginx configuration
-sudo nano /etc/nginx/sites-available/lostfind
+sudo nano /etc/nginx/sites-available/smartfind
 ```
 
 ```nginx
@@ -223,22 +221,22 @@ server {
     client_max_body_size 100M;
 
     location /static/ {
-        alias /var/www/lostfind/staticfiles/;
+        alias /var/www/smartfind/staticfiles/;
     }
 
     location /media/ {
-        alias /var/www/lostfind/media/;
+        alias /var/www/smartfind/media/;
     }
 
     location / {
         include proxy_params;
-        proxy_pass http://unix:/var/www/lostfind/lostfind.sock;
+        proxy_pass http://unix:/var/www/smartfind/smartfind.sock;
     }
 }
 ```
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/lostfind /etc/nginx/sites-enabled
+sudo ln -s /etc/nginx/sites-available/smartfind /etc/nginx/sites-enabled
 sudo nginx -t
 sudo systemctl restart nginx
 
@@ -252,8 +250,13 @@ sudo certbot --nginx -d yourdomain.com
 **Railway:**
 ```bash
 # Connect GitHub repo to Railway
-# Add Postgres plugin
-# Set environment variables in Railway dashboard
+# Add Postgres plugin (or point DB_* vars at Supabase)
+# Set environment variables in Railway dashboard:
+#   SECRET_KEY, DEBUG=False, ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS,
+#   DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT,
+#   JINA_API_KEY, JINA_EMBEDDING_MODEL, JINA_EMBEDDING_DIMENSIONS,
+#   and Supabase S3 vars (if using Supabase storage)
+# No AI model installation needed on Railway - embeddings use the Jina API
 # Deploy - Railway auto-detects the Procfile
 ```
 
@@ -273,11 +276,14 @@ sudo certbot --nginx -d yourdomain.com
 | `DEBUG` | No | False | Set to True only in development |
 | `ALLOWED_HOSTS` | **Yes** | localhost,127.0.0.1 | Comma-separated allowed hosts |
 | `CSRF_TRUSTED_ORIGINS` | **Yes** | - | Comma-separated trusted origins |
-| `DB_NAME` | **Yes** | iubat_lostfind | PostgreSQL database name |
+| `DB_NAME` | **Yes** | iubat_smartfind | PostgreSQL database name |
 | `DB_USER` | **Yes** | postgres | PostgreSQL user |
 | `DB_PASSWORD` | **Yes** | - | PostgreSQL password |
 | `DB_HOST` | **Yes** | localhost | PostgreSQL host |
 | `DB_PORT` | No | 5432 | PostgreSQL port |
+| `JINA_API_KEY` | **Yes (for AI)** | - | Jina API key (backend only, never commit) |
+| `JINA_EMBEDDING_MODEL` | No | jina-embeddings-v5-text-nano | Jina embedding model |
+| `JINA_EMBEDDING_DIMENSIONS` | No | 256 | Vector dimension (must match the pgvector column) |
 | `SSLCOMMERZ_STORE_ID` | **Yes** | - | SSLCommerz store ID |
 | `SSLCOMMERZ_STORE_PASS` | **Yes** | - | SSLCommerz store password |
 | `SSLCOMMERZ_IS_SANDBOX` | No | True | Use sandbox mode |
@@ -288,7 +294,7 @@ sudo certbot --nginx -d yourdomain.com
 ## Project Structure
 
 ```
-LostFind/
+SmartFind/
 ├── core/                    # Django project config
 │   ├── settings.py
 │   ├── urls.py
@@ -348,6 +354,6 @@ Before deploying to production:
 - Run `python manage.py collectstatic --noinput`
 - Ensure `whitenoise` is in MIDDLEWARE (it is by default)
 
-**AI model not working**
-- The first load downloads the model (~90MB). Ensure internet connectivity.
-- If memory is limited, the AI features degrade gracefully (return empty results).
+**AI features not returning results**
+- Smart Search / AI Matching require: (1) `JINA_API_KEY` set, (2) a PostgreSQL database with pgvector, (3) post embeddings generated. Run `python manage.py generate_embeddings` after migrating. If the Jina API is down or the key is invalid, Smart Search automatically falls back to keyword search and post creation still works.
+- On Supabase, pgvector may need enabling once: `CREATE EXTENSION IF NOT EXISTS vector;` (usually already enabled).

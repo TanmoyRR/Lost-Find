@@ -8,9 +8,10 @@ from .models import Post, Category, CampusLocation
 from .forms import PostForm
 from apps.accounts.models import UserActivity
 from apps.accounts.decorators import membership_required
-from apps.ai_engine.utils import find_matches_for_post
+from apps.ai_engine.utils import find_matches_for_post, refresh_post_embedding, build_text_for_post
 
 
+@login_required
 def browse_posts(request):
     query = request.GET.get('q', '')
     post_type = request.GET.get('type', '')
@@ -18,7 +19,7 @@ def browse_posts(request):
     location = request.GET.get('location', '')
     status = request.GET.get('status', '')
 
-    posts = Post.objects.all()
+    posts = Post.objects.select_related('category', 'location', 'user')
 
     if query:
         posts = posts.filter(
@@ -54,8 +55,9 @@ def browse_posts(request):
     })
 
 
+@login_required
 def post_detail(request, pk):
-    post = get_object_or_404(Post, pk=pk)
+    post = get_object_or_404(Post.objects.select_related('category', 'location', 'user'), pk=pk)
     post.views_count += 1
     post.save()
     can_view_full = False
@@ -68,9 +70,11 @@ def post_detail(request, pk):
             membership = getattr(request.user, 'membership', None)
             if membership and membership.is_active:
                 can_view_full = True
-    related_posts = Post.objects.filter(category=post.category).exclude(pk=post.pk)[:4]
+    related_posts = Post.objects.select_related('location', 'category').filter(category=post.category).exclude(pk=post.pk)[:4]
     from apps.ai_engine.models import MatchSuggestion
-    ai_matches_qs = MatchSuggestion.objects.filter(
+    ai_matches_qs = MatchSuggestion.objects.select_related(
+        'post', 'matched_post', 'post__category', 'matched_post__category'
+    ).filter(
         Q(post=post) | Q(matched_post=post)
     ).order_by('-similarity_score')[:5]
     ai_matches = []
@@ -87,6 +91,9 @@ def post_detail(request, pk):
 
 @membership_required
 def create_post(request):
+    if request.user.is_staff or request.user.is_superuser:
+        messages.error(request, 'Admins manage posts; they cannot create new posts.')
+        return redirect('dashboard:admin_home')
     if request.method == 'POST':
         form = PostForm(request.POST, request.FILES)
         if form.is_valid():
@@ -106,12 +113,22 @@ def create_post(request):
 
 @membership_required
 def edit_post(request, pk):
-    post = get_object_or_404(Post, pk=pk, user=request.user)
+    if request.user.is_staff or request.user.is_superuser:
+        post = get_object_or_404(Post, pk=pk)
+    else:
+        post = get_object_or_404(Post, pk=pk, user=request.user)
+    old_searchable_text = build_text_for_post(post)
     if request.method == 'POST':
         form = PostForm(request.POST, request.FILES, instance=post)
         if form.is_valid():
             form.save()
             UserActivity.objects.create(user=request.user, activity_type='post_updated', description=f'Updated post: {post.title}')
+            new_searchable_text = build_text_for_post(post)
+            if new_searchable_text != old_searchable_text:
+                try:
+                    refresh_post_embedding(post)
+                except Exception:
+                    pass
             messages.success(request, 'Post updated successfully!')
             return redirect('posts:detail', pk=post.pk)
     else:

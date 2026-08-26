@@ -1,10 +1,11 @@
 from django.db import models
 from django.conf import settings
+from pgvector.django import VectorField
 
 
 class PostEmbedding(models.Model):
     post = models.OneToOneField('posts.Post', on_delete=models.CASCADE, related_name='embedding')
-    embedding = models.JSONField()
+    embedding = VectorField(dimensions=settings.AI_EMBEDDING_DIMENSIONS)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

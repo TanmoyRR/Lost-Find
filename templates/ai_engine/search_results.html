@@ -2,15 +2,15 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}AI Search Results - IUBAT Lost & Find{% endblock %}
+{% block title %}AI Search Results - IUBAT SmartFind{% endblock %}
 
 {% block content %}
 <div class="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-indigo-100">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
         <!-- Header -->
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">AI Semantic Search</h1>
-            <p class="text-gray-500 mt-1">Find items using natural language descriptions</p>
+            <h1 class="text-3xl font-bold text-gray-900">Smart Search</h1>
+            <p class="text-gray-500 mt-1">AI-powered natural language search across campus lost & found posts</p>
         </div>
 
         <!-- Search Form -->
@@ -42,6 +42,13 @@
                 </div>
                 <span class="text-sm font-medium text-gray-500">{{ results|length }} result{{ results|length|pluralize }} found</span>
             </div>
+            {% if used_fallback %}
+            <div class="mt-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+                <i class="bi bi-exclamation-triangle"></i>
+                AI search is temporarily unavailable (Jina API or vector database unavailable).
+                Showing regular keyword search results instead.
+            </div>
+            {% endif %}
         </div>
 
         <!-- Results List -->
@@ -80,6 +87,14 @@
                                 </div>
                             </div>
                             <!-- Similarity Score Badge -->
+                            {% if used_fallback %}
+                            <div class="flex flex-col items-center ml-4">
+                                <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                                    <i class="bi bi-search text-xl text-gray-400"></i>
+                                </div>
+                                <span class="text-xs text-gray-400 mt-1">Keyword</span>
+                            </div>
+                            {% else %}
                             <div class="flex flex-col items-center ml-4">
                                 <div class="relative w-16 h-16">
                                     <svg class="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
@@ -97,6 +112,7 @@
                                 </div>
                                 <span class="text-xs text-gray-400 mt-1">Match</span>
                             </div>
+                            {% endif %}
                         </div>
                         <p class="text-sm text-gray-500 line-clamp-2">{{ post.description|truncatechars:120 }}</p>
                     </div>

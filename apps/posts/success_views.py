@@ -5,6 +5,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from .models import SuccessStory, Post
 
+@login_required
 def success_stories(request):
     stories = SuccessStory.objects.filter(is_published=True).order_by('-is_featured', '-published_at')
     featured = stories.filter(is_featured=True)[:3]
@@ -15,6 +16,7 @@ def success_stories(request):
         'total_recovered': total_recovered,
     })
 
+@login_required
 def success_story_detail(request, pk):
     story = get_object_or_404(SuccessStory, pk=pk, is_published=True)
     return render(request, 'posts/success_story_detail.html', {'story': story})

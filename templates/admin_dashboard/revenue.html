@@ -1,0 +1,381 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Revenue{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <!-- Header + Export -->
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-xl font-bold text-gray-800">Revenue</h2>
+            <p class="text-sm text-gray-500 mt-0.5">Revenue analytics and payment history from SSLCommerz membership transactions</p>
+        </div>
+        <a href="{% url 'dashboard:admin_revenue_export' %}?{{ filter_qs }}"
+           class="gradient-primary text-white px-5 py-3 rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 flex items-center gap-2 shadow-md shadow-indigo-500/10">
+            <i class="bi bi-file-earmark-excel text-base"></i> Export Excel
+        </a>
+    </div>
+
+    <!-- Revenue Summary -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                    <i class="bi bi-currency-dollar text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ stats.total_revenue|default:0|floatformat:0|intcomma }} BDT</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Total Revenue</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-info flex items-center justify-center">
+                    <i class="bi bi-calendar-month text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ stats.month_revenue|default:0|floatformat:0|intcomma }} BDT</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">This Month's Revenue</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-success flex items-center justify-center">
+                    <i class="bi bi-calendar2-check text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ stats.year_revenue|default:0|floatformat:0|intcomma }} BDT</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">This Year's Revenue</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-success flex items-center justify-center">
+                    <i class="bi bi-check-circle text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ stats.successful_payments }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Successful Payments</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-warning flex items-center justify-center">
+                    <i class="bi bi-hourglass-split text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ stats.pending_payments }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Pending Payments</h3>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl gradient-danger flex items-center justify-center">
+                    <i class="bi bi-x-circle text-white text-xl"></i>
+                </div>
+                <span class="text-3xl font-bold text-gray-800">{{ stats.failed_payments }}</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium">Failed Payments</h3>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <form method="GET" action="{% url 'dashboard:admin_revenue' %}" id="revenueFilters" class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <input type="hidden" name="chart" id="chartInput" value="{{ chart_period }}">
+        <div class="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2 flex-shrink-0">
+                <i class="bi bi-funnel text-indigo-500"></i> Filters
+            </h3>
+            <div class="flex flex-wrap items-center gap-3">
+                <input type="text" name="q" value="{{ q }}" placeholder="Search by transaction, user, email..." class="px-4 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm w-64">
+                <select name="period" class="px-4 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
+                    <option value="all" {% if period == 'all' %}selected{% endif %}>All Time</option>
+                    <option value="today" {% if period == 'today' %}selected{% endif %}>Today</option>
+                    <option value="7d" {% if period == '7d' %}selected{% endif %}>Last 7 Days</option>
+                    <option value="month" {% if period == 'month' %}selected{% endif %}>This Month</option>
+                    <option value="year" {% if period == 'year' %}selected{% endif %}>This Year</option>
+                    <option value="custom" {% if period == 'custom' %}selected{% endif %}>Custom Range</option>
+                </select>
+                <input type="date" name="date_from" value="{{ date_from }}" class="px-3 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                <span class="text-gray-400 text-sm">to</span>
+                <input type="date" name="date_to" value="{{ date_to }}" class="px-3 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm">
+                <select name="status" class="px-4 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
+                    <option value="" {% if not status %}selected{% endif %}>All Statuses</option>
+                    <option value="completed" {% if status == 'completed' %}selected{% endif %}>Success</option>
+                    <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="failed" {% if status == 'failed' %}selected{% endif %}>Failed</option>
+                    <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                    <option value="processing" {% if status == 'processing' %}selected{% endif %}>Processing</option>
+                </select>
+                <select name="payment_type" class="px-4 py-2 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
+                    <option value="" {% if not payment_type %}selected{% endif %}>All Types</option>
+                    {% for t in type_choices %}
+                    <option value="{{ t.0 }}" {% if payment_type == t.0 %}selected{% endif %}>{{ t.1 }}</option>
+                    {% endfor %}
+                </select>
+                <a href="{% url 'dashboard:admin_revenue' %}" class="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">Reset</a>
+                <button type="submit" class="gradient-primary text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition">Apply</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Revenue Chart -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <i class="bi bi-graph-up text-indigo-500"></i> Revenue Analytics
+            </h3>
+            <div class="flex rounded-xl border border-gray-200 overflow-hidden">
+                <button type="button" onclick="document.getElementById('chartInput').value='day'; document.getElementById('revenueFilters').submit();"
+                    class="px-4 py-2 text-sm font-medium transition {% if chart_period == 'day' %}gradient-primary text-white{% else %}text-gray-600 hover:bg-gray-50{% endif %}">Daily</button>
+                <button type="button" onclick="document.getElementById('chartInput').value='week'; document.getElementById('revenueFilters').submit();"
+                    class="px-4 py-2 text-sm font-medium transition {% if chart_period == 'week' %}gradient-primary text-white{% else %}text-gray-600 hover:bg-gray-50{% endif %}">Weekly</button>
+                <button type="button" onclick="document.getElementById('chartInput').value='month'; document.getElementById('revenueFilters').submit();"
+                    class="px-4 py-2 text-sm font-medium transition {% if chart_period == 'month' %}gradient-primary text-white{% else %}text-gray-600 hover:bg-gray-50{% endif %}">Monthly</button>
+            </div>
+        </div>
+        <div class="relative h-72">
+            <canvas id="revenueChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Payment History -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-gray-800">Payment History</h3>
+            <span class="text-sm text-gray-400">{{ total_count }} transaction{{ total_count|pluralize }}</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-100">
+                        <th class="pb-3 font-medium">Transaction ID</th>
+                        <th class="pb-3 font-medium">User Name</th>
+                        <th class="pb-3 font-medium">User Email</th>
+                        <th class="pb-3 font-medium">Payment Type</th>
+                        <th class="pb-3 font-medium">Amount</th>
+                        <th class="pb-3 font-medium">Payment Status</th>
+                        <th class="pb-3 font-medium">Payment Gateway</th>
+                        <th class="pb-3 font-medium">Payment Method</th>
+                        <th class="pb-3 font-medium">SSLCommerz Transaction ID</th>
+                        <th class="pb-3 font-medium">Payment Date</th>
+                        <th class="pb-3 font-medium">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="py-3">
+                            <span class="text-sm font-mono text-gray-500">{{ p.transaction_id|default:'N/A'|truncatechars:16 }}</span>
+                        </td>
+                        <td class="py-3">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-medium">{{ p.user.get_full_name|default:p.user.username|first|upper }}</div>
+                                <span class="text-sm text-gray-700">{{ p.user.get_full_name|default:p.user.username }}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 text-sm text-gray-500">{{ p.user.email|default:'—' }}</td>
+                        <td class="py-3">
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg {% if p.payment_type == 'membership' %}bg-purple-100 text-purple-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                                {{ p.get_payment_type_display }}
+                            </span>
+                        </td>
+                        <td class="py-3">
+                            <span class="text-sm font-semibold text-gray-800">{{ p.amount|floatformat:2 }} BDT</span>
+                        </td>
+                        <td class="py-3">
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg
+                                {% if p.status == 'completed' %}bg-emerald-100 text-emerald-700
+                                {% elif p.status == 'pending' %}bg-amber-100 text-amber-700
+                                {% elif p.status == 'failed' %}bg-red-100 text-red-700
+                                {% elif p.status == 'cancelled' %}bg-gray-100 text-gray-600
+                                {% else %}bg-blue-100 text-blue-700{% endif %}">
+                                {{ p.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="py-3 text-sm text-gray-500">SSLCommerz</td>
+                        <td class="py-3 text-sm text-gray-500">{{ p.payment_method }}</td>
+                        <td class="py-3">
+                            <span class="text-sm font-mono text-gray-500">{{ p.sslcommerz_tran_id|default:'N/A'|truncatechars:16 }}</span>
+                        </td>
+                        <td class="py-3 text-sm text-gray-500">{{ p.created_at|date:"M d, Y" }}</td>
+                        <td class="py-3">
+                            <div class="flex items-center gap-2">
+                                <button
+                                    class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-indigo-600"
+                                    title="View Details"
+                                    @click="detail = JSON.parse(document.getElementById('payd-{{ p.pk }}').textContent)">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            <script type="application/json" id="payd-{{ p.pk }}">{{ p.detail_json|safe }}</script>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="11" class="py-12 text-center text-gray-400">
+                            <div class="w-20 h-20 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                                <i class="bi bi-credit-card text-3xl text-gray-300"></i>
+                            </div>
+                            <p class="text-gray-500 font-medium mb-1">No payments found</p>
+                            <p class="text-gray-400 text-sm">Payment records will appear here once users start transacting.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if payments.paginator.num_pages > 1 %}
+        <div class="flex items-center justify-between mt-6 pt-6 border-t border-gray-100">
+            <p class="text-sm text-gray-500">Showing page {{ payments.number }} of {{ payments.paginator.num_pages }}</p>
+            <div class="flex gap-2">
+                {% if payments.has_previous %}
+                <a href="?{{ filter_qs }}&page=1" class="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">&laquo;&laquo;</a>
+                <a href="?{{ filter_qs }}&page={{ payments.previous_page_number }}" class="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">&laquo;</a>
+                {% endif %}
+                <span class="px-4 py-2 rounded-xl gradient-primary text-white text-sm font-medium">{{ payments.number }}</span>
+                {% if payments.has_next %}
+                <a href="?{{ filter_qs }}&page={{ payments.next_page_number }}" class="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">&raquo;</a>
+                <a href="?{{ filter_qs }}&page={{ payments.paginator.num_pages }}" class="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">&raquo;&raquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Payment Details Modal -->
+<div x-data="{ detail: null }">
+    <div x-show="detail" x-cloak
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+         @click.self="detail = null">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+             x-show="detail"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95">
+            <div class="px-6 py-5 gradient-primary flex items-center justify-between">
+                <h3 class="text-white font-semibold">Payment Details</h3>
+                <button @click="detail = null" class="text-white/80 hover:text-white transition text-lg leading-none"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <template x-if="detail">
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Transaction ID</span>
+                            <span class="text-sm font-mono text-gray-800 font-medium" x-text="detail.transaction_id"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">User</span>
+                            <span class="text-sm text-gray-800 font-medium" x-text="detail.user_name"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Email</span>
+                            <span class="text-sm text-gray-800" x-text="detail.email"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Membership</span>
+                            <span class="text-sm text-gray-800 font-medium" x-text="detail.membership"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Amount</span>
+                            <span class="text-sm font-semibold text-gray-800" x-text="detail.amount"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Payment Status</span>
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700" x-text="detail.status"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Payment Gateway</span>
+                            <span class="text-sm text-gray-800" x-text="detail.gateway"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Payment Method</span>
+                            <span class="text-sm text-gray-800" x-text="detail.method"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">SSLCommerz Transaction ID</span>
+                            <span class="text-sm font-mono text-gray-800" x-text="detail.sslcommerz_tran_id"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Payment Date</span>
+                            <span class="text-sm text-gray-800" x-text="detail.payment_date"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Completion Date</span>
+                            <span class="text-sm text-gray-800" x-text="detail.completion_date"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var labels = {{ chart_labels|safe }};
+    var values = {{ chart_values|safe }};
+    var ctx = document.getElementById('revenueChart');
+    if (!ctx) return;
+    var gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 280);
+    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.85)');
+    gradient.addColorStop(1, 'rgba(139, 92, 246, 0.15)');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Revenue (BDT)',
+                data: values,
+                backgroundColor: gradient,
+                borderColor: 'rgba(99, 102, 241, 0.9)',
+                borderWidth: 1,
+                borderRadius: 6,
+                maxBarThickness: 42
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return '৳ ' + context.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#94a3b8', font: { size: 11 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f1f5f9' },
+                    ticks: {
+                        color: '#94a3b8',
+                        font: { size: 11 },
+                        callback: function(value) { return '৳' + value.toLocaleString(); }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

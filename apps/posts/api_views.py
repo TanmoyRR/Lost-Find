@@ -1,8 +1,10 @@
 from django.http import JsonResponse
 from django.db.models import Q
+from django.contrib.auth.decorators import login_required
 from .models import Post, Category, CampusLocation
 
 
+@login_required
 def api_posts(request):
     query = request.GET.get('q', '')
     post_type = request.GET.get('type', '')

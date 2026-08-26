@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}IUBAT Lost & Find{% endblock %}</title>
+    <title>{% block title %}{% block page_title %}{{ site_name }}{% endblock %} | {{ site_name }}{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -13,6 +13,8 @@
 
         .glass { background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
         .glass-dark { background: rgba(15,23,42,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
+
+        [x-cloak] { display: none !important; }
 
         .gradient-primary { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); }
         .gradient-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
@@ -89,7 +91,7 @@
                     <div class="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-lg shadow-indigo-500/20">
                         <i class="bi bi-shield text-white text-sm"></i>
                     </div>
-                    <span class="text-lg font-bold text-gray-800">Lost & Find</span>
+                    <span class="text-lg font-bold text-gray-800">SmartFind</span>
                 </a>
                 <div class="hidden sm:flex items-center gap-6">
                     <a href="{% url 'pages:home' %}" class="text-sm font-medium text-gray-500 hover:text-indigo-600 transition">Home</a>
