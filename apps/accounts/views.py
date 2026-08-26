@@ -50,11 +50,13 @@ def register(request):
         if form.is_valid():
             user = form.save(commit=False)
             user.role = 'student'
+            user.is_membership_paid = False
             user.email_verification_token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
             user.save()
             _send_verification_email(user)
-            messages.success(request, 'Registration successful! Please check your email to verify your account.')
-            return redirect('accounts:login')
+            login(request, user)
+            messages.success(request, 'Registration successful! One final step — please complete your membership payment to activate your account.')
+            return redirect('membership:pending_purchase')
     else:
         form = UserRegistrationForm()
     return render(request, 'accounts/register.html', {'form': form})
@@ -64,6 +66,8 @@ def user_login(request):
     if request.user.is_authenticated:
         if request.user.role == 'admin':
             return redirect('dashboard:admin_home')
+        if not request.user.is_membership_paid:
+            return redirect('membership:pending_purchase')
         return redirect('dashboard:home')
     if request.method == 'POST':
         form = LoginForm(request, data=request.POST)
@@ -74,11 +78,14 @@ def user_login(request):
                 return render(request, 'accounts/login.html', {'form': form})
             login(request, user)
             UserActivity.objects.create(user=user, activity_type='login', description='User logged in')
+            if user.role == 'admin':
+                return redirect('dashboard:admin_home')
+            if not user.is_membership_paid:
+                messages.info(request, 'Please complete your membership payment to activate your account.')
+                return redirect('membership:pending_purchase')
             next_url = request.GET.get('next', None)
             if next_url:
                 return redirect(next_url)
-            if user.role == 'admin':
-                return redirect('dashboard:admin_home')
             return redirect('dashboard:home')
     else:
         form = LoginForm()

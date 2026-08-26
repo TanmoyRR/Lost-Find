@@ -39,6 +39,7 @@ class User(AbstractUser):
     is_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_suspended = models.BooleanField(default=False)
+    is_membership_paid = models.BooleanField(default=False)
     email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=255, null=True, blank=True)
     reset_password_token = models.CharField(max_length=255, null=True, blank=True)

@@ -37,9 +37,11 @@ class TestRegistration(TestCase):
         response = self.client.post(self.register_url, data)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(User.objects.filter(username='testuser').exists())
+        user = User.objects.get(username='testuser')
+        self.assertFalse(user.is_membership_paid)
 
     def test_registration_requires_unique_username(self):
-        User.objects.create_user(username='testuser', password='test123')
+        User.objects.create_user(username='testuser', password='test123', is_membership_paid=True)
         data = {
             'username': 'testuser',
             'email': 'test2@example.com',
@@ -78,7 +80,7 @@ class TestLogin(TestCase):
     def setUp(self):
         self.client = Client()
         self.login_url = reverse('accounts:login')
-        self.user = User.objects.create_user(username='testuser', password='testpass123', email='test@example.com')
+        self.user = User.objects.create_user(username='testuser', password='testpass123', email='test@example.com', is_membership_paid=True)
 
     def test_login_page_loads(self):
         response = self.client.get(self.login_url)
@@ -104,7 +106,7 @@ class TestLogin(TestCase):
 class TestPermissions(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username='regular', password='testpass')
+        self.user = User.objects.create_user(username='regular', password='testpass', is_membership_paid=True)
         self.admin = User.objects.create_superuser(username='admin', email='admin@test.com', password='adminpass')
         self.admin.role = 'admin'
         self.admin.save()
@@ -133,7 +135,7 @@ class TestPermissions(TestCase):
 class TestPostLifecycle(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username='poster', password='testpass')
+        self.user = User.objects.create_user(username='poster', password='testpass', is_membership_paid=True)
         from apps.membership.models import Membership, MembershipPlan
         plan = MembershipPlan.objects.create(name='Annual Membership', price=100, duration_days=365)
         Membership.objects.create(user=self.user, plan=plan, is_active=True,
@@ -231,7 +233,7 @@ class TestPostLifecycle(TestCase):
         self.assertTrue(post.is_resolved)
 
     def test_user_cannot_edit_anothers_post(self):
-        other_user = User.objects.create_user(username='other', password='testpass')
+        other_user = User.objects.create_user(username='other', password='testpass', is_membership_paid=True)
         from apps.posts.models import Post
         post = Post.objects.create(
             user=other_user, title='Others Post', description='Test',
@@ -252,7 +254,7 @@ class TestBrowseAndSearch(TestCase):
         from apps.posts.models import Post, Category, CampusLocation
         self.cat = Category.objects.create(name='Books', slug='books')
         self.loc = CampusLocation.objects.create(name='Library', slug='library')
-        self.user = User.objects.create_user(username='browser', password='testpass')
+        self.user = User.objects.create_user(username='browser', password='testpass', is_membership_paid=True)
         self.client.login(username='browser', password='testpass')
         for i in range(15):
             Post.objects.create(
@@ -303,7 +305,7 @@ class TestBrowseAndSearch(TestCase):
 class TestMatchingEngine(TestCase):
     def setUp(self):
         from apps.posts.models import Post, Category, CampusLocation
-        self.user = User.objects.create_user(username='matcher', password='testpass')
+        self.user = User.objects.create_user(username='matcher', password='testpass', is_membership_paid=True)
         self.cat = Category.objects.create(name='Electronics', slug='electronics')
         self.loc = CampusLocation.objects.create(name='Campus A', slug='campus-a')
         self.lost_post = Post.objects.create(
@@ -382,7 +384,7 @@ class TestMatchingEngine(TestCase):
 class TestMembership(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username='member', password='testpass')
+        self.user = User.objects.create_user(username='member', password='testpass', is_membership_paid=True)
         self.client.login(username='member', password='testpass')
         from apps.membership.models import MembershipPlan
         self.plan = MembershipPlan.objects.create(
@@ -417,7 +419,7 @@ class TestMembership(TestCase):
 class TestPayments(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username='payer', password='testpass')
+        self.user = User.objects.create_user(username='payer', password='testpass', is_membership_paid=True)
         self.client.login(username='payer', password='testpass')
 
     @patch('apps.payments.views.initiate_payment')
@@ -426,20 +428,26 @@ class TestPayments(TestCase):
         response = self.client.get(reverse('membership:index'))
         self.assertEqual(response.status_code, 200)
 
-    def test_payment_success_callback(self):
+    @patch('apps.payments.views.verify_sslcommerz_payment')
+    def test_payment_success_callback(self, mock_verify):
         from apps.payments.models import Payment
         from apps.membership.models import MembershipPlan, Membership
         plan = MembershipPlan.objects.create(name='Test', price=Decimal('100'), duration_days=30)
         payment = Payment.objects.create(
             user=self.user, transaction_id='TXN123', amount=Decimal('100.00'),
-            payment_type='membership', status='pending',
+            payment_type='membership', status='pending', sslcommerz_tran_id='SSL-TXN-001',
         )
+        mock_verify.return_value = {'status': 'VALID', 'bank_tran_id': 'BANK001'}
         response = self.client.post(reverse('payments:success'), {
-            'tran_id': 'TXN123',
+            'tran_id': 'SSL-TXN-001',
             'status': 'VALID',
             'val_id': 'VAL001',
         })
         self.assertEqual(response.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'completed')
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_membership_paid)
 
 
 # ========================
@@ -504,13 +512,13 @@ class TestAdminModeration(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_admin_users_page_excludes_admin_self(self):
-        user = User.objects.create_user(username='regular', password='testpass')
+        user = User.objects.create_user(username='regular', password='testpass', is_membership_paid=True)
         response = self.client.get(reverse('dashboard:admin_users'))
         self.assertContains(response, 'regular')
         self.assertNotContains(response, '<p class="text-sm font-medium text-gray-800">admin</p>')
 
     def test_admin_update_user_info(self):
-        user = User.objects.create_user(username='target', password='testpass')
+        user = User.objects.create_user(username='target', password='testpass', is_membership_paid=True)
         url = reverse('dashboard:admin_update_user_info', kwargs={'pk': user.pk})
         response = self.client.post(url, {
             'username': 'updatedtarget',
@@ -534,7 +542,7 @@ class TestAdminModeration(TestCase):
         self.assertRedirects(response, reverse('accounts:profile'))
 
     def test_admin_suspend_user(self):
-        user = User.objects.create_user(username='suspendeduser', password='testpass')
+        user = User.objects.create_user(username='suspendeduser', password='testpass', is_membership_paid=True)
         suspend_url = reverse('dashboard:admin_suspend_user', kwargs={'pk': user.pk})
         response = self.client.get(suspend_url)
         self.assertEqual(response.status_code, 302)
@@ -542,7 +550,7 @@ class TestAdminModeration(TestCase):
         self.assertTrue(user.is_suspended)
 
     def test_admin_activate_user(self):
-        user = User.objects.create_user(username='activeuser', password='testpass', is_suspended=True)
+        user = User.objects.create_user(username='activeuser', password='testpass', is_suspended=True, is_membership_paid=True)
         activate_url = reverse('dashboard:admin_activate_user', kwargs={'pk': user.pk})
         response = self.client.get(activate_url)
         self.assertEqual(response.status_code, 302)
@@ -560,8 +568,8 @@ class TestAdminRevenue(TestCase):
         self.admin = User.objects.create_superuser(username='admin', email='admin@test.com', password='adminpass')
         self.admin.role = 'admin'
         self.admin.save()
-        self.student = User.objects.create_user(username='student1', email='student1@test.com', password='testpass')
-        self.student2 = User.objects.create_user(username='student2', email='student2@test.com', password='testpass')
+        self.student = User.objects.create_user(username='student1', email='student1@test.com', password='testpass', is_membership_paid=True)
+        self.student2 = User.objects.create_user(username='student2', email='student2@test.com', password='testpass', is_membership_paid=True)
         from apps.payments.models import Payment
         Payment.objects.create(user=self.student, transaction_id='TXN-COMP', amount=Decimal('100'),
                                payment_type='membership', status='completed')
@@ -685,7 +693,7 @@ class TestAPIs(TestCase):
     def setUp(self):
         self.client = Client()
         from apps.posts.models import Post, Category
-        self.user = User.objects.create_user(username='apiuser', password='testpass')
+        self.user = User.objects.create_user(username='apiuser', password='testpass', is_membership_paid=True)
         self.client.login(username='apiuser', password='testpass')
         self.cat = Category.objects.create(name='TestCat', slug='testcat')
         Post.objects.create(
@@ -714,7 +722,7 @@ class TestAPIs(TestCase):
 class TestNotifications(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username='notifuser', password='testpass')
+        self.user = User.objects.create_user(username='notifuser', password='testpass', is_membership_paid=True)
         self.client.login(username='notifuser', password='testpass')
         from apps.notifications.models import Notification
         Notification.objects.create(
@@ -742,7 +750,7 @@ class TestSuccessStories(TestCase):
     def setUp(self):
         self.client = Client()
         from apps.posts.models import Post, SuccessStory
-        self.user = User.objects.create_user(username='storyuser', password='testpass')
+        self.user = User.objects.create_user(username='storyuser', password='testpass', is_membership_paid=True)
         self.client.login(username='storyuser', password='testpass')
         post = Post.objects.create(
             user=self.user, title='Story Post', description='Test',
@@ -766,7 +774,7 @@ class TestSuccessStories(TestCase):
 class TestTrustSafety(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username='reporter', password='testpass')
+        self.user = User.objects.create_user(username='reporter', password='testpass', is_membership_paid=True)
         self.client.login(username='reporter', password='testpass')
         from apps.posts.models import Post
         self.post = Post.objects.create(
@@ -795,8 +803,8 @@ class TestTrustSafety(TestCase):
 class TestRecoverySystem(TestCase):
     def setUp(self):
         self.client = Client()
-        self.owner = User.objects.create_user(username='owner', password='testpass')
-        self.claimant = User.objects.create_user(username='claimant', password='testpass')
+        self.owner = User.objects.create_user(username='owner', password='testpass', is_membership_paid=True)
+        self.claimant = User.objects.create_user(username='claimant', password='testpass', is_membership_paid=True)
         from apps.membership.models import Membership, MembershipPlan
         plan = MembershipPlan.objects.create(name='Annual Membership', price=100, duration_days=365)
         Membership.objects.create(user=self.owner, plan=plan, is_active=True,
@@ -843,8 +851,8 @@ class TestRecoverySystem(TestCase):
 class TestMembershipGating(TestCase):
     def setUp(self):
         self.client = Client()
-        self.member = User.objects.create_user(username='member', password='testpass', email='member@test.com')
-        self.non_member = User.objects.create_user(username='nonmember', password='testpass', email='nonmember@test.com')
+        self.member = User.objects.create_user(username='member', password='testpass', email='member@test.com', is_membership_paid=True)
+        self.non_member = User.objects.create_user(username='nonmember', password='testpass', email='nonmember@test.com', is_membership_paid=True)
         self.admin = User.objects.create_superuser(username='admin', password='testpass', email='admin@test.com')
         self.admin.role = 'admin'
         self.admin.save()
@@ -907,8 +915,8 @@ class TestMembershipGating(TestCase):
 class TestMessaging(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user1 = User.objects.create_user(username='user1', password='testpass', email='user1@test.com')
-        self.user2 = User.objects.create_user(username='user2', password='testpass', email='user2@test.com')
+        self.user1 = User.objects.create_user(username='user1', password='testpass', email='user1@test.com', is_membership_paid=True)
+        self.user2 = User.objects.create_user(username='user2', password='testpass', email='user2@test.com', is_membership_paid=True)
         from apps.posts.models import Post, Category, CampusLocation
         from apps.membership.models import Membership, MembershipPlan
         self.category = Category.objects.create(name='Electronics', slug='electronics')
@@ -969,3 +977,255 @@ class TestMessaging(TestCase):
         response = self.client.get(reverse('messaging:detail', args=[conv.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(conv.messages.filter(is_read=False).exclude(sender=self.user2).count(), 0)
+
+
+# ========================
+# TWO-STEP REGISTRATION
+# ========================
+
+class TestTwoStepRegistration(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.register_url = reverse('accounts:register')
+        self.login_url = reverse('accounts:login')
+        from apps.membership.models import MembershipPlan
+        self.plan = MembershipPlan.objects.create(
+            name='Annual', price=Decimal('500.00'), duration_days=365, is_active=True
+        )
+
+    def test_registration_creates_pending_user(self):
+        data = {
+            'username': 'newstudent',
+            'email': 'new@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'student_id': '2021-001-002',
+            'department': 'cse',
+        }
+        response = self.client.post(self.register_url, data)
+        self.assertEqual(response.status_code, 302)
+        user = User.objects.get(username='newstudent')
+        self.assertFalse(user.is_membership_paid)
+        self.assertEqual(user.role, 'student')
+
+    def test_registration_auto_logins_and_redirects_to_membership(self):
+        data = {
+            'username': 'autoLogin',
+            'email': 'auto@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'bba',
+        }
+        response = self.client.post(self.register_url, data)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/membership/pending/', response.url)
+
+    def test_pending_user_sees_membership_purchase_page(self):
+        data = {
+            'username': 'pendinguser',
+            'email': 'pending@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'cse',
+        }
+        self.client.post(self.register_url, data)
+        response = self.client.get(reverse('membership:pending_purchase'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Complete Your Registration')
+        self.assertContains(response, 'Membership Payment')
+
+    def test_pending_user_blocked_from_dashboard(self):
+        data = {
+            'username': 'blockeduser',
+            'email': 'blocked@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'cse',
+        }
+        self.client.post(self.register_url, data)
+        response = self.client.get(reverse('dashboard:home'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/membership/pending/', response.url)
+
+    def test_pending_user_blocked_from_browse(self):
+        data = {
+            'username': 'blockeduser2',
+            'email': 'blocked2@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'cse',
+        }
+        self.client.post(self.register_url, data)
+        response = self.client.get(reverse('posts:browse'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/membership/pending/', response.url)
+
+    def test_pending_user_can_access_membership_pages(self):
+        data = {
+            'username': 'canaccess',
+            'email': 'access@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'cse',
+        }
+        self.client.post(self.register_url, data)
+        response = self.client.get(reverse('membership:pending_purchase'))
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(reverse('membership:index'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_pending_user_can_logout(self):
+        data = {
+            'username': 'canlogout',
+            'email': 'logout@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'cse',
+        }
+        self.client.post(self.register_url, data)
+        response = self.client.get(reverse('accounts:logout'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_payment_success_activates_user(self):
+        from apps.payments.models import Payment
+        data = {
+            'username': 'payuser',
+            'email': 'pay@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'cse',
+        }
+        self.client.post(self.register_url, data)
+        user = User.objects.get(username='payuser')
+        self.assertFalse(user.is_membership_paid)
+        payment = Payment.objects.create(
+            user=user, amount=Decimal('500.00'), payment_type='membership',
+            status='pending', sslcommerz_tran_id='TEST-TRAN-001',
+        )
+        with patch('apps.payments.views.verify_sslcommerz_payment') as mock_verify:
+            mock_verify.return_value = {'status': 'VALID', 'bank_tran_id': 'BANK001'}
+            response = self.client.post(reverse('payments:success'), {
+                'tran_id': 'TEST-TRAN-001', 'val_id': 'VAL001',
+            })
+            self.assertEqual(response.status_code, 302)
+        user.refresh_from_db()
+        self.assertTrue(user.is_membership_paid)
+
+    def test_returning_user_redirected_to_membership(self):
+        user = User.objects.create_user(
+            username='returning', password='testpass', email='return@test.com',
+            is_membership_paid=False,
+        )
+        self.client.login(username='returning', password='testpass')
+        response = self.client.get(reverse('dashboard:home'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/membership/pending/', response.url)
+
+    def test_paid_user_accesses_dashboard_normally(self):
+        user = User.objects.create_user(
+            username='paiduser', password='testpass', email='paid@test.com',
+            is_membership_paid=True,
+        )
+        self.client.login(username='paiduser', password='testpass')
+        response = self.client.get(reverse('dashboard:home'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_admin_bypasses_membership_check(self):
+        admin = User.objects.create_superuser(username='admin2', email='a@t.com', password='adminpass')
+        admin.role = 'admin'
+        admin.save()
+        self.client.login(username='admin2', password='adminpass')
+        response = self.client.get(reverse('dashboard:admin_home'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_duplicate_payment_not_doubled(self):
+        from apps.payments.models import Payment
+        data = {
+            'username': 'dupuser',
+            'email': 'dup@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'cse',
+        }
+        self.client.post(self.register_url, data)
+        user = User.objects.get(username='dupuser')
+        payment = Payment.objects.create(
+            user=user, amount=Decimal('500.00'), payment_type='membership',
+            status='completed', sslcommerz_tran_id='COMPLETED-001',
+            transaction_id='BANK-COMPLETE',
+        )
+        with patch('apps.payments.views.verify_sslcommerz_payment') as mock_verify:
+            mock_verify.return_value = {'status': 'VALID', 'bank_tran_id': 'BANK001'}
+            response = self.client.post(reverse('payments:success'), {
+                'tran_id': 'COMPLETED-001', 'val_id': 'VAL001',
+            })
+            self.assertEqual(response.status_code, 302)
+        user.refresh_from_db()
+        self.assertTrue(user.is_membership_paid)
+
+    def test_failed_payment_keeps_user_pending(self):
+        from apps.payments.models import Payment
+        data = {
+            'username': 'failuser',
+            'email': 'fail@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'cse',
+        }
+        self.client.post(self.register_url, data)
+        user = User.objects.get(username='failuser')
+        payment = Payment.objects.create(
+            user=user, amount=Decimal('500.00'), payment_type='membership',
+            status='pending', sslcommerz_tran_id='FAIL-TRAN-001',
+        )
+        response = self.client.post(reverse('payments:fail'), {
+            'tran_id': 'FAIL-TRAN-001',
+        })
+        self.assertEqual(response.status_code, 302)
+        user.refresh_from_db()
+        self.assertFalse(user.is_membership_paid)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'failed')
+
+    def test_cancelled_payment_keeps_user_pending(self):
+        from apps.payments.models import Payment
+        data = {
+            'username': 'canceluser',
+            'email': 'cancel@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'cse',
+        }
+        self.client.post(self.register_url, data)
+        user = User.objects.get(username='canceluser')
+        payment = Payment.objects.create(
+            user=user, amount=Decimal('500.00'), payment_type='membership',
+            status='pending', sslcommerz_tran_id='CANCEL-TRAN-001',
+        )
+        response = self.client.post(reverse('payments:cancel'), {
+            'tran_id': 'CANCEL-TRAN-001',
+        })
+        self.assertEqual(response.status_code, 302)
+        user.refresh_from_db()
+        self.assertFalse(user.is_membership_paid)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'cancelled')
+
+    def test_pending_user_can_retry_payment(self):
+        from apps.payments.models import Payment
+        data = {
+            'username': 'retryuser',
+            'email': 'retry@student.com',
+            'password1': 'ComplexPass123!',
+            'password2': 'ComplexPass123!',
+            'department': 'cse',
+        }
+        self.client.post(self.register_url, data)
+        user = User.objects.get(username='retryuser')
+        Payment.objects.create(
+            user=user, amount=Decimal('500.00'), payment_type='membership',
+            status='failed', sslcommerz_tran_id='RETRY-001',
+        )
+        response = self.client.get(reverse('membership:pending_purchase'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Purchase Membership')

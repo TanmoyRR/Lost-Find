@@ -14,6 +14,28 @@ from apps.accounts.models import UserActivity
 
 
 @login_required
+def pending_membership_purchase(request):
+    if request.user.role == 'admin' or request.user.is_membership_paid:
+        return redirect('dashboard:home')
+
+    plans = MembershipPlan.objects.filter(is_active=True)
+    has_pending_payment = Payment.objects.filter(
+        user=request.user, payment_type='membership', status='pending'
+    ).exists()
+    has_completed_payment = Payment.objects.filter(
+        user=request.user, payment_type='membership', status='completed'
+    ).exists()
+
+    if has_completed_payment:
+        return redirect('membership:success')
+
+    return render(request, 'membership/pending_purchase.html', {
+        'plans': plans,
+        'has_pending_payment': has_pending_payment,
+    })
+
+
+@login_required
 def membership_view(request):
     membership = getattr(request.user, 'membership', None)
     plans = MembershipPlan.objects.filter(is_active=True)
@@ -46,6 +68,8 @@ def membership_success(request):
 
 @login_required
 def membership_cancel(request):
+    if not request.user.is_membership_paid and request.user.role != 'admin':
+        return redirect('membership:pending_purchase')
     return render(request, 'membership/cancel.html')
 
 

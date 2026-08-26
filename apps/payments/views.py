@@ -89,6 +89,10 @@ def initiate_payment(request, amount, purpose, payment_type, reference_id=None):
             membership.expires_at = timezone.now() + timedelta(days=plan.duration_days)
             membership.save()
 
+        if not request.user.is_membership_paid:
+            request.user.is_membership_paid = True
+            request.user.save(update_fields=['is_membership_paid'])
+
         UserActivity.objects.create(
             user=request.user,
             activity_type='membership_purchased',
@@ -141,6 +145,9 @@ def payment_success(request):
     try:
         payment = Payment.objects.get(sslcommerz_tran_id=tran_id)
         if payment.status == 'completed':
+            if not payment.user.is_membership_paid:
+                payment.user.is_membership_paid = True
+                payment.user.save(update_fields=['is_membership_paid'])
             return redirect('membership:success')
 
         payment.status = 'completed'
@@ -156,6 +163,10 @@ def payment_success(request):
             membership.started_at = timezone.now()
             membership.expires_at = timezone.now() + timedelta(days=plan.duration_days)
             membership.save()
+
+        if not payment.user.is_membership_paid:
+            payment.user.is_membership_paid = True
+            payment.user.save(update_fields=['is_membership_paid'])
 
         UserActivity.objects.create(
             user=payment.user,

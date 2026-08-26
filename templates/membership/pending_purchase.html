@@ -1,0 +1,113 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Complete Membership - IUBAT SmartFind{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-indigo-100 relative overflow-hidden py-12 px-4 sm:px-6 lg:px-8">
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -right-40 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse" style="animation-delay: 2s;"></div>
+    </div>
+
+    <div class="max-w-lg w-full relative z-10 animate-fade-in">
+        <!-- Progress Indicator -->
+        <div class="mb-8">
+            <div class="flex items-center justify-center gap-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm font-bold">
+                        <i class="bi bi-check-lg"></i>
+                    </div>
+                    <span class="text-sm font-medium text-emerald-600">Account Information</span>
+                </div>
+                <div class="w-12 h-0.5 bg-indigo-300"></div>
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full gradient-primary text-white flex items-center justify-center text-sm font-bold">2</div>
+                    <span class="text-sm font-medium text-indigo-600">Membership Payment</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass rounded-2xl shadow-xl shadow-indigo-500/10 p-8 sm:p-10">
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl gradient-primary shadow-lg shadow-indigo-500/25 mb-4">
+                    <i class="bi bi-gem text-2xl text-white"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900">Complete Your Registration</h2>
+                <p class="text-gray-500 mt-1">Membership is required to use IUBAT SmartFind</p>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="mb-4 p-4 rounded-xl text-sm font-medium {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% elif message.tags == 'success' %}bg-green-50 text-green-700 border border-green-200{% elif message.tags == 'warning' %}bg-amber-50 text-amber-700 border border-amber-200{% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %} flex items-center gap-2">
+                        <i class="bi {% if message.tags == 'error' %}bi-exclamation-circle{% elif message.tags == 'success' %}bi-check-circle{% elif message.tags == 'warning' %}bi-exclamation-triangle{% else %}bi-info-circle{% endif %}"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% with annual_plan=plans|dictsort:"price"|last %}
+            {% if annual_plan %}
+            <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">
+                <div class="p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                                <i class="bi bi-gem text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-800">{{ annual_plan.name }}</h3>
+                                <p class="text-sm text-gray-500">{{ annual_plan.duration_days }} days validity</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-3xl font-bold text-gray-800">{{ annual_plan.price|floatformat:0 }}</p>
+                            <p class="text-sm text-gray-400">BDT</p>
+                        </div>
+                    </div>
+
+                    <ul class="space-y-2 mb-4">
+                        <li class="flex items-center gap-2 text-sm text-gray-600">
+                            <i class="bi bi-check-circle text-emerald-500"></i> Create and manage lost & found posts
+                        </li>
+                        <li class="flex items-center gap-2 text-sm text-gray-600">
+                            <i class="bi bi-check-circle text-emerald-500"></i> View full contact details
+                        </li>
+                        <li class="flex items-center gap-2 text-sm text-gray-600">
+                            <i class="bi bi-check-circle text-emerald-500"></i> Direct messaging with other users
+                        </li>
+                        <li class="flex items-center gap-2 text-sm text-gray-600">
+                            <i class="bi bi-check-circle text-emerald-500"></i> Initiate recovery sessions
+                        </li>
+                        <li class="flex items-center gap-2 text-sm text-gray-600">
+                            <i class="bi bi-check-circle text-emerald-500"></i> AI-powered match suggestions
+                        </li>
+                    </ul>
+                </div>
+                <div class="px-6 pb-6">
+                    {% if has_pending_payment %}
+                    <a href="{% url 'membership:pending_purchase' %}" class="block w-full py-3 rounded-xl text-sm font-semibold text-center gradient-primary text-white hover:shadow-lg hover:shadow-indigo-500/25 transition">
+                        <i class="bi bi-arrow-clockwise"></i> Retry Payment
+                    </a>
+                    {% else %}
+                    <a href="{% url 'membership:purchase' annual_plan.pk %}" class="block w-full py-3 rounded-xl text-sm font-semibold text-center gradient-primary text-white hover:shadow-lg hover:shadow-indigo-500/25 transition">
+                        <i class="bi bi-gem"></i> Purchase Membership
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-gray-500">
+                <i class="bi bi-info-circle text-2xl mb-2 block"></i>
+                <p>No membership plans available at the moment.</p>
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <p class="text-center text-xs text-gray-400 mt-4">
+                Payment is processed securely via SSLCommerz. You can try again if the payment fails.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
