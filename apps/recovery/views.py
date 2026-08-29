@@ -62,6 +62,28 @@ def create_recovery_session_for_post(post):
     return session
 
 
+def create_finder_recovery_session(post):
+    """
+    Create a RecoverySession when a Found Post is created.
+    The finder (post creator) is set as claimant, ready to scan the owner's QR.
+    """
+    session = RecoverySession.objects.create(
+        post=post,
+        owner=post.user,
+        claimant=post.user,
+        status='qr_generated',
+    )
+    session.generate_qr_image()
+    session.save(update_fields=['qr_code'])
+    RecoveryVerificationLog.objects.create(
+        session=session, action='session_created',
+        performed_by=post.user,
+        details={'post_id': post.id, 'post_title': post.title, 'role': 'finder'},
+    )
+    logger.info('Finder recovery session %s created for found post %s', session.short_code, post.pk)
+    return session
+
+
 @login_required
 def recovery_list(request):
     sessions = RecoverySession.objects.filter(
@@ -141,15 +163,109 @@ def scan_qr(request, short_code):
 
     if request.method == 'POST':
         token = request.POST.get('short_code', '').strip()
-        success, msg = session.verify_and_complete(token, request.user)
-        if success:
-            messages.success(request, msg)
-        else:
-            messages.error(request, msg)
+
+        if token.upper() == session.short_code:
+            success, msg = session.verify_and_complete(token, request.user)
+            if success:
+                messages.success(request, msg)
+            else:
+                messages.error(request, msg)
+            return redirect('recovery:detail', short_code=short_code)
+
+        target_session = RecoverySession.objects.filter(
+            short_code=token, status='qr_generated',
+        ).exclude(pk=session.pk).first()
+
+        if target_session:
+            return redirect('recovery:scan_qr_match', finder_code=short_code, owner_code=token)
+
+        messages.error(request, 'Invalid short code. No active recovery session found.')
         return redirect('recovery:detail', short_code=short_code)
 
     return render(request, 'recovery/scan_qr.html', {
         'session': session,
+        'sidebar_items': _get_sidebar(request.user),
+    })
+
+
+@login_required
+def scan_qr_match(request, finder_code, owner_code):
+    finder_session = get_object_or_404(
+        RecoverySession.objects.select_related('post', 'claimant', 'owner'),
+        short_code=finder_code,
+    )
+    owner_session = get_object_or_404(
+        RecoverySession.objects.select_related('post', 'claimant', 'owner'),
+        short_code=owner_code,
+    )
+
+    if request.user != finder_session.claimant:
+        messages.error(request, 'Access denied.')
+        return redirect('recovery:list')
+
+    if finder_session.status != 'qr_generated':
+        messages.error(request, 'Your recovery session is no longer active.')
+        return redirect('recovery:detail', short_code=finder_code)
+
+    if owner_session.status != 'qr_generated':
+        messages.error(request, 'The owner session is no longer active.')
+        return redirect('recovery:detail', short_code=finder_code)
+
+    if request.method == 'POST':
+        finder_session.claimant = request.user
+        finder_session.status = 'completed'
+        finder_session.qr_scanned_at = timezone.now()
+        finder_session.completed_at = timezone.now()
+        finder_session.save(update_fields=['claimant', 'status', 'qr_scanned_at', 'completed_at'])
+
+        owner_session.claimant = request.user
+        owner_session.status = 'completed'
+        owner_session.qr_scanned_at = timezone.now()
+        owner_session.completed_at = timezone.now()
+        owner_session.save(update_fields=['claimant', 'status', 'qr_scanned_at', 'completed_at'])
+
+        finder_post = finder_session.post
+        owner_post = owner_session.post
+        for p in [finder_post, owner_post]:
+            p.status = 'resolved'
+            p.is_resolved = True
+            p.save(update_fields=['status', 'is_resolved'])
+
+        RecoveryVerificationLog.objects.create(
+            session=finder_session, action='recovery_completed',
+            performed_by=request.user,
+            details={'matched_with': owner_code},
+        )
+        RecoveryVerificationLog.objects.create(
+            session=owner_session, action='recovery_completed',
+            performed_by=request.user,
+            details={'matched_with': finder_code},
+        )
+
+        from apps.notifications.models import Notification
+        if owner_session.owner != request.user:
+            Notification.objects.create(
+                user=owner_session.owner,
+                notification_type='post_resolved',
+                title='Item Successfully Recovered',
+                message=f'Your item "{owner_post.title}" has been successfully recovered.',
+                link='/recovery/',
+            )
+        if finder_session.owner != request.user:
+            Notification.objects.create(
+                user=finder_session.owner,
+                notification_type='post_resolved',
+                title='Item Successfully Recovered',
+                message=f'Your found item "{finder_post.title}" has been matched and recovered.',
+                link='/recovery/',
+            )
+
+        messages.success(request, 'Recovery completed successfully! Both items marked as resolved.')
+        return redirect('recovery:detail', short_code=finder_code)
+
+    return render(request, 'recovery/scan_qr_match.html', {
+        'finder_session': finder_session,
+        'owner_session': owner_session,
         'sidebar_items': _get_sidebar(request.user),
     })
 

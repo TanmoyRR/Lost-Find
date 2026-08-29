@@ -71,6 +71,14 @@ def post_detail(request, pk):
                 create_recovery_session_for_post(post)
         except Exception:
             pass
+    elif post.post_type == 'found' and post.status != 'resolved':
+        try:
+            from apps.recovery.models import RecoverySession
+            if not RecoverySession.objects.filter(post=post).exists():
+                from apps.recovery.views import create_finder_recovery_session
+                create_finder_recovery_session(post)
+        except Exception:
+            pass
 
     can_view_full = False
     if request.user.is_authenticated:
@@ -118,6 +126,13 @@ def create_post(request):
                     from apps.recovery.views import create_recovery_session_for_post
                     session = create_recovery_session_for_post(post)
                     messages.info(request, f'Recovery QR code generated: {session.short_code}')
+                except Exception:
+                    pass
+            elif post.post_type == 'found':
+                try:
+                    from apps.recovery.views import create_finder_recovery_session
+                    session = create_finder_recovery_session(post)
+                    messages.info(request, f'Recovery scan ready: {session.short_code}')
                 except Exception:
                     pass
             try:

@@ -192,6 +192,27 @@
                 {% endwith %}
                 {% endif %}
 
+                {% if request.user == post.user and post.post_type == 'found' and post.status != 'resolved' %}
+                {% with active_session=post.recovery_sessions.all %}
+                {% for session in active_session %}
+                {% if session.status != 'cancelled' and session.status != 'expired' %}
+                <div class="bg-emerald-50 rounded-2xl border border-emerald-200 p-6">
+                    <h3 class="text-sm font-semibold text-emerald-900 mb-3 flex items-center gap-2">
+                        <i class="bi bi-qr-code-scan"></i> Ready to Scan
+                    </h3>
+                    <p class="text-sm text-emerald-800 mb-3">When you meet the owner, scan their QR code or enter their short code to complete the recovery.</p>
+                    <a href="{% url 'recovery:scan_qr' short_code=session.short_code %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium">
+                        <i class="bi bi-qr-code-scan"></i> Scan Owner's QR Code
+                    </a>
+                    <a href="{% url 'recovery:detail' short_code=session.short_code %}" class="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-800 transition ml-3">
+                        View Session <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+                {% endif %}
+                {% endfor %}
+                {% endwith %}
+                {% endif %}
+
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                     <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                         <i class="bi bi-info-circle text-indigo-500"></i> Details

@@ -57,6 +57,8 @@ def start_conversation(request, post_id, user_id):
 
     if post.post_type == 'lost' and post.status != 'resolved':
         _initiate_recovery(post, request.user, other)
+    elif post.post_type == 'found' and post.status != 'resolved':
+        _link_found_recovery(post, request.user, other)
 
     return redirect('messaging:detail', pk=conv.pk)
 
@@ -89,4 +91,19 @@ def _initiate_recovery(post, finder, owner):
             session=session, action='finder_assigned',
             performed_by=finder,
             details={'source': 'messaging'},
+        )
+
+
+def _link_found_recovery(post, finder, owner):
+    from apps.recovery.models import RecoverySession, RecoveryVerificationLog
+    session = RecoverySession.objects.filter(
+        post=post, status__in=('pending', 'qr_generated'),
+    ).first()
+    if session:
+        session.claimant = finder
+        session.save(update_fields=['claimant'])
+        RecoveryVerificationLog.objects.create(
+            session=session, action='finder_assigned',
+            performed_by=finder,
+            details={'source': 'messaging', 'found_post': True},
         )
