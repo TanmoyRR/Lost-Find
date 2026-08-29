@@ -10,6 +10,7 @@ class Notification(models.Model):
         ('post_resolved', 'Post Resolved'),
         ('message', 'Message'),
         ('system', 'System'),
+        ('recovery_update', 'Recovery Update'),
     )
 
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='notifications')
