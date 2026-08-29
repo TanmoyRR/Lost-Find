@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Q
+from django.db import transaction
 from django.core.paginator import Paginator
 from .models import RecoverySession, RecoveryVerificationLog
 from apps.posts.models import Post
@@ -162,24 +163,67 @@ def scan_qr(request, short_code):
         return redirect('recovery:detail', short_code=short_code)
 
     if request.method == 'POST':
-        token = request.POST.get('short_code', '').strip()
+        token = (request.POST.get('short_code', '') or '').strip().upper()
 
-        if token.upper() == session.short_code:
-            success, msg = session.verify_and_complete(token, request.user)
-            if success:
-                messages.success(request, msg)
-            else:
-                messages.error(request, msg)
-            return redirect('recovery:detail', short_code=short_code)
+        if not token:
+            messages.error(request, 'Please enter the owner\'s short code.')
+            return render(request, 'recovery/scan_qr.html', {'session': session, 'sidebar_items': _get_sidebar(request.user)})
 
-        target_session = RecoverySession.objects.filter(
+        owner_session = RecoverySession.objects.filter(
             short_code=token, status='qr_generated',
-        ).exclude(pk=session.pk).first()
+        ).exclude(pk=session.pk).select_related('post', 'owner').first()
 
-        if target_session:
-            return redirect('recovery:scan_qr_match', finder_code=short_code, owner_code=token)
+        if not owner_session:
+            messages.error(request, 'Invalid or inactive short code. Please check the code and try again.')
+            return render(request, 'recovery/scan_qr.html', {'session': session, 'sidebar_items': _get_sidebar(request.user)})
 
-        messages.error(request, 'Invalid short code. No active recovery session found.')
+        with transaction.atomic():
+            session.claimant = request.user
+            session.status = 'completed'
+            session.qr_scanned_at = timezone.now()
+            session.completed_at = timezone.now()
+            session.save(update_fields=['claimant', 'status', 'qr_scanned_at', 'completed_at'])
+
+            owner_session.claimant = request.user
+            owner_session.status = 'completed'
+            owner_session.qr_scanned_at = timezone.now()
+            owner_session.completed_at = timezone.now()
+            owner_session.save(update_fields=['claimant', 'status', 'qr_scanned_at', 'completed_at'])
+
+            for p in [session.post, owner_session.post]:
+                p.status = 'resolved'
+                p.is_resolved = True
+                p.save(update_fields=['status', 'is_resolved'])
+
+            RecoveryVerificationLog.objects.create(
+                session=session, action='recovery_completed',
+                performed_by=request.user,
+                details={'matched_with': owner_session.short_code},
+            )
+            RecoveryVerificationLog.objects.create(
+                session=owner_session, action='recovery_completed',
+                performed_by=request.user,
+                details={'matched_with': session.short_code},
+            )
+
+            if owner_session.owner != request.user:
+                Notification.objects.create(
+                    user=owner_session.owner,
+                    notification_type='post_resolved',
+                    title='Item Successfully Recovered',
+                    message=f'Your item "{owner_session.post.title}" has been successfully recovered.',
+                    link='/recovery/',
+                )
+            if session.owner != request.user:
+                Notification.objects.create(
+                    user=session.owner,
+                    notification_type='post_resolved',
+                    title='Item Successfully Recovered',
+                    message=f'Your found item "{session.post.title}" has been matched and recovered.',
+                    link='/recovery/',
+                )
+
+        messages.success(request, 'Recovery completed successfully! Both items marked as resolved.')
         return redirect('recovery:detail', short_code=short_code)
 
     return render(request, 'recovery/scan_qr.html', {
