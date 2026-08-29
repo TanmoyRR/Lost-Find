@@ -111,7 +111,7 @@ def admin_dashboard(request):
     recovery_agg = RecoverySession.objects.aggregate(
         recovery_sessions=Count('id'),
         completed_recoveries=Count('id', filter=Q(status='completed')),
-        pending_recoveries=Count('id', filter=Q(status__in=['pending', 'qr_generated', 'qr_scanned', 'handover_verified'])),
+        pending_recoveries=Count('id', filter=Q(status__in=['pending', 'qr_generated', 'qr_scanned'])),
     )
     recent_activities = UserActivity.objects.all()[:20]
     users = User.objects.exclude(pk=request.user.pk).order_by('-date_joined')[:10]
