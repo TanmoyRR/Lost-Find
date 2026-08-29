@@ -44,7 +44,104 @@ class Command(BaseCommand):
             else:
                 self.stdout.write('Admin user already exists, skipping.')
         else:
-            self.stdout.write('Production mode: skipping admin user creation.')
+            self.stdout.write('Production mode: ensuring admin password is set.')
+            admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+            try:
+                admin = User.objects.get(username='admin')
+                admin.set_password(admin_password)
+                admin.is_staff = True
+                admin.is_superuser = True
+                admin.role = 'admin'
+                admin.is_verified = True
+                admin.email_verified = True
+                admin.is_active = True
+                admin.save()
+                self.stdout.write(f'Admin password reset: admin / {admin_password}')
+            except User.DoesNotExist:
+                admin = User.objects.create_superuser(
+                    username='admin',
+                    email='admin@iubat.edu',
+                    password=admin_password,
+                    role='admin',
+                    student_id='ADMIN001',
+                    department='cse',
+                    phone='01700000000',
+                    is_verified=True,
+                    email_verified=True,
+                )
+                self.stdout.write(f'Admin created: admin / {admin_password}')
+
+        # Create test users (both dev and production)
+        test_users = [
+            {
+                'username': 'Harun',
+                'email': 'harun@iubat.edu',
+                'password': 'h@run123',
+                'first_name': 'Harun',
+                'last_name': 'Rahman',
+                'role': 'student',
+                'student_id': 'IUBAT-001',
+                'department': 'cse',
+                'phone': '01712345678',
+            },
+            {
+                'username': 'Rafid',
+                'email': 'rafid@iubat.edu',
+                'password': 'rafid123',
+                'first_name': 'Rafid',
+                'last_name': 'Ahmed',
+                'role': 'student',
+                'student_id': 'IUBAT-002',
+                'department': 'cse',
+                'phone': '01712345679',
+            },
+            {
+                'username': 'Tanmoy',
+                'email': 'tanmoy@iubat.edu',
+                'password': 'tanmoy123',
+                'first_name': 'Tanmoy',
+                'last_name': 'Das',
+                'role': 'student',
+                'student_id': 'IUBAT-003',
+                'department': 'cse',
+                'phone': '01712345680',
+            },
+        ]
+
+        plan = MembershipPlan.objects.first()
+        for u in test_users:
+            user, created = User.objects.get_or_create(
+                username=u['username'],
+                defaults={
+                    'email': u['email'],
+                    'first_name': u['first_name'],
+                    'last_name': u['last_name'],
+                    'role': u['role'],
+                    'student_id': u['student_id'],
+                    'department': u['department'],
+                    'phone': u['phone'],
+                    'is_verified': True,
+                    'email_verified': True,
+                    'is_membership_paid': True,
+                },
+            )
+            user.set_password(u['password'])
+            user.is_verified = True
+            user.email_verified = True
+            user.is_membership_paid = True
+            user.is_active = True
+            user.save()
+            Membership.objects.get_or_create(
+                user=user,
+                defaults={
+                    'plan': plan,
+                    'is_active': True,
+                    'started_at': timezone.now(),
+                    'expires_at': timezone.now() + timedelta(days=365),
+                },
+            )
+            action = 'created' if created else 'password reset'
+            self.stdout.write(f"User {action}: {u['username']} / {u['password']}")
 
         # Create categories
         categories = [
