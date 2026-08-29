@@ -36,6 +36,11 @@ class Payment(models.Model):
         verbose_name = 'Payment'
         verbose_name_plural = 'Payments'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'payment_type'], name='payment_status_type_idx'),
+            models.Index(fields=['user', 'status'], name='payment_user_status_idx'),
+            models.Index(fields=['sslcommerz_tran_id'], name='payment_tran_id_idx'),
+        ]
 
     def __str__(self):
         return f"{self.user.username} - {self.amount} BDT - {self.status}"

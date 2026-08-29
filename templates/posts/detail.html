@@ -38,9 +38,7 @@
                             {% if post.category %}
                             <span class="flex items-center gap-1.5"><i class="bi bi-tag text-indigo-400"></i> {{ post.category.name }}</span>
                             {% endif %}
-                            {% if post.location %}
-                            <span class="flex items-center gap-1.5"><i class="bi bi-geo-alt text-indigo-400"></i> {{ post.location.name }}</span>
-                            {% endif %}
+                            <span class="flex items-center gap-1.5"><i class="bi bi-geo-alt text-indigo-400"></i> {{ post.display_location }}</span>
                             <span class="flex items-center gap-1.5"><i class="bi bi-calendar text-indigo-400"></i> {{ post.date_lost_found|date:"F d, Y" }}</span>
                             <span class="flex items-center gap-1.5"><i class="bi bi-eye text-indigo-400"></i> {{ post.views_count }} views</span>
                         </div>
@@ -68,17 +66,6 @@
                         </div>
                         {% endif %}
 
-                        {% if post.reward_amount %}
-                        <div class="mt-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                                <i class="bi bi-gift text-amber-600"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-amber-800">Reward Offered</p>
-                                <p class="text-lg font-bold text-amber-900">{{ post.reward_amount }} BDT</p>
-                            </div>
-                        </div>
-                        {% endif %}
                     </div>
                 </div>
 
@@ -121,9 +108,6 @@
                     </h3>
                     <div class="space-y-2">
                         {% if can_view_full %}
-                        <a href="{% url 'recovery:initiate' post.id %}" class="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition">
-                            <i class="bi bi-shield-check"></i> Claim This Item
-                        </a>
                         <a href="{% url 'messaging:start' post.id post.user.id %}" class="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-indigo-600 border border-indigo-200 hover:bg-indigo-50 transition">
                             <i class="bi bi-chat-dots"></i> Contact {{ post.get_post_type_display|default:'Owner' }}
                         </a>
@@ -154,6 +138,30 @@
                         </a>
                     </div>
                 </div>
+                {% endif %}
+
+                {% if request.user == post.user and post.post_type == 'lost' and post.status != 'resolved' %}
+                {% with active_session=post.recovery_sessions.all %}
+                {% for session in active_session %}
+                {% if session.status != 'cancelled' and session.status != 'expired' %}
+                <div class="bg-indigo-50 rounded-2xl border border-indigo-200 p-6">
+                    <h3 class="text-sm font-semibold text-indigo-900 mb-3 flex items-center gap-2">
+                        <i class="bi bi-qr-code"></i> Recovery QR
+                    </h3>
+                    {% if session.qr_code %}
+                    <div class="bg-white p-3 rounded-xl border border-indigo-100 inline-block mb-3">
+                        <img src="{{ session.qr_code.url }}" alt="Recovery QR" class="w-32 h-32">
+                    </div>
+                    {% endif %}
+                    <p class="text-sm text-indigo-800 mb-1">Short Code: <strong class="font-mono text-lg">{{ session.short_code }}</strong></p>
+                    <p class="text-xs text-indigo-600 mb-3">Show this code to the finder when they claim your item.</p>
+                    <a href="{% url 'recovery:detail' short_code=session.short_code %}" class="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition">
+                        View Recovery Session <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+                {% endif %}
+                {% endfor %}
+                {% endwith %}
                 {% endif %}
 
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">

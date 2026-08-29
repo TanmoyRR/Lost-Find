@@ -1,34 +1,42 @@
-from django.db import models
+import logging
+import secrets
+import string
+
+from django.db import models, transaction
 from django.conf import settings
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
-import uuid
-import hashlib
-import hmac
-import json
-import time
+
+logger = logging.getLogger(__name__)
+
+
+def generate_short_code():
+    """Generate a short random code like LF-7K29QX."""
+    alphabet = string.ascii_uppercase + string.digits
+    code = ''.join(secrets.choice(alphabet) for _ in range(6))
+    return f'LF-{code}'
+
 
 class RecoverySession(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('qr_generated', 'QR Generated'),
         ('qr_scanned', 'QR Scanned'),
-        ('handover_verified', 'Handover Verified'),
         ('completed', 'Completed'),
         ('expired', 'Expired'),
         ('cancelled', 'Cancelled'),
     )
 
-    uid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     post = models.ForeignKey('posts.Post', on_delete=models.CASCADE, related_name='recovery_sessions')
-    claimant = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='recovery_sessions')
     owner = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='owner_recovery_sessions')
+    claimant = models.ForeignKey(
+        'accounts.User', on_delete=models.CASCADE,
+        related_name='recovery_sessions', null=True, blank=True,
+    )
+    short_code = models.CharField(max_length=10, unique=True, db_index=True, default=generate_short_code)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    qr_token = models.CharField(max_length=255, null=True, blank=True)
     qr_code = models.ImageField(upload_to='recovery_qr/', null=True, blank=True)
-    qr_expires_at = models.DateTimeField(null=True, blank=True)
     qr_scanned_at = models.DateTimeField(null=True, blank=True)
-    handover_verified_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -38,37 +46,102 @@ class RecoverySession(models.Model):
         verbose_name = 'Recovery Session'
         verbose_name_plural = 'Recovery Sessions'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status'], name='recovery_status_idx'),
+            models.Index(fields=['owner', 'status'], name='recovery_owner_status_idx'),
+            models.Index(fields=['post', 'status'], name='recovery_post_status_idx'),
+        ]
 
     def __str__(self):
-        return f"Recovery {self.uid} - {self.post.title[:50]}"
+        return f"Recovery {self.short_code} - {self.post.title[:50]}"
 
-    def generate_qr_token(self):
-        import hashlib, hmac, json, time
-        timestamp = int(time.time())
-        payload = json.dumps({'session_uid': str(self.uid), 'timestamp': timestamp})
-        secret = settings.SECRET_KEY.encode()
-        signature = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
-        self.qr_token = f"{str(self.uid)}.{timestamp}.{signature}"
-        self.qr_expires_at = timezone.now() + timezone.timedelta(minutes=30)
-        self.save(update_fields=['qr_token', 'qr_expires_at'])
-        return self.qr_token
+    def save(self, *args, **kwargs):
+        if not self.short_code:
+            self.short_code = generate_short_code()
+            while RecoverySession.objects.filter(short_code=self.short_code).exists():
+                self.short_code = generate_short_code()
+        super().save(*args, **kwargs)
 
-    def verify_qr_token(self, token):
-        try:
-            parts = token.split('.')
-            if len(parts) != 3:
-                return False
-            uid_str, timestamp, signature = parts
-            if uid_str != str(self.uid):
-                return False
-            if timezone.now() > self.qr_expires_at:
-                return False
-            expected = hmac.new(settings.SECRET_KEY.encode(),
-                json.dumps({'session_uid': uid_str, 'timestamp': int(timestamp)}).encode(),
-                hashlib.sha256).hexdigest()
-            return hmac.compare_digest(signature, expected)
-        except Exception:
-            return False
+    def generate_qr_image(self):
+        """Generate the QR image encoding the short code."""
+        import qrcode
+        from io import BytesIO
+        from django.core.files.base import ContentFile
+
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(self.short_code)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        self.qr_code.save(
+            f'qr_{self.short_code}.png',
+            ContentFile(buffer.getvalue()),
+            save=False,
+        )
+        return self.qr_code
+
+    def verify_and_complete(self, token, scanned_by):
+        """
+        Validate the QR token and atomically complete the recovery.
+
+        Returns (success: bool, message: str).
+        """
+        from apps.notifications.models import Notification
+        from apps.recovery.models import RecoveryVerificationLog
+
+        if self.status not in ('qr_generated',):
+            return False, 'This recovery session is no longer active.'
+
+        if not self.claimant:
+            return False, 'No authorized finder has been assigned to this session.'
+
+        if scanned_by != self.claimant:
+            return False, 'Only the authorized finder can scan this QR code.'
+
+        cleaned = (token or '').strip().upper()
+        if cleaned != self.short_code:
+            return False, 'Invalid QR code.'
+
+        with transaction.atomic():
+            self.status = 'completed'
+            self.qr_scanned_at = timezone.now()
+            self.completed_at = timezone.now()
+            self.save(update_fields=['status', 'qr_scanned_at', 'completed_at'])
+
+            self.post.status = 'resolved'
+            self.post.is_resolved = True
+            self.post.save(update_fields=['status', 'is_resolved'])
+
+            RecoveryVerificationLog.objects.create(
+                session=self, action='qr_scanned',
+                performed_by=scanned_by,
+                ip_address=None,
+            )
+            RecoveryVerificationLog.objects.create(
+                session=self, action='recovery_completed',
+                performed_by=scanned_by,
+                ip_address=None,
+            )
+
+            Notification.objects.create(
+                user=self.owner,
+                notification_type='post_resolved',
+                title='Item Successfully Recovered',
+                message=f'Your item "{self.post.title}" has been successfully recovered.',
+                link=f'/recovery/',
+            )
+            Notification.objects.create(
+                user=self.claimant,
+                notification_type='post_resolved',
+                title='Recovery Completed',
+                message=f'You have successfully completed the recovery of "{self.post.title}".',
+                link=f'/recovery/',
+            )
+
+        logger.info('Recovery %s completed by finder %s', self.short_code, scanned_by.pk)
+        return True, 'Recovery completed successfully!'
+
 
 class RecoveryOTP(models.Model):
     session = models.ForeignKey(RecoverySession, on_delete=models.CASCADE, related_name='otps')
@@ -86,29 +159,8 @@ class RecoveryOTP(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"OTP for {self.session.uid}"
+        return f"OTP for {self.session.short_code}"
 
-    def is_valid(self):
-        return (not self.is_used and
-                self.attempts < self.max_attempts and
-                timezone.now() <= self.expires_at)
-
-    def verify(self, code):
-        if not self.is_valid():
-            return False, 'OTP expired or already used'
-        self.attempts += 1
-        if self.attempts >= self.max_attempts:
-            self.save(update_fields=['attempts'])
-            return False, 'Maximum attempts exceeded'
-        if self.otp_code == code:
-            self.is_used = True
-            self.verified_at = timezone.now()
-            self.save(update_fields=['is_used', 'verified_at', 'attempts'])
-            self.session.status = 'otp_verified'
-            self.session.save(update_fields=['status'])
-            return True, 'OTP verified successfully'
-        self.save(update_fields=['attempts'])
-        return False, 'Invalid OTP code'
 
 class RecoveryVerificationLog(models.Model):
     session = models.ForeignKey(RecoverySession, on_delete=models.CASCADE, related_name='verification_logs')
@@ -124,7 +176,8 @@ class RecoveryVerificationLog(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.session.uid} - {self.action}"
+        return f"{self.session.short_code} - {self.action}"
+
 
 class RecoveryConfirmation(models.Model):
     session = models.OneToOneField(RecoverySession, on_delete=models.CASCADE, related_name='confirmation')
@@ -144,7 +197,4 @@ class RecoveryConfirmation(models.Model):
         verbose_name_plural = 'Recovery Confirmations'
 
     def __str__(self):
-        return f"Confirmation for {self.session.uid}"
-
-    def is_complete(self):
-        return self.confirmed_by_owner and self.confirmed_by_claimant
+        return f"Confirmation for {self.session.short_code}"

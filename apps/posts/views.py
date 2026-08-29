@@ -1,7 +1,8 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Q, F
 from django.core.paginator import Paginator
 
 from .models import Post, Category, CampusLocation
@@ -9,6 +10,8 @@ from .forms import PostForm
 from apps.accounts.models import UserActivity
 from apps.accounts.decorators import membership_required
 from apps.ai_engine.utils import find_matches_for_post, refresh_post_embedding, build_text_for_post
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -58,8 +61,7 @@ def browse_posts(request):
 @login_required
 def post_detail(request, pk):
     post = get_object_or_404(Post.objects.select_related('category', 'location', 'user'), pk=pk)
-    post.views_count += 1
-    post.save()
+    Post.objects.filter(pk=pk).update(views_count=F('views_count') + 1)
     can_view_full = False
     if request.user.is_authenticated:
         if request.user == post.user:
@@ -101,6 +103,13 @@ def create_post(request):
             post.user = request.user
             post.save()
             messages.success(request, 'Post created successfully!')
+            if post.post_type == 'lost':
+                try:
+                    from apps.recovery.views import create_recovery_session_for_post
+                    session = create_recovery_session_for_post(post)
+                    messages.info(request, f'Recovery QR code generated: {session.short_code}')
+                except Exception:
+                    pass
             try:
                 find_matches_for_post(post)
             except Exception:
@@ -126,7 +135,7 @@ def edit_post(request, pk):
             new_searchable_text = build_text_for_post(post)
             if new_searchable_text != old_searchable_text:
                 try:
-                    refresh_post_embedding(post)
+                    find_matches_for_post(post)
                 except Exception:
                     pass
             messages.success(request, 'Post updated successfully!')
@@ -150,15 +159,19 @@ def delete_post(request, pk):
 @membership_required
 def mark_resolved(request, pk):
     post = get_object_or_404(Post, pk=pk, user=request.user)
-    post.status = 'resolved'
-    post.is_resolved = True
-    post.save()
-    UserActivity.objects.create(user=request.user, activity_type='post_resolved', description=f'Resolved post: {post.title}')
-    messages.success(request, 'Post marked as resolved!')
-    return redirect('posts:detail', pk=post.pk)
+    if request.method == 'POST':
+        post.status = 'resolved'
+        post.is_resolved = True
+        post.save()
+        UserActivity.objects.create(user=request.user, activity_type='post_resolved', description=f'Resolved post: {post.title}')
+        messages.success(request, 'Post marked as resolved!')
+    return redirect('posts:detail', pk=pk)
 
 
 @login_required
 def my_posts(request):
-    posts = Post.objects.filter(user=request.user).order_by('-created_at')
-    return render(request, 'posts/my_posts.html', {'posts': posts})
+    posts = Post.objects.filter(user=request.user).select_related('category', 'location').order_by('-created_at')
+    paginator = Paginator(posts, 20)
+    page = request.GET.get('page', 1)
+    posts_page = paginator.get_page(page)
+    return render(request, 'posts/my_posts.html', {'posts': posts_page})

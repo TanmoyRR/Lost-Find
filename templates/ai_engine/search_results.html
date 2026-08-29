@@ -81,7 +81,7 @@
                                     <span class="flex items-center gap-1"><i class="bi bi-tag text-indigo-400"></i> {{ post.category.name }}</span>
                                     {% endif %}
                                     {% if post.location %}
-                                    <span class="flex items-center gap-1"><i class="bi bi-geo-alt text-indigo-400"></i> {{ post.location.name }}</span>
+                                    <span class="flex items-center gap-1"><i class="bi bi-geo-alt text-indigo-400"></i> {{ post.display_location }}</span>
                                     {% endif %}
                                     <span class="flex items-center gap-1"><i class="bi bi-calendar text-indigo-400"></i> {{ post.created_at|date:"M d, Y" }}</span>
                                 </div>
@@ -101,16 +101,16 @@
                                         <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e5e7eb" stroke-width="2.5"></circle>
                                         <circle cx="18" cy="18" r="15.5" fill="none"
                                             stroke="{% if score > 0.8 %}#10b981{% elif score > 0.6 %}#f59e0b{% else %}#6366f1{% endif %}"
-                                            stroke-width="2.5" stroke-dasharray="{{ score|floatformat:2 }}, 100"
+                                            stroke-width="2.5" stroke-dasharray="{{ score }}, 100"
                                             stroke-linecap="round"></circle>
                                     </svg>
                                     <div class="absolute inset-0 flex items-center justify-center">
                                         <span class="text-sm font-bold {% if score > 0.8 %}text-emerald-600{% elif score > 0.6 %}text-amber-600{% else %}text-indigo-600{% endif %}">
-                                            {{ score|floatformat:1 }}%
+                                            {{ score|floatformat:0 }}%
                                         </span>
                                     </div>
                                 </div>
-                                <span class="text-xs text-gray-400 mt-1">Match</span>
+                                <span class="text-xs text-gray-400 mt-1">Similarity</span>
                             </div>
                             {% endif %}
                         </div>

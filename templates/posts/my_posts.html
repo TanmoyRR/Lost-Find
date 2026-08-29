@@ -66,7 +66,7 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ post.category.name|default:'—' }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">{{ post.location.name|default:'—' }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">{{ post.display_location }}</td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ post.created_at|date:"M d, Y" }}</td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ post.views_count }}</td>
                         <td class="px-6 py-4 text-right">

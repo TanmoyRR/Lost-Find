@@ -20,14 +20,19 @@ from apps.posts.models import Post
 from . import jina_client
 from .models import PostEmbedding, MatchSuggestion
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('apps.ai_engine')
 
 _vector_backend_state = None
 
 
 def generate_embedding(text, **kwargs):
     """Generate an embedding via the Jina API. Returns a list or None."""
-    return jina_client.generate_embedding(text, **kwargs)
+    result = jina_client.generate_embedding(text, **kwargs)
+    if result:
+        logger.debug('Embedding generated (%d dims)', len(result))
+    else:
+        logger.warning('Embedding generation returned None')
+    return result
 
 
 def vector_backend_available():
@@ -69,17 +74,23 @@ def compute_cosine_similarity(embedding1, embedding2):
 
 
 def build_text_for_post(post):
-    """Build the searchable text representation used for embeddings."""
+    """
+    Build the searchable text representation used for embeddings.
+
+    Includes item-type, title, category, location, description, and tags.
+    Excludes contact_info and other personally identifiable data for privacy.
+    """
     parts = []
     parts.append('{}: {}'.format(post.get_post_type_display(), post.title))
     if post.category_id:
         parts.append('Category: {}'.format(post.category.name))
-    if post.location_id:
-        parts.append('Location: {}'.format(post.location.name))
+    location_display = post.display_location if hasattr(post, 'display_location') else ''
+    if location_display and location_display != 'N/A':
+        parts.append('Location: {}'.format(location_display))
     if post.description:
         parts.append(post.description)
     try:
-        tags = [t for t in post.tags.values_list('name', flat=True)]
+        tags = list(post.tags.values_list('name', flat=True))
         if tags:
             parts.append('Tags: {}'.format(', '.join(tags)))
     except Exception:
@@ -103,11 +114,13 @@ def store_post_embedding(post, vector):
 def refresh_post_embedding(post):
     """Regenerate and store the embedding for a single post. Safe to retry."""
     try:
-        vector = generate_embedding(build_text_for_post(post))
+        text = build_text_for_post(post)
+        vector = generate_embedding(text)
     except Exception as exc:
         logger.error('refresh_post_embedding error for post %s: %s', post.pk, exc)
         return None
     if not vector:
+        logger.warning('refresh_post_embedding: no vector for post %s', post.pk)
         return None
     return store_post_embedding(post, vector)
 
@@ -148,7 +161,7 @@ def semantic_search_posts(query_vector, limit=None, min_score=None, **filters):
 
     results = []
     for pe in qs[:limit]:
-        similarity = max(0.0, min(1.0, 1.0 - pe.distance))
+        similarity = max(0.0, 1.0 - (pe.distance / 2.0))
         if similarity >= min_score:
             results.append((pe.post, round(similarity, 4)))
     return results
@@ -162,7 +175,8 @@ def keyword_search_posts(query, **filters):
         qs = qs.filter(
             Q(title__icontains=query) |
             Q(description__icontains=query) |
-            Q(category__name__icontains=query)
+            Q(category__name__icontains=query) |
+            Q(location_name__icontains=query)
         )
     post_type = filters.get('post_type')
     if post_type:
@@ -218,22 +232,25 @@ def hybrid_match_score(post_a, post_b, semantic_similarity):
     """
     Weighted blend of semantic similarity + structured attributes.
 
+    Returns (final_score, metadata_score) tuple.
+
     Default weights (configurable via settings.AI_MATCH_WEIGHTS):
         semantic 60%, category 15%, location 10%, date 10%, tags 5%
     """
     weights = settings.AI_MATCH_WEIGHTS
 
-    score = (
-        weights.get('semantic', 0.60) * max(0.0, min(1.0, semantic_similarity))
-    )
+    semantic_component = weights.get('semantic', 0.60) * max(0.0, min(1.0, semantic_similarity))
+    metadata_component = 0.0
     if post_a.category_id and post_a.category_id == post_b.category_id:
-        score += weights.get('category', 0.15)
+        metadata_component += weights.get('category', 0.15)
     if post_a.location_id and post_a.location_id == post_b.location_id:
-        score += weights.get('location', 0.10)
-    score += weights.get('date', 0.10) * compute_date_proximity(post_a, post_b)
-    score += weights.get('tags', 0.05) * tag_overlap(post_a, post_b)
+        metadata_component += weights.get('location', 0.10)
+    metadata_component += weights.get('date', 0.10) * compute_date_proximity(post_a, post_b)
+    metadata_component += weights.get('tags', 0.05) * tag_overlap(post_a, post_b)
 
-    return round(min(score, 1.0), 4)
+    final_score = round(min(semantic_component + metadata_component, 1.0), 4)
+    metadata_score = round(min(metadata_component, 1.0), 4)
+    return final_score, metadata_score
 
 
 def _ranked_candidates(post, query_vector):
@@ -255,7 +272,7 @@ def _ranked_candidates(post, query_vector):
             .order_by('distance')[:limit]
         )
         return [
-            (pe.post, max(0.0, min(1.0, 1.0 - pe.distance)))
+            (pe.post, max(0.0, 1.0 - (pe.distance / 2.0)))
             for pe in qs
         ]
 
@@ -263,7 +280,8 @@ def _ranked_candidates(post, query_vector):
         Post.objects
         .filter(post_type=opposite_type, status='open')
         .exclude(pk=post.pk)
-        .select_related('category', 'location')[:limit]
+        .select_related('category', 'location')
+        .prefetch_related('tags')[:limit]
     )
     results = []
     for candidate in candidates:
@@ -278,6 +296,13 @@ def _ranked_candidates(post, query_vector):
             )
         results.append((candidate, semantic))
     return results
+
+
+def _get_match_strength(score):
+    """Classify a final hybrid score into match strength."""
+    if score >= settings.AI_STRONG_MATCH_THRESHOLD:
+        return 'strong'
+    return 'possible'
 
 
 def find_matches_for_post(post):
@@ -296,7 +321,7 @@ def find_matches_for_post(post):
     try:
         post_vector = generate_embedding(post_text)
     except Exception as exc:
-        logger.error('find_matches_for_post embedding error: %s', exc)
+        logger.error('find_matches_for_post embedding error for post %s: %s', post.pk, exc)
         return []
 
     if not post_vector:
@@ -305,23 +330,33 @@ def find_matches_for_post(post):
 
     store_post_embedding(post, post_vector)
 
-    threshold = settings.AI_MATCH_THRESHOLD
     matches = []
     try:
         candidates = _ranked_candidates(post, post_vector)
     except Exception as exc:
-        logger.error('find_matches_for_post candidate search error: %s', exc)
+        logger.error('find_matches_for_post candidate search error for post %s: %s', post.pk, exc)
         return []
 
+    if hasattr(post, '_prefetched_objects_cache') is False:
+        try:
+            _ = list(post.tags.all())
+        except Exception:
+            pass
+
     for candidate, semantic in candidates:
-        score = hybrid_match_score(post, candidate, semantic)
-        if score < threshold:
+        score, meta = hybrid_match_score(post, candidate, semantic)
+        if score < settings.AI_MATCH_THRESHOLD:
             continue
         try:
             match, _created = MatchSuggestion.objects.update_or_create(
                 post=post,
                 matched_post=candidate,
-                defaults={'similarity_score': score},
+                defaults={
+                    'similarity_score': score,
+                    'semantic_score': round(semantic, 4),
+                    'metadata_score': meta,
+                    'match_strength': _get_match_strength(score),
+                },
             )
             matches.append(match)
         except Exception as exc:
@@ -329,4 +364,8 @@ def find_matches_for_post(post):
                          post.pk, candidate.pk, exc)
 
     matches.sort(key=lambda m: m.similarity_score, reverse=True)
+    logger.info(
+        'Matching completed for post %s: %d candidates evaluated, %d matches created',
+        post.pk, len(candidates), len(matches),
+    )
     return matches[:settings.AI_MATCH_RESULTS]

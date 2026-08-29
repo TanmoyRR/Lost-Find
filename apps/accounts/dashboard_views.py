@@ -1,3 +1,4 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -18,6 +19,8 @@ from apps.payments.models import Payment
 from apps.ai_engine.models import PostEmbedding, MatchSuggestion
 from apps.notifications.models import Notification
 
+logger = logging.getLogger(__name__)
+
 
 def is_admin(user):
     return user.is_authenticated and (user.role == 'admin' or user.is_staff or user.is_superuser)
@@ -30,7 +33,6 @@ def user_dashboard(request):
     recent_activities = UserActivity.objects.filter(user=user)[:10]
     membership = getattr(user, 'membership', None)
     matches = MatchSuggestion.objects.select_related('post', 'matched_post').filter(post__user=user)[:5]
-    from apps.notifications.models import Notification
     unread_notifications = Notification.objects.filter(user=user, is_read=False).count()
     site_agg = Post.objects.aggregate(
         total_posts=Count('id'),
@@ -51,18 +53,19 @@ def user_dashboard(request):
         'recent_activities': recent_activities,
         'membership': membership,
         'matches': matches,
-        'sidebar_items': [
-            {'url': '/dashboard/', 'label': 'Dashboard', 'icon': 'bi bi-grid-1x2', 'active': True},
-            {'url': '/my-posts/', 'label': 'My Posts', 'icon': 'bi bi-file-earmark-text'},
-            {'url': '/post/create/', 'label': 'Create Post', 'icon': 'bi bi-plus-circle'},
-            {'url': '/ai/matches/', 'label': 'AI Matches', 'icon': 'bi bi-robot'},
-            {'url': '/membership/manage/', 'label': 'Membership', 'icon': 'bi bi-gem'},
-            {'url': '/notifications/', 'label': 'Notifications', 'icon': 'bi bi-bell'},
-            {'url': '/profile/', 'label': 'Profile', 'icon': 'bi bi-person'},
-            {'url': '/settings/', 'label': 'Settings', 'icon': 'bi bi-gear'},
-        ],
     }
     return render(request, 'dashboard/user_dashboard.html', context)
+
+
+ADMIN_SIDEBAR = [
+    {'url_name': 'dashboard:admin_home', 'label': 'Dashboard', 'icon': 'bi bi-grid-1x2'},
+    {'url_name': 'dashboard:admin_users', 'label': 'Users', 'icon': 'bi bi-people'},
+    {'url_name': 'posts:browse', 'label': 'Browse Posts', 'icon': 'bi bi-collection'},
+    {'url_name': 'notifications:list', 'label': 'Notifications', 'icon': 'bi bi-bell'},
+    {'url_name': 'dashboard:admin_memberships', 'label': 'Memberships', 'icon': 'bi bi-gem'},
+    {'url_name': 'dashboard:admin_revenue', 'label': 'Revenue', 'icon': 'bi bi-currency-dollar'},
+    {'url_name': 'dashboard:admin_settings', 'label': 'Settings', 'icon': 'bi bi-gear'},
+]
 
 
 @login_required
@@ -113,7 +116,7 @@ def admin_dashboard(request):
     recent_activities = UserActivity.objects.all()[:20]
     users = User.objects.exclude(pk=request.user.pk).order_by('-date_joined')[:10]
     posts = Post.objects.select_related('location', 'category').order_by('-created_at')[:10]
-    payments = Payment.objects.all().order_by('-created_at')[:10]
+    payments = Payment.objects.select_related('user').all().order_by('-created_at')[:10]
 
     context = {
         'total_users': total_users,
@@ -142,33 +145,14 @@ def admin_dashboard(request):
     return render(request, 'admin_dashboard/dashboard.html', context)
 
 
-ADMIN_SIDEBAR = [
-    {'url': '/dashboard/admin/', 'label': 'Dashboard', 'icon': 'bi bi-grid-1x2'},
-    {'url': '/dashboard/admin/users/', 'label': 'Users', 'icon': 'bi bi-people'},
-    {'url': '/browse/', 'label': 'Browse Posts', 'icon': 'bi bi-collection'},
-    {'url': '/notifications/', 'label': 'Notifications', 'icon': 'bi bi-bell'},
-    {'url': '/dashboard/admin/memberships/', 'label': 'Memberships', 'icon': 'bi bi-gem'},
-    {'url': '/dashboard/admin/revenue/', 'label': 'Revenue', 'icon': 'bi bi-currency-dollar'},
-    {'url': '/dashboard/admin/settings/', 'label': 'Settings', 'icon': 'bi bi-gear'},
-]
-
-USER_SIDEBAR = [
-    {'url': '/dashboard/', 'label': 'Dashboard', 'icon': 'bi bi-grid-1x2'},
-    {'url': '/my-posts/', 'label': 'My Posts', 'icon': 'bi bi-file-earmark-text'},
-    {'url': '/post/create/', 'label': 'Create Post', 'icon': 'bi bi-plus-circle'},
-    {'url': '/ai/matches/', 'label': 'AI Matches', 'icon': 'bi bi-robot'},
-    {'url': '/membership/', 'label': 'Membership', 'icon': 'bi bi-gem'},
-    {'url': '/notifications/', 'label': 'Notifications', 'icon': 'bi bi-bell'},
-    {'url': '/profile/', 'label': 'Profile', 'icon': 'bi bi-person'},
-    {'url': '/settings/', 'label': 'Settings', 'icon': 'bi bi-gear'},
-]
-
-
 @login_required
 @user_passes_test(is_admin)
 def admin_users(request):
     users = User.objects.exclude(pk=request.user.pk).order_by('-date_joined')
-    return render(request, 'admin_dashboard/users.html', {'users': users, 'sidebar_items': ADMIN_SIDEBAR})
+    paginator = Paginator(users, 20)
+    page = request.GET.get('page', 1)
+    users_page = paginator.get_page(page)
+    return render(request, 'admin_dashboard/users.html', {'users': users_page, 'sidebar_items': ADMIN_SIDEBAR})
 
 
 @login_required
@@ -177,8 +161,8 @@ def admin_user_detail(request, pk):
     from apps.payments.models import Payment
     from apps.membership.models import MembershipPlan
     user = get_object_or_404(User, pk=pk)
-    user_posts = Post.objects.filter(user=user)
-    user_payments = Payment.objects.filter(user=user)
+    user_posts = Post.objects.filter(user=user).select_related('category', 'location')
+    user_payments = Payment.objects.filter(user=user).select_related('user')
     user_activities = UserActivity.objects.filter(user=user)[:20]
     open_posts = user_posts.filter(status='open').count()
     resolved_posts = user_posts.filter(status='resolved').count()
@@ -202,10 +186,13 @@ def admin_user_detail(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def admin_suspend_user(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_users')
     user = get_object_or_404(User, pk=pk)
     user.is_suspended = True
     user.is_active = False
     user.save()
+    logger.info('Admin %s suspended user %s', request.user.username, user.username)
     messages.success(request, f'User {user.username} has been suspended.')
     return redirect('dashboard:admin_users')
 
@@ -213,10 +200,13 @@ def admin_suspend_user(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def admin_activate_user(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_users')
     user = get_object_or_404(User, pk=pk)
     user.is_suspended = False
     user.is_active = True
     user.save()
+    logger.info('Admin %s activated user %s', request.user.username, user.username)
     messages.success(request, f'User {user.username} has been activated.')
     return redirect('dashboard:admin_users')
 
@@ -224,17 +214,13 @@ def admin_activate_user(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def admin_posts(request):
-    posts = Post.objects.all().order_by('-created_at')
-    pending_posts = posts.filter(status='open')
-    total_posts_count = posts.count()
-    pending_count = pending_posts.count()
-    resolved_count = posts.filter(status='resolved').count()
+    posts = Post.objects.select_related('user', 'category', 'location').all().order_by('-created_at')
+    paginator = Paginator(posts, 20)
+    page = request.GET.get('page', 1)
+    posts_page = paginator.get_page(page)
     return render(request, 'admin_dashboard/posts.html', {
-        'posts': posts,
-        'pending_posts': posts,
-        'total_posts_count': total_posts_count,
-        'pending_count': pending_count,
-        'resolved_count': resolved_count,
+        'posts': posts_page,
+        'total_posts_count': posts.count(),
         'sidebar_items': ADMIN_SIDEBAR,
     })
 
@@ -242,6 +228,8 @@ def admin_posts(request):
 @login_required
 @user_passes_test(is_admin)
 def admin_post_approve(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_posts')
     post = get_object_or_404(Post, pk=pk)
     post.status = 'open'
     post.save(update_fields=['status'])
@@ -252,6 +240,8 @@ def admin_post_approve(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def admin_post_reject(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_posts')
     post = get_object_or_404(Post, pk=pk)
     post.status = 'claimed'
     post.save(update_fields=['status'])
@@ -262,6 +252,8 @@ def admin_post_reject(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def admin_post_soft_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_posts')
     post = get_object_or_404(Post, pk=pk)
     post.is_active = False
     post.save(update_fields=['is_active'])
@@ -272,6 +264,8 @@ def admin_post_soft_delete(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def admin_post_restore(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_posts')
     post = get_object_or_404(Post, pk=pk)
     post.is_active = True
     post.save(update_fields=['is_active'])
@@ -282,6 +276,8 @@ def admin_post_restore(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def admin_post_permanent_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_posts')
     post = get_object_or_404(Post, pk=pk)
     title = post.title
     post.delete()
@@ -292,10 +288,9 @@ def admin_post_permanent_delete(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def admin_categories(request):
-    from django.db.models import Count
     categories = Category.objects.annotate(post_count=Count('posts'))
     total_categories = categories.count()
-    active_categories = categories.count()
+    active_categories = categories.filter(is_active=True).count()
     total_posts_in_categories = Post.objects.filter(category__isnull=False).count()
     return render(request, 'admin_dashboard/categories.html', {
         'categories': categories,
@@ -309,10 +304,9 @@ def admin_categories(request):
 @login_required
 @user_passes_test(is_admin)
 def admin_locations(request):
-    from django.db.models import Count
     locations = CampusLocation.objects.annotate(post_count=Count('posts'))
     total_locations = locations.count()
-    active_locations = locations.count()
+    active_locations = locations.filter(is_active=True).count()
     total_posts_in_locations = Post.objects.filter(location__isnull=False).count()
     return render(request, 'admin_dashboard/locations.html', {
         'locations': locations,
@@ -649,7 +643,6 @@ def _revenue_chart_series(qs, chart, date_from='', date_to=''):
 @login_required
 @user_passes_test(is_admin)
 def admin_reports(request):
-    from django.db.models import Count, Sum
     total_users = User.objects.count()
     total_posts = Post.objects.count()
     resolved_posts = Post.objects.filter(status='resolved').count()
@@ -672,7 +665,6 @@ def admin_reports(request):
 @login_required
 @user_passes_test(is_admin)
 def admin_analytics(request):
-    from django.db.models import Count, Sum
     total_users = User.objects.count()
     total_posts = Post.objects.count()
     resolved_posts = Post.objects.filter(status='resolved').count()
@@ -710,13 +702,15 @@ def admin_settings(request):
 @login_required
 @user_passes_test(is_admin)
 def admin_memberships(request):
-    from django.db.models import Count
     memberships = Membership.objects.select_related('user', 'plan').order_by('-created_at')
     total_members = memberships.count()
     active_members = memberships.filter(is_active=True).count()
     expired_members = total_members - active_members
+    paginator = Paginator(memberships, 20)
+    page = request.GET.get('page', 1)
+    memberships_page = paginator.get_page(page)
     return render(request, 'admin_dashboard/memberships.html', {
-        'memberships': memberships,
+        'memberships': memberships_page,
         'total_members': total_members,
         'active_members': active_members,
         'expired_members': expired_members,
@@ -727,46 +721,48 @@ def admin_memberships(request):
 @login_required
 @user_passes_test(is_admin)
 def admin_update_membership(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_user_detail', pk=pk)
     user = get_object_or_404(User, pk=pk)
     membership = getattr(user, 'membership', None)
-    from apps.membership.models import MembershipPlan
 
-    if request.method == 'POST':
-        is_active = request.POST.get('is_active') == 'on'
-        plan_id = request.POST.get('plan')
-        started_at_str = request.POST.get('started_at')
-        expires_at_str = request.POST.get('expires_at')
+    is_active = request.POST.get('is_active') == 'on'
+    plan_id = request.POST.get('plan')
+    started_at_str = request.POST.get('started_at')
+    expires_at_str = request.POST.get('expires_at')
 
-        plan = MembershipPlan.objects.filter(pk=plan_id).first() if plan_id else None
-        if is_active and not plan:
-            messages.error(request, 'Please select a plan for active membership.')
-            return redirect('dashboard:admin_user_detail', pk=pk)
+    plan = MembershipPlan.objects.filter(pk=plan_id).first() if plan_id else None
+    if is_active and not plan:
+        messages.error(request, 'Please select a plan for active membership.')
+        return redirect('dashboard:admin_user_detail', pk=pk)
 
-        started_at = timezone.datetime.strptime(started_at_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone()) if started_at_str else None
-        expires_at = timezone.datetime.strptime(expires_at_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone()) if expires_at_str else None
+    started_at = timezone.datetime.strptime(started_at_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone()) if started_at_str else None
+    expires_at = timezone.datetime.strptime(expires_at_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone()) if expires_at_str else None
 
-        if is_active and (not started_at or not expires_at):
-            messages.error(request, 'Start and expiry dates are required for active membership.')
-            return redirect('dashboard:admin_user_detail', pk=pk)
+    if is_active and (not started_at or not expires_at):
+        messages.error(request, 'Start and expiry dates are required for active membership.')
+        return redirect('dashboard:admin_user_detail', pk=pk)
 
-        if membership:
-            membership.plan = plan
-            membership.is_active = is_active
-            membership.started_at = started_at
-            membership.expires_at = expires_at
-            membership.save()
-        else:
-            Membership.objects.create(
-                user=user, plan=plan, is_active=is_active,
-                started_at=started_at, expires_at=expires_at
-            )
-        messages.success(request, f'Membership updated for {user.username}.')
+    if membership:
+        membership.plan = plan
+        membership.is_active = is_active
+        membership.started_at = started_at
+        membership.expires_at = expires_at
+        membership.save()
+    else:
+        Membership.objects.create(
+            user=user, plan=plan, is_active=is_active,
+            started_at=started_at, expires_at=expires_at
+        )
+    messages.success(request, f'Membership updated for {user.username}.')
     return redirect('dashboard:admin_user_detail', pk=pk)
 
 
 @login_required
 @user_passes_test(is_admin)
 def admin_toggle_membership(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_user_detail', pk=pk)
     user = get_object_or_404(User, pk=pk)
     membership = getattr(user, 'membership', None)
     if membership and membership.is_active:
@@ -775,7 +771,6 @@ def admin_toggle_membership(request, pk):
         membership.save()
         messages.success(request, f'Membership revoked for {user.username}.')
     else:
-        from apps.membership.models import MembershipPlan
         plan = MembershipPlan.objects.filter(is_active=True).first()
         if not plan:
             messages.error(request, 'No active membership plan found. Create one first.')
@@ -799,93 +794,97 @@ def admin_toggle_membership(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def admin_extend_membership(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_user_detail', pk=pk)
     user = get_object_or_404(User, pk=pk)
-    if request.method == 'POST':
-        try:
-            days = int(request.POST.get('days', 30))
-            days = max(1, min(days, 3650))
-        except (TypeError, ValueError):
-            days = 30
-        membership = getattr(user, 'membership', None)
-        if membership:
-            base = membership.expires_at if membership.expires_at and membership.expires_at > timezone.now() else timezone.now()
-            membership.expires_at = base + timedelta(days=days)
-            membership.is_active = True
-            if not membership.started_at:
-                membership.started_at = timezone.now()
-            membership.save()
-        else:
-            plan = MembershipPlan.objects.filter(is_active=True).first()
-            if not plan:
-                messages.error(request, 'No active membership plan found. Create one first.')
-                return redirect('dashboard:admin_user_detail', pk=pk)
-            Membership.objects.create(
-                user=user, plan=plan, is_active=True,
-                started_at=timezone.now(),
-                expires_at=timezone.now() + timedelta(days=days),
-            )
-        messages.success(request, f'Membership extended by {days} days for {user.username}.')
+    try:
+        days = int(request.POST.get('days', 30))
+        days = max(1, min(days, 3650))
+    except (TypeError, ValueError):
+        days = 30
+    membership = getattr(user, 'membership', None)
+    if membership:
+        base = membership.expires_at if membership.expires_at and membership.expires_at > timezone.now() else timezone.now()
+        membership.expires_at = base + timedelta(days=days)
+        membership.is_active = True
+        if not membership.started_at:
+            membership.started_at = timezone.now()
+        membership.save()
+    else:
+        plan = MembershipPlan.objects.filter(is_active=True).first()
+        if not plan:
+            messages.error(request, 'No active membership plan found. Create one first.')
+            return redirect('dashboard:admin_user_detail', pk=pk)
+        Membership.objects.create(
+            user=user, plan=plan, is_active=True,
+            started_at=timezone.now(),
+            expires_at=timezone.now() + timedelta(days=days),
+        )
+    messages.success(request, f'Membership extended by {days} days for {user.username}.')
     return redirect('dashboard:admin_user_detail', pk=pk)
 
 
 @login_required
 @user_passes_test(is_admin)
 def admin_delete_user(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_users')
     user = get_object_or_404(User, pk=pk)
     if user.pk == request.user.pk:
         messages.error(request, 'You cannot delete your own account.')
         return redirect('dashboard:admin_users')
-    if request.method == 'POST':
-        username = user.username
-        user.delete()
-        messages.success(request, f'User "{username}" deleted.')
+    username = user.username
+    user.delete()
+    logger.info('Admin %s deleted user %s', request.user.username, username)
+    messages.success(request, f'User "{username}" deleted.')
     return redirect('dashboard:admin_users')
 
 
 @login_required
 @user_passes_test(is_admin)
 def admin_update_user_info(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_user_detail', pk=pk)
     user = get_object_or_404(User, pk=pk)
-    if request.method == 'POST':
-        username = request.POST.get('username', '').strip()
-        first_name = request.POST.get('first_name', '').strip()
-        last_name = request.POST.get('last_name', '').strip()
-        email = request.POST.get('email', '').strip()
-        phone = request.POST.get('phone', '').strip()
-        student_id = request.POST.get('student_id', '').strip()
-        department = request.POST.get('department', '').strip()
+    username = request.POST.get('username', '').strip()
+    first_name = request.POST.get('first_name', '').strip()
+    last_name = request.POST.get('last_name', '').strip()
+    email = request.POST.get('email', '').strip()
+    phone = request.POST.get('phone', '').strip()
+    student_id = request.POST.get('student_id', '').strip()
+    department = request.POST.get('department', '').strip()
 
-        valid_departments = [d[0] for d in User.DEPARTMENTS]
-        errors = []
-        if not username:
-            errors.append('Username is required.')
-        elif User.objects.exclude(pk=user.pk).filter(username__iexact=username).exists():
-            errors.append('That username is already taken.')
-        if not email:
-            errors.append('Email is required.')
-        elif User.objects.exclude(pk=user.pk).filter(email__iexact=email).exists():
-            errors.append('That email is already in use.')
-        if student_id and User.objects.exclude(pk=user.pk).filter(student_id__iexact=student_id).exists():
-            errors.append('That student ID is already in use.')
-        if department and department not in valid_departments:
-            department = ''
+    valid_departments = [d[0] for d in User.DEPARTMENTS]
+    errors = []
+    if not username:
+        errors.append('Username is required.')
+    elif User.objects.exclude(pk=user.pk).filter(username__iexact=username).exists():
+        errors.append('That username is already taken.')
+    if not email:
+        errors.append('Email is required.')
+    elif User.objects.exclude(pk=user.pk).filter(email__iexact=email).exists():
+        errors.append('That email is already in use.')
+    if student_id and User.objects.exclude(pk=user.pk).filter(student_id__iexact=student_id).exists():
+        errors.append('That student ID is already in use.')
+    if department and department not in valid_departments:
+        department = ''
 
-        if errors:
-            for error in errors:
-                messages.error(request, error)
-        else:
-            user.username = username
-            user.first_name = first_name
-            user.last_name = last_name
-            user.email = email
-            user.phone = phone or None
-            user.student_id = student_id or None
-            user.department = department or None
-            user.save()
-            UserActivity.objects.create(
-                user=user,
-                activity_type='profile_updated',
-                description=f'Information updated by admin {request.user.username}.',
-            )
-            messages.success(request, f'Information updated for {user.username}.')
+    if errors:
+        for error in errors:
+            messages.error(request, error)
+    else:
+        user.username = username
+        user.first_name = first_name
+        user.last_name = last_name
+        user.email = email
+        user.phone = phone or None
+        user.student_id = student_id or None
+        user.department = department or None
+        user.save()
+        UserActivity.objects.create(
+            user=user,
+            activity_type='profile_updated',
+            description=f'Information updated by admin {request.user.username}.',
+        )
+        messages.success(request, f'Information updated for {user.username}.')
     return redirect(f"{reverse('dashboard:admin_user_detail', kwargs={'pk': pk})}?tab=info")

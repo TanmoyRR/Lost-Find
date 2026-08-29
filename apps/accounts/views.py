@@ -1,3 +1,6 @@
+import logging
+from urllib.parse import urlparse
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
@@ -10,7 +13,6 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
-import uuid
 import hashlib
 import secrets
 
@@ -23,21 +25,35 @@ from apps.posts.models import Post
 from apps.membership.models import Membership
 from apps.notifications.models import Notification
 
+logger = logging.getLogger(__name__)
+
+
+def _is_safe_redirect_url(url, request=None):
+    """Check if a URL is safe for redirect (same host, no external domains)."""
+    if not url:
+        return False
+    # Only allow relative paths
+    parsed = urlparse(url)
+    if parsed.scheme or parsed.netloc:
+        return False
+    # Must start with /
+    if not url.startswith('/') or url.startswith('//'):
+        return False
+    return True
+
 
 def _send_email(subject, template, context, recipient):
     html = render_to_string(template, context)
     plain = strip_tags(html)
-    from django.core.mail import send_mail
-    from django.conf import settings
     send_mail(subject, plain, settings.DEFAULT_FROM_EMAIL, [recipient], html_message=html)
 
 
 def _send_verification_email(user):
     token = user.email_verification_token
-    verify_url = f'{settings.SITE_URL}/accounts/verify-email/{token}/'
+    verify_url = f'{settings.SITE_URL}/verify-email/{token}/'
     context = {'user': user, 'verify_url': verify_url, 'site_name': settings.SITE_NAME}
     _send_email(
-        subject='Verify your email - IUBAT SmartFind',
+        subject=f'Verify your email - {settings.SITE_NAME}',
         template='accounts/emails/email_verification.html',
         context=context,
         recipient=user.email,
@@ -53,7 +69,10 @@ def register(request):
             user.is_membership_paid = False
             user.email_verification_token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
             user.save()
-            _send_verification_email(user)
+            try:
+                _send_verification_email(user)
+            except Exception:
+                logger.warning('Failed to send verification email for user %s', user.pk, exc_info=True)
             login(request, user)
             messages.success(request, 'Registration successful! One final step — please complete your membership payment to activate your account.')
             return redirect('membership:pending_purchase')
@@ -83,8 +102,8 @@ def user_login(request):
             if not user.is_membership_paid:
                 messages.info(request, 'Please complete your membership payment to activate your account.')
                 return redirect('membership:pending_purchase')
-            next_url = request.GET.get('next', None)
-            if next_url:
+            next_url = request.GET.get('next', '')
+            if next_url and _is_safe_redirect_url(next_url):
                 return redirect(next_url)
             return redirect('dashboard:home')
     else:
@@ -115,7 +134,7 @@ def forgot_password(request):
                 user.save()
                 reset_url = request.build_absolute_uri(reverse('accounts:reset_password', args=[token]))
                 _send_email(
-                    'Password Reset - IUBAT SmartFind',
+                    f'Password Reset - {settings.SITE_NAME}',
                     'accounts/emails/password_reset.html',
                     {'user': user, 'reset_url': reset_url},
                     user.email
@@ -158,7 +177,7 @@ def user_logout(request):
 @login_required
 def profile_view(request):
     user = request.user
-    user_posts = Post.objects.filter(user=user).order_by('-created_at')
+    user_posts = Post.objects.filter(user=user).select_related('category', 'location').order_by('-created_at')
     total_posts = user_posts.count()
     open_posts = user_posts.filter(status='open').count()
     resolved_posts = user_posts.filter(status='resolved').count()
@@ -229,4 +248,13 @@ def settings_view(request):
     return render(request, 'profile/settings.html', {'form': form})
 
 
-
+@login_required
+def delete_account(request):
+    if request.method != 'POST':
+        return redirect('accounts:settings')
+    user = request.user
+    username = user.username
+    logout(request)
+    user.delete()
+    messages.success(request, f'Account "{username}" has been permanently deleted.')
+    return redirect('pages:home')

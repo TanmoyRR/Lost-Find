@@ -304,8 +304,9 @@ class TestBrowseAndSearch(TestCase):
 
 class TestMatchingEngine(TestCase):
     def setUp(self):
-        from apps.posts.models import Post, Category, CampusLocation
+        from apps.posts.models import Post, Category, CampusLocation, PostTag
         self.user = User.objects.create_user(username='matcher', password='testpass', is_membership_paid=True)
+        self.other_user = User.objects.create_user(username='other_matcher', password='testpass', is_membership_paid=True)
         self.cat = Category.objects.create(name='Electronics', slug='electronics')
         self.loc = CampusLocation.objects.create(name='Campus A', slug='campus-a')
         self.lost_post = Post.objects.create(
@@ -314,10 +315,12 @@ class TestMatchingEngine(TestCase):
             date_lost_found=timezone.now().date(),
         )
         self.found_post = Post.objects.create(
-            user=self.user, title='Found Phone', description='Found a black Samsung',
+            user=self.other_user, title='Found Phone', description='Found a black Samsung',
             post_type='found', category=self.cat, location=self.loc,
             date_lost_found=timezone.now().date(),
         )
+        PostTag.objects.create(post=self.lost_post, name='phone')
+        PostTag.objects.create(post=self.found_post, name='phone')
 
     @patch('apps.ai_engine.utils.generate_embedding')
     @patch('apps.ai_engine.utils._ranked_candidates')
@@ -328,22 +331,22 @@ class TestMatchingEngine(TestCase):
         matches = find_matches_for_post(self.lost_post)
         self.assertEqual(len(matches), 1)
         self.assertEqual(matches[0].matched_post, self.found_post)
-        # 0.60*0.85 (semantic) + 0.15 (category) + 0.10 (location) + 0.10 (date) = 0.86
-        self.assertAlmostEqual(matches[0].similarity_score, 0.86, places=2)
+        # 0.60*0.85 (semantic) + 0.15 (category) + 0.10 (location) + 0.10 (date) + 0.05 (tags) = 0.91
+        self.assertAlmostEqual(matches[0].similarity_score, 0.91, places=2)
+        self.assertEqual(matches[0].match_strength, 'strong')
 
     def test_hybrid_scoring_prefers_structured_matches(self):
-        from datetime import timedelta
         from apps.ai_engine.utils import hybrid_match_score
         from apps.posts.models import Post
         other_cat_post = Post.objects.create(
             user=self.user, title='Found Wallet', description='Leather wallet',
             post_type='found', date_lost_found=timezone.now().date() - timedelta(days=30),
         )
-        same_attrs = hybrid_match_score(self.lost_post, self.found_post, 0.5)
-        diff_attrs = hybrid_match_score(self.lost_post, other_cat_post, 0.5)
-        self.assertGreater(same_attrs, diff_attrs)
-        # semantic weight = 60% of the semantic component (no aligned attributes)
-        self.assertAlmostEqual(hybrid_match_score(self.lost_post, other_cat_post, 1.0), 0.60, places=2)
+        same_score, same_meta = hybrid_match_score(self.lost_post, self.found_post, 0.5)
+        diff_score, diff_meta = hybrid_match_score(self.lost_post, other_cat_post, 0.5)
+        self.assertGreater(same_score, diff_score)
+        raw_score, raw_meta = hybrid_match_score(self.lost_post, other_cat_post, 1.0)
+        self.assertAlmostEqual(raw_score, 0.60, places=2)
 
     def test_match_suggestion_page_requires_login(self):
         response = self.client.get(reverse('ai:matches'))
@@ -357,24 +360,277 @@ class TestMatchingEngine(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Lost Phone')
 
-    def test_dismiss_match(self):
+    def test_dismiss_match_post(self):
+        from apps.ai_engine.models import MatchSuggestion
+        match = MatchSuggestion.objects.create(post=self.lost_post, matched_post=self.found_post, similarity_score=0.9)
+        self.client.login(username='matcher', password='testpass')
+        response = self.client.post(reverse('ai:dismiss_match', kwargs={'match_id': match.pk}))
+        self.assertEqual(response.status_code, 302)
+        match.refresh_from_db()
+        self.assertEqual(match.status, 'dismissed')
+
+    def test_accept_match_post(self):
+        from apps.ai_engine.models import MatchSuggestion
+        match = MatchSuggestion.objects.create(post=self.lost_post, matched_post=self.found_post, similarity_score=0.9)
+        self.client.login(username='matcher', password='testpass')
+        response = self.client.post(reverse('ai:accept_match', kwargs={'match_id': match.pk}))
+        self.assertEqual(response.status_code, 302)
+        match.refresh_from_db()
+        self.assertEqual(match.status, 'accepted')
+        self.assertTrue(match.is_accepted)
+
+    def test_dismiss_match_get_rejected(self):
         from apps.ai_engine.models import MatchSuggestion
         match = MatchSuggestion.objects.create(post=self.lost_post, matched_post=self.found_post, similarity_score=0.9)
         self.client.login(username='matcher', password='testpass')
         response = self.client.get(reverse('ai:dismiss_match', kwargs={'match_id': match.pk}))
         self.assertEqual(response.status_code, 302)
         match.refresh_from_db()
-        self.assertEqual(match.status, 'dismissed')
+        self.assertEqual(match.status, 'pending')
 
-    def test_accept_match(self):
+    def test_accept_match_get_rejected(self):
         from apps.ai_engine.models import MatchSuggestion
         match = MatchSuggestion.objects.create(post=self.lost_post, matched_post=self.found_post, similarity_score=0.9)
         self.client.login(username='matcher', password='testpass')
         response = self.client.get(reverse('ai:accept_match', kwargs={'match_id': match.pk}))
         self.assertEqual(response.status_code, 302)
         match.refresh_from_db()
-        self.assertEqual(match.status, 'accepted')
-        self.assertTrue(match.is_accepted)
+        self.assertEqual(match.status, 'pending')
+
+    def test_unauthorized_user_cannot_dismiss_match(self):
+        from apps.ai_engine.models import MatchSuggestion
+        stranger = User.objects.create_user(username='stranger', password='testpass', is_membership_paid=True)
+        match = MatchSuggestion.objects.create(post=self.lost_post, matched_post=self.found_post, similarity_score=0.9)
+        self.client.login(username='stranger', password='testpass')
+        response = self.client.post(reverse('ai:dismiss_match', kwargs={'match_id': match.pk}))
+        self.assertEqual(response.status_code, 302)
+        match.refresh_from_db()
+        self.assertEqual(match.status, 'pending')
+
+    def test_unauthorized_user_cannot_accept_match(self):
+        from apps.ai_engine.models import MatchSuggestion
+        stranger = User.objects.create_user(username='stranger2', password='testpass', is_membership_paid=True)
+        match = MatchSuggestion.objects.create(post=self.lost_post, matched_post=self.found_post, similarity_score=0.9)
+        self.client.login(username='stranger2', password='testpass')
+        response = self.client.post(reverse('ai:accept_match', kwargs={'match_id': match.pk}))
+        self.assertEqual(response.status_code, 302)
+        match.refresh_from_db()
+        self.assertEqual(match.status, 'pending')
+
+    def test_ranked_candidates_filters_by_opposite_type(self):
+        from apps.ai_engine.utils import _ranked_candidates, generate_embedding, build_text_for_post
+        from apps.posts.models import Post
+        lost2 = Post.objects.create(
+            user=self.other_user, title='Lost Wallet', description='Brown leather wallet',
+            post_type='lost', date_lost_found=timezone.now().date(),
+        )
+        with patch('apps.ai_engine.utils.generate_embedding', return_value=[0.1] * 256):
+            with patch('apps.ai_engine.utils.vector_backend_available', return_value=False):
+                candidates = _ranked_candidates(self.lost_post, [0.1] * 256)
+        candidate_pks = [p.pk for p, _ in candidates]
+        self.assertIn(self.found_post.pk, candidate_pks)
+        self.assertNotIn(lost2.pk, candidate_pks)
+
+    def test_ranked_candidates_filters_found_excludes_found(self):
+        from apps.ai_engine.utils import _ranked_candidates
+        from apps.posts.models import Post
+        found2 = Post.objects.create(
+            user=self.other_user, title='Found Wallet', description='Brown leather wallet',
+            post_type='found', date_lost_found=timezone.now().date(),
+        )
+        with patch('apps.ai_engine.utils.generate_embedding', return_value=[0.1] * 256):
+            with patch('apps.ai_engine.utils.vector_backend_available', return_value=False):
+                candidates = _ranked_candidates(self.found_post, [0.1] * 256)
+        candidate_pks = [p.pk for p, _ in candidates]
+        self.assertIn(self.lost_post.pk, candidate_pks)
+        self.assertNotIn(found2.pk, candidate_pks)
+
+    def test_match_below_threshold_not_created(self):
+        from apps.ai_engine.models import MatchSuggestion
+        from apps.posts.models import Post, Category
+        diff_cat = Category.objects.create(name='Clothing', slug='clothing')
+        diff_cat_post = Post.objects.create(
+            user=self.other_user, title='Found Scarf', description='Red wool scarf',
+            post_type='found', category=diff_cat,
+            date_lost_found=timezone.now().date() - timedelta(days=30),
+        )
+        with patch('apps.ai_engine.utils.generate_embedding', return_value=[0.1] * 256):
+            with patch('apps.ai_engine.utils._ranked_candidates', return_value=[(diff_cat_post, 0.1)]):
+                from apps.ai_engine.utils import find_matches_for_post
+                matches = find_matches_for_post(self.lost_post)
+        self.assertEqual(len(matches), 0)
+        self.assertEqual(MatchSuggestion.objects.count(), 0)
+
+    def test_duplicate_suggestion_not_created(self):
+        from apps.ai_engine.models import MatchSuggestion
+        MatchSuggestion.objects.create(post=self.lost_post, matched_post=self.found_post, similarity_score=0.9)
+        with patch('apps.ai_engine.utils.generate_embedding', return_value=[0.1] * 256):
+            with patch('apps.ai_engine.utils._ranked_candidates', return_value=[(self.found_post, 0.9)]):
+                from apps.ai_engine.utils import find_matches_for_post
+                find_matches_for_post(self.lost_post)
+        self.assertEqual(MatchSuggestion.objects.count(), 1)
+
+    def test_existing_suggestion_updated_not_duplicated(self):
+        from apps.ai_engine.models import MatchSuggestion
+        MatchSuggestion.objects.create(post=self.lost_post, matched_post=self.found_post, similarity_score=0.6)
+        with patch('apps.ai_engine.utils.generate_embedding', return_value=[0.1] * 256):
+            with patch('apps.ai_engine.utils._ranked_candidates', return_value=[(self.found_post, 0.95)]):
+                from apps.ai_engine.utils import find_matches_for_post
+                find_matches_for_post(self.lost_post)
+        match = MatchSuggestion.objects.get(post=self.lost_post, matched_post=self.found_post)
+        # 0.60*0.95 + 0.15 + 0.10 + 0.10 + 0.05 = 0.97
+        self.assertAlmostEqual(match.similarity_score, 0.97, places=2)
+        self.assertEqual(MatchSuggestion.objects.count(), 1)
+
+    @patch('apps.ai_engine.utils.generate_embedding')
+    def test_jina_failure_does_not_prevent_post_creation(self, mock_embedding):
+        mock_embedding.return_value = None
+        from apps.ai_engine.utils import find_matches_for_post
+        matches = find_matches_for_post(self.lost_post)
+        self.assertEqual(matches, [])
+
+    def test_match_notification_created_for_both_users(self):
+        from apps.ai_engine.models import MatchSuggestion
+        from apps.notifications.models import Notification
+        match = MatchSuggestion.objects.create(
+            post=self.lost_post, matched_post=self.found_post, similarity_score=0.9
+        )
+        self.assertTrue(Notification.objects.filter(user=self.user, notification_type='match_found').exists())
+        self.assertTrue(Notification.objects.filter(user=self.other_user, notification_type='match_found').exists())
+
+    def test_match_strength_classifies_correctly(self):
+        from apps.ai_engine.utils import _get_match_strength
+        self.assertEqual(_get_match_strength(0.80), 'strong')
+        self.assertEqual(_get_match_strength(0.60), 'possible')
+        self.assertEqual(_get_match_strength(0.45), 'possible')
+
+    def test_hybrid_match_score_returns_tuple(self):
+        from apps.ai_engine.utils import hybrid_match_score
+        result = hybrid_match_score(self.lost_post, self.found_post, 0.8)
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        score, meta = result
+        self.assertGreaterEqual(score, 0.0)
+        self.assertLessEqual(score, 1.0)
+        self.assertGreaterEqual(meta, 0.0)
+        self.assertLessEqual(meta, 1.0)
+
+
+# ========================
+# AI SEARCH
+# ========================
+
+class TestAISearch(TestCase):
+    def setUp(self):
+        from apps.posts.models import Post, Category, CampusLocation
+        self.user = User.objects.create_user(username='searcher', password='testpass', is_membership_paid=True)
+        self.cat = Category.objects.create(name='Electronics', slug='electronics')
+        self.loc = CampusLocation.objects.create(name='Library', slug='library')
+        self.post = Post.objects.create(
+            user=self.user, title='Lost black Samsung phone',
+            description='Lost near the library entrance',
+            post_type='lost', category=self.cat, location=self.loc,
+            date_lost_found=timezone.now().date(),
+        )
+
+    def test_search_page_requires_login(self):
+        response = self.client.get(reverse('ai:search'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_search_page_loads(self):
+        self.client.login(username='searcher', password='testpass')
+        response = self.client.get(reverse('ai:search'))
+        self.assertEqual(response.status_code, 200)
+
+    @patch('apps.ai_engine.views.semantic_search_posts')
+    @patch('apps.ai_engine.views.generate_embedding')
+    @patch('apps.ai_engine.views.vector_backend_available', return_value=True)
+    def test_semantic_search_used_when_available(self, mock_avail, mock_emb, mock_semantic):
+        mock_emb.return_value = [0.1] * 256
+        mock_semantic.return_value = [(self.post, 0.85)]
+        self.client.login(username='searcher', password='testpass')
+        response = self.client.get(reverse('ai:search') + '?q=black+samsung+phone')
+        self.assertEqual(response.status_code, 200)
+        mock_semantic.assert_called_once()
+
+    @patch('apps.ai_engine.views.generate_embedding', return_value=None)
+    @patch('apps.ai_engine.views.vector_backend_available', return_value=True)
+    def test_keyword_fallback_when_embedding_fails(self, mock_avail, mock_emb):
+        self.client.login(username='searcher', password='testpass')
+        response = self.client.get(reverse('ai:search') + '?q=samsung')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Samsung')
+
+    @patch('apps.ai_engine.views.vector_backend_available', return_value=False)
+    def test_keyword_fallback_when_vector_backend_unavailable(self, mock_avail):
+        self.client.login(username='searcher', password='testpass')
+        response = self.client.get(reverse('ai:search') + '?q=samsung')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Samsung')
+
+    def test_filters_still_work(self):
+        self.client.login(username='searcher', password='testpass')
+        response = self.client.get(reverse('ai:search') + '?type=lost&category=electronics')
+        self.assertEqual(response.status_code, 200)
+
+    def test_empty_search_returns_nothing(self):
+        self.client.login(username='searcher', password='testpass')
+        response = self.client.get(reverse('ai:search') + '?q=')
+        self.assertEqual(response.status_code, 200)
+
+
+# ========================
+# EMBEDDING GENERATION
+# ========================
+
+class TestEmbeddingGeneration(TestCase):
+    def setUp(self):
+        from apps.posts.models import Post, Category
+        self.user = User.objects.create_user(username='embedder', password='testpass', is_membership_paid=True)
+        self.cat = Category.objects.create(name='Documents', slug='documents')
+        self.post = Post.objects.create(
+            user=self.user, title='Lost student ID card',
+            description='Blue student ID card with photo',
+            post_type='lost', category=self.cat,
+            date_lost_found=timezone.now().date(),
+        )
+
+    def test_build_text_includes_key_fields(self):
+        from apps.ai_engine.utils import build_text_for_post
+        text = build_text_for_post(self.post)
+        self.assertIn('Lost', text)
+        self.assertIn('student ID card', text)
+        self.assertIn('Documents', text)
+
+    def test_build_text_excludes_contact_info(self):
+        self.post.contact_info = 'Phone: 01712345678'
+        self.post.save()
+        from apps.ai_engine.utils import build_text_for_post
+        text = build_text_for_post(self.post)
+        self.assertNotIn('01712345678', text)
+
+    @patch('apps.ai_engine.utils.store_post_embedding')
+    @patch('apps.ai_engine.utils.generate_embedding')
+    def test_refresh_post_embedding(self, mock_embedding, mock_store):
+        mock_embedding.return_value = [0.5] * 256
+        mock_store.return_value = (True,)
+        from apps.ai_engine.utils import refresh_post_embedding
+        result = refresh_post_embedding(self.post)
+        self.assertIsNotNone(result)
+        mock_embedding.assert_called_once()
+
+    @patch('apps.ai_engine.utils.generate_embedding', return_value=None)
+    def test_refresh_returns_none_on_failure(self, mock_embedding):
+        from apps.ai_engine.utils import refresh_post_embedding
+        result = refresh_post_embedding(self.post)
+        self.assertIsNone(result)
+
+    def test_post_without_pk_skips_matching(self):
+        from apps.ai_engine.utils import find_matches_for_post
+        from apps.posts.models import Post
+        unsaved = Post(user=self.user, title='test', description='test', post_type='lost', date_lost_found=timezone.now().date())
+        matches = find_matches_for_post(unsaved)
+        self.assertEqual(matches, [])
 
 
 # ========================
@@ -544,7 +800,7 @@ class TestAdminModeration(TestCase):
     def test_admin_suspend_user(self):
         user = User.objects.create_user(username='suspendeduser', password='testpass', is_membership_paid=True)
         suspend_url = reverse('dashboard:admin_suspend_user', kwargs={'pk': user.pk})
-        response = self.client.get(suspend_url)
+        response = self.client.post(suspend_url)
         self.assertEqual(response.status_code, 302)
         user.refresh_from_db()
         self.assertTrue(user.is_suspended)
@@ -552,7 +808,7 @@ class TestAdminModeration(TestCase):
     def test_admin_activate_user(self):
         user = User.objects.create_user(username='activeuser', password='testpass', is_suspended=True, is_membership_paid=True)
         activate_url = reverse('dashboard:admin_activate_user', kwargs={'pk': user.pk})
-        response = self.client.get(activate_url)
+        response = self.client.post(activate_url)
         self.assertEqual(response.status_code, 302)
         user.refresh_from_db()
         self.assertFalse(user.is_suspended)
@@ -736,7 +992,7 @@ class TestNotifications(TestCase):
         self.assertContains(response, 'Test Notification')
 
     def test_mark_all_read_works(self):
-        response = self.client.get(reverse('notifications:mark_all_read'))
+        response = self.client.post(reverse('notifications:mark_all_read'))
         self.assertEqual(response.status_code, 302)
         from apps.notifications.models import Notification
         self.assertEqual(Notification.objects.filter(is_read=False).count(), 0)
@@ -804,44 +1060,105 @@ class TestRecoverySystem(TestCase):
     def setUp(self):
         self.client = Client()
         self.owner = User.objects.create_user(username='owner', password='testpass', is_membership_paid=True)
-        self.claimant = User.objects.create_user(username='claimant', password='testpass', is_membership_paid=True)
-        from apps.membership.models import Membership, MembershipPlan
-        plan = MembershipPlan.objects.create(name='Annual Membership', price=100, duration_days=365)
-        Membership.objects.create(user=self.owner, plan=plan, is_active=True,
-                                  started_at=timezone.now(),
-                                  expires_at=timezone.now() + timedelta(days=365))
-        Membership.objects.create(user=self.claimant, plan=plan, is_active=True,
-                                  started_at=timezone.now(),
-                                  expires_at=timezone.now() + timedelta(days=365))
+        self.finder = User.objects.create_user(username='finder', password='testpass', is_membership_paid=True)
         from apps.posts.models import Post
         self.post = Post.objects.create(
             user=self.owner, title='Recoverable Item', description='Test',
             post_type='lost', date_lost_found=timezone.now().date()
         )
-
-    def test_initiate_recovery_requires_login(self):
-        response = self.client.get(reverse('recovery:initiate', kwargs={'post_id': self.post.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_initiate_recovery_works(self):
-        self.client.login(username='claimant', password='testpass')
-        response = self.client.get(reverse('recovery:initiate', kwargs={'post_id': self.post.pk}))
-        self.assertEqual(response.status_code, 302)
         from apps.recovery.models import RecoverySession
-        self.assertTrue(RecoverySession.objects.filter(post=self.post, claimant=self.claimant).exists())
+        self.session = RecoverySession.objects.create(
+            post=self.post, owner=self.owner, claimant=None,
+            status='qr_generated',
+        )
+        self.session.generate_qr_image()
+        self.session.save(update_fields=['qr_code'])
 
-    def test_cannot_initiate_own_post(self):
-        self.client.login(username='owner', password='testpass')
-        response = self.client.get(reverse('recovery:initiate', kwargs={'post_id': self.post.pk}))
+    def test_recovery_list_requires_login(self):
+        response = self.client.get(reverse('recovery:list'))
         self.assertEqual(response.status_code, 302)
-        from django.contrib.messages import get_messages
-        msgs = list(get_messages(response.wsgi_request))
-        self.assertTrue(any('cannot claim' in str(m).lower() for m in msgs))
 
     def test_recovery_list_works(self):
         self.client.login(username='owner', password='testpass')
         response = self.client.get(reverse('recovery:list'))
         self.assertEqual(response.status_code, 200)
+
+    def test_recovery_detail_requires_access(self):
+        self.client.login(username='finder', password='testpass')
+        response = self.client.get(reverse('recovery:detail', args=[self.session.short_code]))
+        self.assertEqual(response.status_code, 302)
+
+    def test_owner_can_view_detail(self):
+        self.client.login(username='owner', password='testpass')
+        response = self.client.get(reverse('recovery:detail', args=[self.session.short_code]))
+        self.assertEqual(response.status_code, 200)
+
+    def test_scan_qr_requires_finder(self):
+        self.client.login(username='owner', password='testpass')
+        response = self.client.get(reverse('recovery:scan_qr', args=[self.session.short_code]))
+        self.assertEqual(response.status_code, 302)
+
+    def test_finder_can_scan(self):
+        self.session.claimant = self.finder
+        self.session.save(update_fields=['claimant'])
+        self.client.login(username='finder', password='testpass')
+        response = self.client.get(reverse('recovery:scan_qr', args=[self.session.short_code]))
+        self.assertEqual(response.status_code, 200)
+
+    def test_scan_completes_recovery(self):
+        self.session.claimant = self.finder
+        self.session.save(update_fields=['claimant'])
+        self.client.login(username='finder', password='testpass')
+        response = self.client.post(reverse('recovery:scan_qr', args=[self.session.short_code]),
+                                    {'short_code': self.session.short_code})
+        self.assertEqual(response.status_code, 302)
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.status, 'completed')
+        self.post.refresh_from_db()
+        self.assertTrue(self.post.is_resolved)
+
+    def test_wrong_code_fails(self):
+        self.session.claimant = self.finder
+        self.session.save(update_fields=['claimant'])
+        self.client.login(username='finder', password='testpass')
+        response = self.client.post(reverse('recovery:scan_qr', args=[self.session.short_code]),
+                                    {'short_code': 'WRONG-CODE'})
+        self.assertEqual(response.status_code, 302)
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.status, 'qr_generated')
+
+    def test_cancel_session(self):
+        self.client.login(username='owner', password='testpass')
+        response = self.client.post(reverse('recovery:cancel', args=[self.session.short_code]))
+        self.assertEqual(response.status_code, 302)
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.status, 'cancelled')
+
+    def test_generate_qr_owner_only(self):
+        self.client.login(username='finder', password='testpass')
+        response = self.client.post(reverse('recovery:generate_qr', args=[self.session.short_code]))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_creates_recovery_session(self):
+        from apps.posts.models import Post
+        from apps.membership.models import Membership, MembershipPlan
+        plan = MembershipPlan.objects.create(name='Test Plan', price=100, duration_days=365)
+        Membership.objects.create(user=self.owner, plan=plan, is_active=True,
+                                  started_at=timezone.now(),
+                                  expires_at=timezone.now() + timedelta(days=365))
+        self.client.login(username='owner', password='testpass')
+        response = self.client.post(reverse('posts:create'), {
+            'post_type': 'lost',
+            'title': 'Lost Keys',
+            'description': 'Lost my keys',
+            'date_lost_found': timezone.now().date(),
+            'contact_info': 'test@test.com',
+        })
+        self.assertEqual(response.status_code, 302)
+        post = Post.objects.filter(title='Lost Keys').first()
+        self.assertIsNotNone(post)
+        from apps.recovery.models import RecoverySession
+        self.assertTrue(RecoverySession.objects.filter(post=post).exists())
 
 
 # ========================
@@ -885,17 +1202,6 @@ class TestMembershipGating(TestCase):
         response = self.client.get(reverse('posts:create'))
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, reverse('dashboard:admin_home'))
-
-    def test_non_member_cannot_initiate_recovery(self):
-        self.client.login(username='nonmember', password='testpass')
-        response = self.client.get(reverse('recovery:initiate', args=[self.post.pk]))
-        self.assertEqual(response.status_code, 302)
-
-    def test_member_cannot_claim_own_post(self):
-        self.client.login(username='member', password='testpass')
-        response = self.client.get(reverse('recovery:initiate', args=[self.post.pk]))
-        msgs = list(response.wsgi_request._messages)
-        self.assertTrue(any('cannot claim' in str(m).lower() for m in msgs))
 
     def test_non_member_gets_limited_post_detail(self):
         self.client.login(username='nonmember', password='testpass')

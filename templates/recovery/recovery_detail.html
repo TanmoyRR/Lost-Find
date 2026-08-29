@@ -1,18 +1,18 @@
 {% extends 'base/dashboard_base.html' %}
 {% load static %}
 
-{% block page_title %}Recovery Session Details{% endblock %}
+{% block page_title %}Recovery Session - {{ session.short_code }}{% endblock %}
 
 {% block dashboard_content %}
 <div class="space-y-6 animate-fade-in">
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Recovery Session</h1>
-            <p class="text-gray-500 text-sm mt-1">UID: {{ session.uid }}</p>
+            <p class="text-gray-500 text-sm mt-1">Code: <strong class="font-mono text-indigo-600">{{ session.short_code }}</strong></p>
         </div>
         <div class="flex items-center gap-2">
             {% if session.status != 'completed' and session.status != 'cancelled' and session.status != 'expired' %}
-            <form method="post" action="{% url 'recovery:cancel' uid=session.uid %}" class="inline">
+            <form method="post" action="{% url 'recovery:cancel' short_code=session.short_code %}" class="inline">
                 {% csrf_token %}
                 <button type="submit" class="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition">
                     <i class="bi bi-x-circle"></i> Cancel
@@ -54,83 +54,63 @@
                         <div class="flex items-center gap-3 mt-2 text-sm text-gray-500">
                             <span class="px-2 py-0.5 rounded bg-gray-100">{{ session.post.get_post_type_display }}</span>
                             {% if session.post.category %}<span>{{ session.post.category.name }}</span>{% endif %}
-                            {% if session.post.location %}<span>{{ session.post.location.name }}</span>{% endif %}
+                            {% if session.post.display_location %}<span>{{ session.post.display_location }}</span>{% endif %}
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- QR Code Card -->
-            {% if session.status == 'qr_generated' or session.status == 'qr_scanned' %}
+            {% if session.status == 'completed' %}
+            <div class="bg-emerald-50 rounded-xl border border-emerald-200 p-6 text-center">
+                <div class="w-14 h-14 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-emerald-500/30">
+                    <i class="bi bi-check-lg text-2xl"></i>
+                </div>
+                <h3 class="font-semibold text-emerald-900 mb-1">Recovery Completed</h3>
+                <p class="text-sm text-emerald-700">{{ session.completed_at|date:"M d, Y H:i" }}</p>
+                <span class="inline-block mt-3 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Post marked as resolved</span>
+            </div>
+            {% endif %}
+
+            {% if session.status == 'qr_generated' and is_finder %}
+            <div class="bg-indigo-50 rounded-xl border border-indigo-200 p-6">
+                <h2 class="text-lg font-semibold text-indigo-900 mb-2">Scan QR to Complete Recovery</h2>
+                <p class="text-sm text-indigo-800 mb-4">When you meet the owner in person, scan or enter the QR code to complete the recovery.</p>
+                <a href="{% url 'recovery:scan_qr' short_code=session.short_code %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+                    <i class="bi bi-qr-code-scan"></i> Scan QR Code
+                </a>
+            </div>
+            {% endif %}
+
+            {% if session.status == 'pending' and is_owner and not session.claimant %}
+            <div class="bg-amber-50 rounded-xl border border-amber-200 p-6">
+                <h2 class="text-lg font-semibold text-amber-900 mb-2">Waiting for a Finder</h2>
+                <p class="text-sm text-amber-800 mb-4">Your QR code is ready. When a finder claims your item, they will scan this code to complete recovery.</p>
+                <form method="post" action="{% url 'recovery:generate_qr' short_code=session.short_code %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-100 transition text-sm font-medium">
+                        <i class="bi bi-arrow-clockwise"></i> Regenerate QR
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+
+            {% if session.qr_code and session.status != 'completed' %}
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Verification QR Code</h2>
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Recovery QR Code</h2>
                 <div class="flex flex-col sm:flex-row items-start gap-6">
-                    {% if session.qr_code %}
                     <div class="bg-white p-4 rounded-xl border border-gray-200">
                         <img src="{{ session.qr_code.url }}" alt="Recovery QR" class="w-48 h-48">
                     </div>
-                    {% else %}
-                    <div class="w-48 h-48 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex items-center justify-center">
-                        <i class="bi bi-qr-code text-5xl text-gray-300"></i>
-                    </div>
-                    {% endif %}
                     <div class="flex-1">
-                        {% if session.qr_expires_at %}
-                        <p class="text-sm text-gray-600 mb-1">Expires: <strong class="text-gray-900">{{ session.qr_expires_at|date:"M d, Y H:i" }}</strong></p>
+                        <p class="text-sm text-gray-600 mb-1">Short Code: <strong class="font-mono text-lg text-indigo-600">{{ session.short_code }}</strong></p>
+                        {% if is_owner %}
+                        <p class="text-sm text-gray-500 mb-2">Show this QR code to the finder when they come to claim the item.</p>
+                        {% elif is_finder %}
+                        <p class="text-sm text-gray-500 mb-2">Scan or enter this code to complete the recovery.</p>
                         {% endif %}
-                        <p class="text-sm text-gray-500 mb-4">The claimant scans this QR code in person at the handover meeting to verify the delivery.</p>
-                        <div class="flex flex-wrap gap-3">
-                            <a href="{% url 'recovery:scan_qr' uid=session.uid %}" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
-                                <i class="bi bi-qr-code-scan"></i> Scan QR Code
-                            </a>
-                            {% if session.status == 'qr_generated' and session.owner == request.user %}
-                            <form method="post" action="{% url 'recovery:generate_qr' uid=session.uid %}" class="inline">
-                                {% csrf_token %}
-                                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
-                                    <i class="bi bi-arrow-clockwise"></i> Regenerate QR
-                                </button>
-                            </form>
-                            {% endif %}
-                        </div>
+                        <p class="text-xs text-gray-400 mt-3">This QR code encodes the short code <strong class="font-mono">{{ session.short_code }}</strong>.</p>
                     </div>
                 </div>
-            </div>
-            {% endif %}
-
-            <!-- Handover verification (owner only) -->
-            {% if session.status == 'qr_scanned' and session.owner == request.user %}
-            <div class="bg-amber-50 rounded-xl border border-amber-200 p-6">
-                <h2 class="text-lg font-semibold text-amber-900 mb-2">Handover Verification</h2>
-                <p class="text-sm text-amber-800 mb-4">The QR code has been scanned. Verify that the item has been physically handed over to the claimant.</p>
-                <form method="post" action="{% url 'recovery:verify_handover' uid=session.uid %}">
-                    {% csrf_token %}
-                    <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium">
-                        <i class="bi bi-check2-circle"></i> Confirm Handover
-                    </button>
-                </form>
-            </div>
-            {% endif %}
-
-            <!-- Final confirmation -->
-            {% if session.status == 'handover_verified' %}
-            <div class="bg-emerald-50 rounded-xl border border-emerald-200 p-6">
-                <h2 class="text-lg font-semibold text-emerald-900 mb-2">Confirm Recovery</h2>
-                <p class="text-sm text-emerald-800 mb-4">
-                    The handover has been verified. Both the owner and the claimant must confirm to complete the recovery.
-                    {% if session.confirmation.confirmed_by_owner and session.confirmation.confirmed_by_claimant %}
-                    Both parties confirmed - the item is marked as resolved!
-                    {% elif session.confirmation and session.confirmation.confirmed_by_owner %}
-                    <strong>Owner confirmed.</strong> Waiting for the claimant to confirm.
-                    {% elif session.confirmation and session.confirmation.confirmed_by_claimant %}
-                    <strong>Claimant confirmed.</strong> Waiting for the owner to confirm.
-                    {% endif %}
-                </p>
-                <form method="post" action="{% url 'recovery:confirm' uid=session.uid %}">
-                    {% csrf_token %}
-                    <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium">
-                        <i class="bi bi-check2-circle"></i> Confirm Recovery
-                    </button>
-                </form>
             </div>
             {% endif %}
         </div>
@@ -144,48 +124,52 @@
                         <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold">{{ session.owner.get_full_name|default:session.owner.username|first|upper }}</div>
                         <div>
                             <p class="text-sm font-medium text-gray-900">{{ session.owner.get_full_name|default:session.owner.username }} <span class="text-gray-400 font-normal">(Owner)</span></p>
-                            {% if session.owner == request.user %}<p class="text-xs text-indigo-600">This is you</p>{% endif %}
+                            {% if is_owner %}<p class="text-xs text-indigo-600">This is you</p>{% endif %}
                         </div>
                     </div>
+                    {% if session.claimant %}
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-semibold">{{ session.claimant.get_full_name|default:session.claimant.username|first|upper }}</div>
                         <div>
-                            <p class="text-sm font-medium text-gray-900">{{ session.claimant.get_full_name|default:session.claimant.username }} <span class="text-gray-400 font-normal">(Claimant)</span></p>
-                            {% if session.claimant == request.user %}<p class="text-xs text-indigo-600">This is you</p>{% endif %}
+                            <p class="text-sm font-medium text-gray-900">{{ session.claimant.get_full_name|default:session.claimant.username }} <span class="text-gray-400 font-normal">(Finder)</span></p>
+                            {% if is_finder %}<p class="text-xs text-indigo-600">This is you</p>{% endif %}
                         </div>
+                    </div>
+                    {% else %}
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 font-semibold">?</div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-400">No finder assigned yet</p>
+                            <p class="text-xs text-gray-400">Waiting for AI matching...</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Session Info</h3>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Created</span>
+                        <span class="font-medium text-gray-700">{{ session.created_at|date:"M d, Y H:i" }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Status</span>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                            {% if session.status == 'completed' %}bg-green-100 text-green-800
+                            {% elif session.status == 'pending' %}bg-yellow-100 text-yellow-800
+                            {% elif session.status == 'cancelled' or session.status == 'expired' %}bg-red-100 text-red-800
+                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ session.get_status_display }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Short Code</span>
+                        <span class="font-mono font-medium text-indigo-600">{{ session.short_code }}</span>
                     </div>
                 </div>
             </div>
-
-            {% if session.status == 'pending' %}
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Next Step</h3>
-                {% if session.owner == request.user %}
-                <p class="text-sm text-gray-600 mb-4">Generate the verification QR code for {{ session.claimant.get_full_name|default:session.claimant.username }} to scan at handover.</p>
-                <form method="post" action="{% url 'recovery:generate_qr' uid=session.uid %}">
-                    {% csrf_token %}
-                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
-                        <i class="bi bi-qr-code"></i> Generate QR Code
-                    </button>
-                </form>
-                {% else %}
-                <p class="text-sm text-gray-600">Waiting for <strong>{{ session.owner.get_full_name|default:session.owner.username }}</strong> to generate the verification QR code.</p>
-                {% endif %}
-            </div>
-            {% endif %}
-
-            {% if session.status == 'completed' %}
-            <div class="bg-emerald-50 rounded-xl border border-emerald-200 p-6 text-center">
-                <div class="w-14 h-14 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-emerald-500/30">
-                    <i class="bi bi-check-lg text-2xl"></i>
-                </div>
-                <h3 class="font-semibold text-emerald-900 mb-1">Recovery Completed</h3>
-                <p class="text-sm text-emerald-700">{{ session.completed_at|date:"M d, Y H:i" }}</p>
-                {% if session.post.is_resolved %}
-                <span class="inline-block mt-3 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Post marked as resolved</span>
-                {% endif %}
-            </div>
-            {% endif %}
         </div>
     </div>
 </div>

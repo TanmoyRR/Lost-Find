@@ -117,9 +117,10 @@ class Command(BaseCommand):
                         self.style.WARNING(
                             f'  [{index}/{total}] SKIPPED store (vector backend?): {post.title}'
                         )
-)
-                    if options['delay']:
-                        time.sleep(options['delay'])
+                    )
+            # Rate-limit: sleep between API calls to avoid 429s
+            if options['delay'] and index < total:
+                time.sleep(options['delay'])
 
         self.stdout.write(
             self.style.SUCCESS(

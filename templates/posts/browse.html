@@ -77,7 +77,7 @@
                     <h3 class="font-semibold text-gray-800 text-sm mb-1">{{ post.title|truncatechars:50 }}</h3>
                     <p class="text-xs text-gray-500 line-clamp-2">{{ post.description|truncatechars:100 }}</p>
                     <div class="flex items-center gap-3 mt-3 text-xs text-gray-400">
-                        <span><i class="bi bi-geo-alt mr-1"></i>{{ post.location.name|default:'N/A' }}</span>
+                        <span><i class="bi bi-geo-alt mr-1"></i>{{ post.display_location }}</span>
                         <span><i class="bi bi-calendar mr-1"></i>{{ post.created_at|date:"M d, Y" }}</span>
                     </div>
                 </div>

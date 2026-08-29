@@ -91,7 +91,7 @@
                             </div>
                         </td>
                         <td class="py-3 text-sm text-gray-500">{{ post.category.name|default:'N/A' }}</td>
-                        <td class="py-3 text-sm text-gray-500">{{ post.location.name|default:'N/A' }}</td>
+                        <td class="py-3 text-sm text-gray-500">{{ post.display_location }}</td>
                         <td class="py-3">
                             <span class="text-xs font-medium px-2 py-1 rounded-lg {% if post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
                                 {{ post.get_post_type_display }}

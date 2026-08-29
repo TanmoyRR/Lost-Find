@@ -46,14 +46,27 @@ def drop_hnsw_index(apps, schema_editor):
             cursor.execute('DROP INDEX IF EXISTS ai_engine_postembedding_embedding_hnsw')
 
 
-ALTER_EMBEDDING_COLUMN_SQL = (
-    'ALTER TABLE ai_engine_postembedding '
-    'ALTER COLUMN embedding TYPE vector(256) USING embedding::text::vector(256)'
-)
-REVERSE_ALTER_EMBEDDING_COLUMN_SQL = (
-    'ALTER TABLE ai_engine_postembedding '
-    'ALTER COLUMN embedding TYPE jsonb USING embedding::text::jsonb'
-)
+def alter_embedding_column_forward(apps, schema_editor):
+    """ALTER COLUMN only on PostgreSQL; skip on SQLite/other backends."""
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            'ALTER TABLE ai_engine_postembedding '
+            'ALTER COLUMN embedding TYPE vector(256) '
+            'USING embedding::text::vector(256)'
+        )
+
+
+def alter_embedding_column_reverse(apps, schema_editor):
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            'ALTER TABLE ai_engine_postembedding '
+            'ALTER COLUMN embedding TYPE jsonb '
+            'USING embedding::text::jsonb'
+        )
 
 
 class Migration(migrations.Migration):
@@ -65,16 +78,11 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(create_extension, drop_extension),
         migrations.RunPython(delete_old_embeddings, reverse_delete),
-        migrations.RunSQL(
-            ALTER_EMBEDDING_COLUMN_SQL,
-            reverse_sql=REVERSE_ALTER_EMBEDDING_COLUMN_SQL,
-            state_operations=[
-                migrations.AlterField(
-                    model_name='postembedding',
-                    name='embedding',
-                    field=VectorField(dimensions=256),
-                ),
-            ],
+        migrations.RunPython(alter_embedding_column_forward, alter_embedding_column_reverse),
+        migrations.AlterField(
+            model_name='postembedding',
+            name='embedding',
+            field=VectorField(dimensions=256),
         ),
         migrations.RunPython(create_hnsw_index, drop_hnsw_index),
     ]

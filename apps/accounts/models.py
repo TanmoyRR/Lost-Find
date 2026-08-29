@@ -99,6 +99,9 @@ class UserActivity(models.Model):
         verbose_name = 'User Activity'
         verbose_name_plural = 'User Activities'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'activity_type'], name='activity_user_type_idx'),
+        ]
 
     def __str__(self):
         return f"{self.user.username} - {self.get_activity_type_display()}"

@@ -55,11 +55,11 @@ class Post(models.Model):
     description = models.TextField()
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='posts')
     location = models.ForeignKey(CampusLocation, on_delete=models.SET_NULL, null=True, related_name='posts')
+    location_name = models.CharField(max_length=200, blank=True, null=True)
     post_type = models.CharField(max_length=10, choices=POST_TYPES)
     date_lost_found = models.DateField()
     image = models.ImageField(upload_to='posts/', null=True, blank=True)
     contact_info = models.TextField(blank=True, null=True)
-    reward_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
     is_resolved = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -69,9 +69,22 @@ class Post(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'post_type'], name='post_status_type_idx'),
+            models.Index(fields=['user', 'status'], name='post_user_status_idx'),
+            models.Index(fields=['-created_at'], name='post_created_idx'),
+            models.Index(fields=['category', 'status'], name='post_category_status_idx'),
+            models.Index(fields=['location', 'status'], name='post_location_status_idx'),
+        ]
 
     def __str__(self):
         return f"{self.get_post_type_display()}: {self.title}"
+
+    @property
+    def display_location(self):
+        if self.location:
+            return self.location.name
+        return self.location_name or 'N/A'
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -169,6 +182,9 @@ class TrustReport(models.Model):
         verbose_name = 'Trust Report'
         verbose_name_plural = 'Trust Reports'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status'], name='report_status_idx'),
+        ]
 
     def __str__(self):
         return f"{self.get_report_type_display()} - {self.created_at.date()}"

@@ -23,10 +23,17 @@ class MatchSuggestion(models.Model):
         ('accepted', 'Accepted'),
         ('dismissed', 'Dismissed'),
     )
+    MATCH_STRENGTH = (
+        ('strong', 'Strong Match'),
+        ('possible', 'Possible Match'),
+    )
 
     post = models.ForeignKey('posts.Post', on_delete=models.CASCADE, related_name='match_suggestions')
     matched_post = models.ForeignKey('posts.Post', on_delete=models.CASCADE, related_name='incoming_matches')
     similarity_score = models.FloatField(default=0.0)
+    semantic_score = models.FloatField(default=0.0)
+    metadata_score = models.FloatField(default=0.0)
+    match_strength = models.CharField(max_length=10, choices=MATCH_STRENGTH, default='possible')
     status = models.CharField(max_length=20, choices=MATCH_STATUS, default='pending')
     is_viewed = models.BooleanField(default=False)
     is_accepted = models.BooleanField(default=False)
@@ -38,6 +45,9 @@ class MatchSuggestion(models.Model):
         verbose_name_plural = 'Match Suggestions'
         unique_together = ['post', 'matched_post']
         ordering = ['-similarity_score']
+        indexes = [
+            models.Index(fields=['status', '-similarity_score'], name='match_status_score_idx'),
+        ]
 
     def __str__(self):
         return f"Match: {self.post.title[:30]} <-> {self.matched_post.title[:30]} ({self.similarity_score:.0%})"
@@ -47,10 +57,28 @@ class MatchSuggestion(models.Model):
         super().save(*args, **kwargs)
         if is_new:
             from apps.notifications.models import Notification
+            strength_label = self.get_match_strength_display()
+            pct = int(round(self.similarity_score * 100))
+            msg = (
+                f'AI {strength_label}: "{self.post.title}" may match '
+                f'"{self.matched_post.title}" ({pct}% similarity)'
+            )
+
             Notification.objects.create(
                 user=self.post.user,
                 notification_type='match_found',
                 title='Potential Match Found!',
-                message=f'Your "{self.post.title}" may match "{self.matched_post.title}" (confidence: {self.similarity_score:.0%})',
+                message=msg,
                 link=self.matched_post.get_absolute_url() if hasattr(self.matched_post, 'get_absolute_url') else f'/post/{self.matched_post.pk}/',
             )
+            if self.matched_post.user_id and self.matched_post.user_id != self.post.user_id:
+                Notification.objects.create(
+                    user=self.matched_post.user,
+                    notification_type='match_found',
+                    title='Potential Match Found!',
+                    message=(
+                        f'AI {strength_label}: "{self.matched_post.title}" may match '
+                        f'"{self.post.title}" ({pct}% similarity)'
+                    ),
+                    link=self.post.get_absolute_url() if hasattr(self.post, 'get_absolute_url') else f'/post/{self.post.pk}/',
+                )

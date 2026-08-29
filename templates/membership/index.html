@@ -80,8 +80,15 @@
             </div>
             <div class="px-6 pb-6">
                 {% if membership and membership.is_active %}
-                <div class="block w-full py-2.5 rounded-xl text-sm font-medium text-center bg-emerald-100 text-emerald-700 cursor-default">
-                    <i class="bi bi-check"></i> Active — {{ membership.days_remaining }} days remaining
+                <div class="space-y-3">
+                    <div class="block w-full py-2.5 rounded-xl text-sm font-medium text-center bg-emerald-100 text-emerald-700 cursor-default">
+                        <i class="bi bi-check"></i> Active — {{ membership.days_remaining }} days remaining
+                    </div>
+                    {% if membership.plan %}
+                    <a href="{% url 'membership:purchase' membership.plan.pk %}" class="block w-full py-2.5 rounded-xl text-sm font-medium text-center gradient-primary text-white hover:shadow-lg hover:shadow-indigo-500/25 transition">
+                        <i class="bi bi-arrow-repeat"></i> Extend Membership
+                    </a>
+                    {% endif %}
                 </div>
                 {% elif annual_plan %}
                 <a href="{% url 'membership:purchase' annual_plan.pk %}" class="block w-full py-2.5 rounded-xl text-sm font-medium text-center gradient-primary text-white hover:shadow-lg hover:shadow-indigo-500/25 transition">

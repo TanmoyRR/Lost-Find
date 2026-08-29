@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, PasswordChangeForm, PasswordResetForm, SetPasswordForm
 from django.contrib.auth import authenticate
 from .models import User
+from .validators import validate_profile_image
 
 
 class UserRegistrationForm(UserCreationForm):
@@ -36,6 +37,24 @@ class UserProfileForm(forms.ModelForm):
     first_name = forms.CharField(widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}))
     last_name = forms.CharField(widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}))
     email = forms.EmailField(widget=forms.EmailInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}))
+
+    def clean_profile_picture(self):
+        pic = self.cleaned_data.get('profile_picture')
+        if pic:
+            validate_profile_image(pic)
+        return pic
+
+    def clean_cover_photo(self):
+        photo = self.cleaned_data.get('cover_photo')
+        if photo:
+            validate_profile_image(photo)
+        return photo
+
+    def clean_bio(self):
+        bio = self.cleaned_data.get('bio', '')
+        if bio and len(bio) > 500:
+            raise forms.ValidationError('Bio must be 500 characters or fewer.')
+        return bio
 
     class Meta:
         model = User

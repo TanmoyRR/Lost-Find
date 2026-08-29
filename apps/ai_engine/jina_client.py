@@ -5,8 +5,10 @@ Reusable backend service that talks to the Jina Embeddings API.
 The API key lives only on the backend - it is never exposed to the
 browser, never logged, and never committed to the repository.
 """
+import hashlib
 import logging
 import time
+from collections import OrderedDict
 
 import requests
 from django.conf import settings
@@ -15,6 +17,11 @@ logger = logging.getLogger(__name__)
 
 # None = not checked yet, True/False = known state (cached for the process)
 _availability = None
+
+# Simple LRU cache for embeddings: text_hash -> embedding list
+# Prevents redundant API calls for the same text
+_EMBEDDING_CACHE_MAX_SIZE = 512
+_embedding_cache = OrderedDict()
 
 
 def is_configured():
@@ -39,6 +46,12 @@ def get_embedding_model():
     return getattr(settings, 'JINA_EMBEDDING_MODEL', 'jina-embeddings-v5-text-nano')
 
 
+def _cache_key(text):
+    """Generate a cache key for the given text."""
+    max_chars = getattr(settings, 'JINA_MAX_INPUT_CHARS', 4000)
+    return hashlib.sha256(text[:max_chars].encode('utf-8')).hexdigest()
+
+
 def generate_embedding(text, model=None, max_chars=None):
     """
     Send `text` to the Jina Embeddings API and return the embedding as a
@@ -51,6 +64,12 @@ def generate_embedding(text, model=None, max_chars=None):
     if not text:
         logger.warning('Jina: empty text, skipping embedding')
         return None
+
+    # Check cache first
+    cache_key = _cache_key(text)
+    if cache_key in _embedding_cache:
+        _embedding_cache.move_to_end(cache_key)
+        return _embedding_cache[cache_key]
 
     api_key = getattr(settings, 'JINA_API_KEY', '').strip()
     if not api_key:
@@ -103,6 +122,10 @@ def generate_embedding(text, model=None, max_chars=None):
                 logger.error('Jina: empty embedding in response')
                 return None
             _availability = True
+            # Cache the result
+            _embedding_cache[cache_key] = embedding
+            if len(_embedding_cache) > _EMBEDDING_CACHE_MAX_SIZE:
+                _embedding_cache.popitem(last=False)
             return embedding
 
         if response.status_code == 401:

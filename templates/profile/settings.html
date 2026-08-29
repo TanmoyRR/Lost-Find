@@ -191,9 +191,13 @@
                 <p class="text-sm font-medium text-red-800">Delete Account</p>
                 <p class="text-xs text-red-500">Permanently delete your account and all associated data</p>
             </div>
-            <button onclick="return confirm('Are you sure you want to delete your account? This action cannot be undone.')" class="px-4 py-2 rounded-xl text-sm font-medium gradient-danger text-white hover:shadow-lg transition">
-                <i class="bi bi-trash mr-1"></i> Delete
-            </button>
+            <form method="POST" action="{% url 'accounts:delete_account' %}"
+                  onsubmit="return confirm('Are you sure you want to delete your account? This action cannot be undone.')">
+                {% csrf_token %}
+                <button type="submit" class="px-4 py-2 rounded-xl text-sm font-medium gradient-danger text-white hover:shadow-lg transition">
+                    <i class="bi bi-trash mr-1"></i> Delete
+                </button>
+            </form>
         </div>
     </div>
 </div>

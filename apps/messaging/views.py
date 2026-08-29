@@ -1,25 +1,31 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Q, Count, Max
 from django.db import transaction
 
 from .models import Conversation, Message
 from apps.accounts.decorators import membership_required
 from apps.accounts.models import User
 from apps.posts.models import Post
-from apps.notifications.models import Notification
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
 def inbox(request):
-    conversations = Conversation.objects.filter(participants=request.user).order_by('-updated_at')
-    unread_counts = {}
-    for conv in conversations:
-        unread_counts[conv.id] = conv.messages.filter(is_read=False).exclude(sender=request.user).count()
+    conversations = Conversation.objects.filter(
+        participants=request.user
+    ).order_by('-updated_at').prefetch_related('participants').annotate(
+        last_msg_time=Max('messages__created_at'),
+        unread_count=Count(
+            'messages',
+            filter=Q(messages__is_read=False) & ~Q(messages__sender=request.user)
+        )
+    )
     return render(request, 'messaging/inbox.html', {
         'conversations': conversations,
-        'unread_counts': unread_counts,
     })
 
 
@@ -29,18 +35,6 @@ def conversation_detail(request, pk):
     messages_qs = conv.messages.all().select_related('sender')
     Message.objects.filter(conversation=conv, is_read=False).exclude(sender=request.user).update(is_read=True)
     other = conv.other_participants(request.user).first()
-    if request.method == 'POST':
-        body = request.POST.get('body', '').strip()
-        if body:
-            Message.objects.create(conversation=conv, sender=request.user, body=body)
-            Notification.objects.create(
-                user=other,
-                notification_type='message',
-                title=f'New message from {request.user.get_full_name() or request.user.username}',
-                message=body[:200],
-                link=f'/messages/{conv.pk}/',
-            )
-            return redirect('messaging:detail', pk=conv.pk)
     return render(request, 'messaging/conversation.html', {
         'conversation': conv,
         'messages': messages_qs,

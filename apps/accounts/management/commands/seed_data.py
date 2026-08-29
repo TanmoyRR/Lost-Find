@@ -1,8 +1,9 @@
+import os
+import secrets
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.hashers import make_password
-import random
 
 from apps.accounts.models import User, UserActivity
 from apps.posts.models import Category, CampusLocation, Post
@@ -13,23 +14,37 @@ from apps.payments.models import Payment
 class Command(BaseCommand):
     help = 'Seed database with initial data'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--production',
+            action='store_true',
+            help='Skip admin user creation in production',
+        )
+
     def handle(self, *args, **options):
         self.stdout.write('Seeding data...')
+        is_production = options.get('production', False) or os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('PRODUCTION')
 
-        # Create admin
-        if not User.objects.filter(username='admin').exists():
-            admin = User.objects.create_superuser(
-                username='admin',
-                email='admin@iubat.edu',
-                password='admin123',
-                role='admin',
-                student_id='ADMIN001',
-                department='cse',
-                phone='01700000000',
-                is_verified=True,
-                email_verified=True,
-            )
-            self.stdout.write('Admin created: admin / admin123')
+        # Create admin only in development
+        if not is_production:
+            if not User.objects.filter(username='admin').exists():
+                admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+                admin = User.objects.create_superuser(
+                    username='admin',
+                    email='admin@iubat.edu',
+                    password=admin_password,
+                    role='admin',
+                    student_id='ADMIN001',
+                    department='cse',
+                    phone='01700000000',
+                    is_verified=True,
+                    email_verified=True,
+                )
+                self.stdout.write(f'Admin created: admin / {admin_password}')
+            else:
+                self.stdout.write('Admin user already exists, skipping.')
+        else:
+            self.stdout.write('Production mode: skipping admin user creation.')
 
         # Create categories
         categories = [
