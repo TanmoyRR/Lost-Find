@@ -54,4 +54,39 @@ def start_conversation(request, post_id, user_id):
     if not conv:
         conv = Conversation.objects.create(post=post, subject=f'Regarding: {post.title}')
         conv.participants.add(request.user, other)
+
+    if post.post_type == 'lost' and post.status != 'resolved':
+        _initiate_recovery(post, request.user, other)
+
     return redirect('messaging:detail', pk=conv.pk)
+
+
+def _initiate_recovery(post, finder, owner):
+    from apps.recovery.models import RecoverySession, RecoveryVerificationLog
+    session = RecoverySession.objects.filter(
+        post=post, status__in=('pending', 'qr_generated'),
+    ).first()
+    if not session:
+        session = RecoverySession.objects.create(
+            post=post, owner=owner, claimant=finder, status='qr_generated',
+        )
+        session.generate_qr_image()
+        session.save(update_fields=['qr_code'])
+        RecoveryVerificationLog.objects.create(
+            session=session, action='session_created',
+            performed_by=owner,
+            details={'post_id': post.id, 'initiated_by': 'messaging'},
+        )
+    elif not session.claimant or session.claimant == finder:
+        session.claimant = finder
+        if session.status == 'pending':
+            session.status = 'qr_generated'
+            session.generate_qr_image()
+            session.save(update_fields=['claimant', 'status', 'qr_code'])
+        else:
+            session.save(update_fields=['claimant'])
+        RecoveryVerificationLog.objects.create(
+            session=session, action='finder_assigned',
+            performed_by=finder,
+            details={'source': 'messaging'},
+        )
