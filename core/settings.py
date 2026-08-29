@@ -88,15 +88,23 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 
-# Channel Layers (WebSockets)
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [config('REDIS_URL', default='redis://127.0.0.1:6379/0')],
+# Channel Layers (WebSockets) - use Redis if available, fallback to in-memory
+_redis_url = config('REDIS_URL', default='')
+if _redis_url:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [_redis_url],
+            },
         },
-    },
-}
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 
@@ -197,6 +205,7 @@ STORAGES = {
 }
 
 MEDIA_URL = f'{config("SUPABASE_S3_ENDPOINT", default="https://localhost:8000")}/{config("SUPABASE_BUCKET", default="smartfind-media")}/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
