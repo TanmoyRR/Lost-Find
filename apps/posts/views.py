@@ -62,6 +62,16 @@ def browse_posts(request):
 def post_detail(request, pk):
     post = get_object_or_404(Post.objects.select_related('category', 'location', 'user'), pk=pk)
     Post.objects.filter(pk=pk).update(views_count=F('views_count') + 1)
+
+    if post.post_type == 'lost' and post.status != 'resolved':
+        try:
+            from apps.recovery.models import RecoverySession
+            if not RecoverySession.objects.filter(post=post).exists():
+                from apps.recovery.views import create_recovery_session_for_post
+                create_recovery_session_for_post(post)
+        except Exception:
+            pass
+
     can_view_full = False
     if request.user.is_authenticated:
         if request.user == post.user:
