@@ -161,7 +161,7 @@ def semantic_search_posts(query_vector, limit=None, min_score=None, **filters):
 
     results = []
     for pe in qs[:limit]:
-        similarity = max(0.0, 1.0 - (pe.distance / 2.0))
+        similarity = max(0.0, 1.0 - pe.distance)
         if similarity >= min_score:
             results.append((pe.post, round(similarity, 4)))
     return results
@@ -272,7 +272,7 @@ def _ranked_candidates(post, query_vector):
             .order_by('distance')[:limit]
         )
         return [
-            (pe.post, max(0.0, 1.0 - (pe.distance / 2.0)))
+            (pe.post, max(0.0, 1.0 - pe.distance))
             for pe in qs
         ]
 

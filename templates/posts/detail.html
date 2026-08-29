@@ -1,5 +1,6 @@
 {% extends 'base/base.html' %}
 {% load static %}
+{% load ai_filters %}
 
 {% block title %}{{ post.title }} - IUBAT SmartFind{% endblock %}
 
@@ -261,7 +262,7 @@
                             </div>
                             <div class="flex-shrink-0 text-right">
                                 <span class="text-xs font-semibold {% if match.score > 0.7 %}text-emerald-600{% elif match.score > 0.5 %}text-amber-600{% else %}text-gray-400{% endif %}">
-                                    {{ match.score|floatformat:0 }}%
+                                    {{ match.score|to_percent }}%
                                 </span>
                             </div>
                         </a>

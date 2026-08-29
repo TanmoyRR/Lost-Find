@@ -1,6 +1,7 @@
 {% extends 'base/base.html' %}
 {% load static %}
 {% load humanize %}
+{% load ai_filters %}
 
 {% block title %}AI Search Results - IUBAT SmartFind{% endblock %}
 
@@ -101,12 +102,12 @@
                                         <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e5e7eb" stroke-width="2.5"></circle>
                                         <circle cx="18" cy="18" r="15.5" fill="none"
                                             stroke="{% if score > 0.8 %}#10b981{% elif score > 0.6 %}#f59e0b{% else %}#6366f1{% endif %}"
-                                            stroke-width="2.5" stroke-dasharray="{{ score }}, 100"
+                                            stroke-width="2.5"                                             stroke-dasharray="{{ score|to_percent }}, 100"
                                             stroke-linecap="round"></circle>
                                     </svg>
                                     <div class="absolute inset-0 flex items-center justify-center">
                                         <span class="text-sm font-bold {% if score > 0.8 %}text-emerald-600{% elif score > 0.6 %}text-amber-600{% else %}text-indigo-600{% endif %}">
-                                            {{ score|floatformat:0 }}%
+                                            {{ score|to_percent }}%
                                         </span>
                                     </div>
                                 </div>

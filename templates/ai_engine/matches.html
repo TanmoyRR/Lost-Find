@@ -1,6 +1,7 @@
 {% extends 'base/dashboard_base.html' %}
 {% load static %}
 {% load humanize %}
+{% load ai_filters %}
 
 {% block page_title %}AI Match Suggestions{% endblock %}
 
@@ -34,7 +35,7 @@
                 <i class="bi bi-check-circle text-emerald-600 text-lg"></i>
             </div>
             <div>
-                <p class="text-2xl font-bold text-gray-800">{{ matches.0.similarity_score|floatformat:0 }}%</p>
+                <p class="text-2xl font-bold text-gray-800">{{ matches.0.similarity_score|to_percent }}%</p>
                 <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Highest Score</p>
             </div>
         </div>
@@ -45,7 +46,7 @@
             <div>
                 <p class="text-2xl font-bold text-gray-800">
                     {% with last=matches|dictsort:"similarity_score"|last %}
-                    {{ last.similarity_score|floatformat:0 }}%
+                    {{ last.similarity_score|to_percent }}%
                     {% endwith %}
                 </p>
                 <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Lowest Score</p>
@@ -80,12 +81,12 @@
                                     <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e5e7eb" stroke-width="2.5"></circle>
                                     <circle cx="18" cy="18" r="15.5" fill="none"
                                         stroke="{% if match.match_strength == 'strong' %}#10b981{% else %}#f59e0b{% endif %}"
-                                        stroke-width="2.5" stroke-dasharray="{{ match.similarity_score }}, 100"
+                                        stroke-width="2.5"                                         stroke-dasharray="{{ match.similarity_score|to_percent }}, 100"
                                         stroke-linecap="round"></circle>
                                 </svg>
                                 <div class="absolute inset-0 flex items-center justify-center">
                                     <span class="text-xs font-bold {% if match.match_strength == 'strong' %}text-emerald-600{% else %}text-amber-600{% endif %}">
-                                        {{ match.similarity_score|floatformat:0 }}%
+                                        {{ match.similarity_score|to_percent }}%
                                     </span>
                                 </div>
                             </div>

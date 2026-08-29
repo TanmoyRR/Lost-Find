@@ -1,6 +1,7 @@
 {% extends 'base/dashboard_base.html' %}
 {% load static %}
 {% load humanize %}
+{% load ai_filters %}
 
 {% block page_title %}Dashboard{% endblock %}
 
@@ -108,7 +109,7 @@
                         </div>
                         <div class="flex items-center gap-3 flex-shrink-0 ml-3">
                             <span class="text-xs font-semibold px-2.5 py-1 rounded-lg {% if match.similarity_score > 0.8 %}bg-emerald-100 text-emerald-700{% elif match.similarity_score > 0.6 %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-600{% endif %}">
-                                {{ match.similarity_score|floatformat:1 }}%
+                                {{ match.similarity_score|to_percent }}%
                             </span>
                             <a href="{% url 'posts:detail' match.matched_post.pk %}" class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center hover:bg-indigo-200 transition">
                                 <i class="bi bi-arrow-right text-xs"></i>
