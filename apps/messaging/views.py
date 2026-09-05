@@ -66,14 +66,12 @@ def start_conversation(request, post_id, user_id):
 def _initiate_recovery(post, finder, owner):
     from apps.recovery.models import RecoverySession, RecoveryVerificationLog
     session = RecoverySession.objects.filter(
-        post=post, status__in=('pending', 'qr_generated'),
+        post=post, status__in=('pending', 'token_generated'),
     ).first()
     if not session:
         session = RecoverySession.objects.create(
-            post=post, owner=owner, claimant=finder, status='qr_generated',
+            post=post, owner=owner, claimant=finder, status='token_generated',
         )
-        session.generate_qr_image()
-        session.save(update_fields=['qr_code'])
         RecoveryVerificationLog.objects.create(
             session=session, action='session_created',
             performed_by=owner,
@@ -82,9 +80,8 @@ def _initiate_recovery(post, finder, owner):
     elif not session.claimant or session.claimant == finder:
         session.claimant = finder
         if session.status == 'pending':
-            session.status = 'qr_generated'
-            session.generate_qr_image()
-            session.save(update_fields=['claimant', 'status', 'qr_code'])
+            session.status = 'token_generated'
+            session.save(update_fields=['claimant', 'status'])
         else:
             session.save(update_fields=['claimant'])
         RecoveryVerificationLog.objects.create(
@@ -97,7 +94,7 @@ def _initiate_recovery(post, finder, owner):
 def _link_found_recovery(post, finder, owner):
     from apps.recovery.models import RecoverySession, RecoveryVerificationLog
     session = RecoverySession.objects.filter(
-        post=post, status__in=('pending', 'qr_generated'),
+        post=post, status__in=('pending', 'token_generated'),
     ).first()
     if session:
         session.claimant = finder

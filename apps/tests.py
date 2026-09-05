@@ -1069,10 +1069,8 @@ class TestRecoverySystem(TestCase):
         from apps.recovery.models import RecoverySession
         self.session = RecoverySession.objects.create(
             post=self.post, owner=self.owner, claimant=None,
-            status='qr_generated',
+            status='token_generated',
         )
-        self.session.generate_qr_image()
-        self.session.save(update_fields=['qr_code'])
 
     def test_recovery_list_requires_login(self):
         response = self.client.get(reverse('recovery:list'))
@@ -1093,23 +1091,23 @@ class TestRecoverySystem(TestCase):
         response = self.client.get(reverse('recovery:detail', args=[self.session.short_code]))
         self.assertEqual(response.status_code, 200)
 
-    def test_scan_qr_requires_finder(self):
+    def test_enter_token_requires_finder(self):
         self.client.login(username='owner', password='testpass')
-        response = self.client.get(reverse('recovery:scan_qr', args=[self.session.short_code]))
+        response = self.client.get(reverse('recovery:enter_token', args=[self.session.short_code]))
         self.assertEqual(response.status_code, 302)
 
-    def test_finder_can_scan(self):
+    def test_finder_can_enter_token(self):
         self.session.claimant = self.finder
         self.session.save(update_fields=['claimant'])
         self.client.login(username='finder', password='testpass')
-        response = self.client.get(reverse('recovery:scan_qr', args=[self.session.short_code]))
+        response = self.client.get(reverse('recovery:enter_token', args=[self.session.short_code]))
         self.assertEqual(response.status_code, 200)
 
-    def test_scan_completes_recovery(self):
+    def test_token_completes_recovery(self):
         self.session.claimant = self.finder
         self.session.save(update_fields=['claimant'])
         self.client.login(username='finder', password='testpass')
-        response = self.client.post(reverse('recovery:scan_qr', args=[self.session.short_code]),
+        response = self.client.post(reverse('recovery:enter_token', args=[self.session.short_code]),
                                     {'short_code': self.session.short_code})
         self.assertEqual(response.status_code, 302)
         self.session.refresh_from_db()
@@ -1117,15 +1115,15 @@ class TestRecoverySystem(TestCase):
         self.post.refresh_from_db()
         self.assertTrue(self.post.is_resolved)
 
-    def test_wrong_code_fails(self):
+    def test_wrong_token_fails(self):
         self.session.claimant = self.finder
         self.session.save(update_fields=['claimant'])
         self.client.login(username='finder', password='testpass')
-        response = self.client.post(reverse('recovery:scan_qr', args=[self.session.short_code]),
+        response = self.client.post(reverse('recovery:enter_token', args=[self.session.short_code]),
                                     {'short_code': 'WRONG-CODE'})
         self.assertEqual(response.status_code, 302)
         self.session.refresh_from_db()
-        self.assertEqual(self.session.status, 'qr_generated')
+        self.assertEqual(self.session.status, 'token_generated')
 
     def test_cancel_session(self):
         self.client.login(username='owner', password='testpass')
@@ -1134,9 +1132,9 @@ class TestRecoverySystem(TestCase):
         self.session.refresh_from_db()
         self.assertEqual(self.session.status, 'cancelled')
 
-    def test_generate_qr_owner_only(self):
+    def test_regenerate_token_owner_only(self):
         self.client.login(username='finder', password='testpass')
-        response = self.client.post(reverse('recovery:generate_qr', args=[self.session.short_code]))
+        response = self.client.post(reverse('recovery:regenerate_token', args=[self.session.short_code]))
         self.assertEqual(response.status_code, 302)
 
     def test_post_creates_recovery_session(self):

@@ -125,14 +125,14 @@ def create_post(request):
                 try:
                     from apps.recovery.views import create_recovery_session_for_post
                     session = create_recovery_session_for_post(post)
-                    messages.info(request, f'Recovery QR code generated: {session.short_code}')
+                    messages.info(request, f'Recovery token generated: {session.short_code}')
                 except Exception:
                     pass
             elif post.post_type == 'found':
                 try:
                     from apps.recovery.views import create_finder_recovery_session
                     session = create_finder_recovery_session(post)
-                    messages.info(request, f'Recovery scan ready: {session.short_code}')
+                    messages.info(request, f'Recovery token ready: {session.short_code}')
                 except Exception:
                     pass
             try:

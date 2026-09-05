@@ -110,7 +110,7 @@ def accept_match(request, match_id):
     try:
         from apps.recovery.models import RecoverySession, RecoveryVerificationLog
         from apps.notifications.models import Notification
-        session = RecoverySession.objects.filter(post=lost_post, status__in=('pending', 'qr_generated')).first()
+        session = RecoverySession.objects.filter(post=lost_post, status__in=('pending', 'token_generated')).first()
         if session and not session.claimant:
             session.claimant = finder
             session.save(update_fields=['claimant'])
@@ -123,14 +123,14 @@ def accept_match(request, match_id):
                 user=lost_post.user,
                 notification_type='recovery_update',
                 title='Finder Claimed Your Item',
-                message=f'{finder.get_full_name() or finder.username} has been assigned as the finder for "{lost_post.title}". They can now scan the QR code to complete recovery.',
+                message=f'{finder.get_full_name() or finder.username} has been assigned as the finder for "{lost_post.title}". They can now enter the recovery token to complete recovery.',
                 link=f'/recovery/{session.short_code}/',
             )
             Notification.objects.create(
                 user=finder,
                 notification_type='recovery_update',
                 title='You Are Now the Finder',
-                message=f'You have been assigned as the finder for "{lost_post.title}". Go to the recovery session to scan the QR code.',
+                message=f'You have been assigned as the finder for "{lost_post.title}". Go to the recovery session to enter the recovery token.',
                 link=f'/recovery/{session.short_code}/',
             )
     except Exception:

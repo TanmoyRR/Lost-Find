@@ -71,12 +71,12 @@
             </div>
             {% endif %}
 
-            {% if session.status == 'qr_generated' and is_finder %}
+            {% if session.status == 'token_generated' and is_finder %}
             <div class="bg-indigo-50 rounded-xl border border-indigo-200 p-6">
-                <h2 class="text-lg font-semibold text-indigo-900 mb-2">Scan QR to Complete Recovery</h2>
-                <p class="text-sm text-indigo-800 mb-4">When you meet the owner in person, scan or enter the QR code to complete the recovery.</p>
-                <a href="{% url 'recovery:scan_qr' short_code=session.short_code %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
-                    <i class="bi bi-qr-code-scan"></i> Scan QR Code
+                <h2 class="text-lg font-semibold text-indigo-900 mb-2">Enter Token to Complete Recovery</h2>
+                <p class="text-sm text-indigo-800 mb-4">When you meet the owner in person, enter their recovery token to complete the recovery.</p>
+                <a href="{% url 'recovery:enter_token' short_code=session.short_code %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+                    <i class="bi bi-key"></i> Enter Token
                 </a>
             </div>
             {% endif %}
@@ -84,31 +84,31 @@
             {% if session.status == 'pending' and is_owner and not session.claimant %}
             <div class="bg-amber-50 rounded-xl border border-amber-200 p-6">
                 <h2 class="text-lg font-semibold text-amber-900 mb-2">Waiting for a Finder</h2>
-                <p class="text-sm text-amber-800 mb-4">Your QR code is ready. When a finder claims your item, they will scan this code to complete recovery.</p>
-                <form method="post" action="{% url 'recovery:generate_qr' short_code=session.short_code %}" class="inline">
+                <p class="text-sm text-amber-800 mb-4">Your recovery token is ready. When a finder claims your item, they will enter this token to complete recovery.</p>
+                <form method="post" action="{% url 'recovery:regenerate_token' short_code=session.short_code %}" class="inline">
                     {% csrf_token %}
                     <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-100 transition text-sm font-medium">
-                        <i class="bi bi-arrow-clockwise"></i> Regenerate QR
+                        <i class="bi bi-arrow-clockwise"></i> Regenerate Token
                     </button>
                 </form>
             </div>
             {% endif %}
 
-            {% if session.qr_code and session.status != 'completed' %}
+            {% if session.status != 'completed' %}
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Recovery QR Code</h2>
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Recovery Token</h2>
                 <div class="flex flex-col sm:flex-row items-start gap-6">
-                    <div class="bg-white p-4 rounded-xl border border-gray-200">
-                        <img src="{{ session.qr_code.url }}" alt="Recovery QR" class="w-48 h-48">
+                    <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-200 text-center">
+                        <p class="font-mono text-3xl font-bold text-indigo-700 tracking-widest">{{ session.short_code }}</p>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm text-gray-600 mb-1">Short Code: <strong class="font-mono text-lg text-indigo-600">{{ session.short_code }}</strong></p>
+                        <p class="text-sm text-gray-600 mb-1">Recovery Token: <strong class="font-mono text-lg text-indigo-600">{{ session.short_code }}</strong></p>
                         {% if is_owner %}
-                        <p class="text-sm text-gray-500 mb-2">Show this QR code to the finder when they come to claim the item.</p>
+                        <p class="text-sm text-gray-500 mb-2">Share this token with the finder when they come to claim the item.</p>
                         {% elif is_finder %}
-                        <p class="text-sm text-gray-500 mb-2">Scan or enter this code to complete the recovery.</p>
+                        <p class="text-sm text-gray-500 mb-2">Enter this token to complete the recovery.</p>
                         {% endif %}
-                        <p class="text-xs text-gray-400 mt-3">This QR code encodes the short code <strong class="font-mono">{{ session.short_code }}</strong>.</p>
+                        <p class="text-xs text-gray-400 mt-3">This token is unique to this recovery session.</p>
                     </div>
                 </div>
             </div>

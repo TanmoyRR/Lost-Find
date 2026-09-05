@@ -147,15 +147,10 @@
                 {% if session.status != 'cancelled' and session.status != 'expired' %}
                 <div class="bg-indigo-50 rounded-2xl border border-indigo-200 p-6">
                     <h3 class="text-sm font-semibold text-indigo-900 mb-3 flex items-center gap-2">
-                        <i class="bi bi-qr-code"></i> Recovery QR
+                        <i class="bi bi-key"></i> Recovery Token
                     </h3>
-                    {% if session.qr_code %}
-                    <div class="bg-white p-3 rounded-xl border border-indigo-100 inline-block mb-3">
-                        <img src="{{ session.qr_code.url }}" alt="Recovery QR" class="w-32 h-32">
-                    </div>
-                    {% endif %}
-                    <p class="text-sm text-indigo-800 mb-1">Short Code: <strong class="font-mono text-lg">{{ session.short_code }}</strong></p>
-                    <p class="text-xs text-indigo-600 mb-3">Show this code to the finder when they claim your item.</p>
+                    <p class="font-mono text-2xl font-bold text-indigo-700 tracking-widest mb-2">{{ session.short_code }}</p>
+                    <p class="text-xs text-indigo-600 mb-3">Share this token with the finder when they claim your item.</p>
                     <a href="{% url 'recovery:detail' short_code=session.short_code %}" class="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition">
                         View Recovery Session <i class="bi bi-arrow-right"></i>
                     </a>
@@ -175,12 +170,12 @@
                         <i class="bi bi-shield-check"></i> Recovery Session
                     </h3>
                     <p class="text-sm text-indigo-800 mb-3">You are matched as the finder for this item.</p>
-                    <a href="{% url 'recovery:scan_qr' short_code=session.short_code %}" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
-                        <i class="bi bi-qr-code-scan"></i> Scan QR to Complete Recovery
+                    <a href="{% url 'recovery:enter_token' short_code=session.short_code %}" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+                        <i class="bi bi-key"></i> Enter Token to Complete Recovery
                     </a>
                     {% else %}
                     <h3 class="text-sm font-semibold text-indigo-900 mb-3 flex items-center gap-2">
-                        <i class="bi bi-qr-code"></i> Recovery QR Available
+                        <i class="bi bi-key"></i> Recovery Token Available
                     </h3>
                     <p class="text-xs text-indigo-600 mb-3">This item has an active recovery session. Contact the owner to initiate recovery.</p>
                     {% endif %}
@@ -199,11 +194,11 @@
                 {% if session.status != 'cancelled' and session.status != 'expired' %}
                 <div class="bg-emerald-50 rounded-2xl border border-emerald-200 p-6">
                     <h3 class="text-sm font-semibold text-emerald-900 mb-3 flex items-center gap-2">
-                        <i class="bi bi-qr-code-scan"></i> Ready to Scan
+                        <i class="bi bi-key"></i> Ready to Enter Token
                     </h3>
-                    <p class="text-sm text-emerald-800 mb-3">When you meet the owner, scan their QR code or enter their short code to complete the recovery.</p>
-                    <a href="{% url 'recovery:scan_qr' short_code=session.short_code %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium">
-                        <i class="bi bi-qr-code-scan"></i> Scan Owner's QR Code
+                    <p class="text-sm text-emerald-800 mb-3">When you meet the owner, enter their recovery token to complete the recovery.</p>
+                    <a href="{% url 'recovery:enter_token' short_code=session.short_code %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium">
+                        <i class="bi bi-key"></i> Enter Owner's Token
                     </a>
                     <a href="{% url 'recovery:detail' short_code=session.short_code %}" class="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-800 transition ml-3">
                         View Session <i class="bi bi-arrow-right"></i>

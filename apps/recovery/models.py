@@ -20,8 +20,8 @@ def generate_short_code():
 class RecoverySession(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
-        ('qr_generated', 'QR Generated'),
-        ('qr_scanned', 'QR Scanned'),
+        ('token_generated', 'Token Generated'),
+        ('token_entered', 'Token Entered'),
         ('completed', 'Completed'),
         ('expired', 'Expired'),
         ('cancelled', 'Cancelled'),
@@ -35,8 +35,7 @@ class RecoverySession(models.Model):
     )
     short_code = models.CharField(max_length=10, unique=True, db_index=True, default=generate_short_code)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    qr_code = models.ImageField(upload_to='recovery_qr/', null=True, blank=True)
-    qr_scanned_at = models.DateTimeField(null=True, blank=True)
+    token_verified_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -62,59 +61,40 @@ class RecoverySession(models.Model):
                 self.short_code = generate_short_code()
         super().save(*args, **kwargs)
 
-    def generate_qr_image(self):
-        """Generate the QR image encoding the short code."""
-        import qrcode
-        from io import BytesIO
-        from django.core.files.base import ContentFile
-
-        qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(self.short_code)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        self.qr_code.save(
-            f'qr_{self.short_code}.png',
-            ContentFile(buffer.getvalue()),
-            save=False,
-        )
-        return self.qr_code
-
     def verify_and_complete(self, token, scanned_by):
         """
-        Validate the QR token and atomically complete the recovery.
+        Validate the recovery token and atomically complete the recovery.
 
         Returns (success: bool, message: str).
         """
         from apps.notifications.models import Notification
         from apps.recovery.models import RecoveryVerificationLog
 
-        if self.status not in ('qr_generated',):
+        if self.status not in ('token_generated',):
             return False, 'This recovery session is no longer active.'
 
         if not self.claimant:
             return False, 'No authorized finder has been assigned to this session.'
 
         if scanned_by != self.claimant:
-            return False, 'Only the authorized finder can scan this QR code.'
+            return False, 'Only the authorized finder can complete this recovery.'
 
         cleaned = (token or '').strip().upper()
         if cleaned != self.short_code:
-            return False, 'Invalid QR code.'
+            return False, 'Invalid recovery token.'
 
         with transaction.atomic():
             self.status = 'completed'
-            self.qr_scanned_at = timezone.now()
+            self.token_verified_at = timezone.now()
             self.completed_at = timezone.now()
-            self.save(update_fields=['status', 'qr_scanned_at', 'completed_at'])
+            self.save(update_fields=['status', 'token_verified_at', 'completed_at'])
 
             self.post.status = 'resolved'
             self.post.is_resolved = True
             self.post.save(update_fields=['status', 'is_resolved'])
 
             RecoveryVerificationLog.objects.create(
-                session=self, action='qr_scanned',
+                session=self, action='token_entered',
                 performed_by=scanned_by,
                 ip_address=None,
             )

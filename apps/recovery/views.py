@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.db.models import Q
 from django.db import transaction
 from django.core.paginator import Paginator
-from .models import RecoverySession, RecoveryVerificationLog
+from .models import RecoverySession, RecoveryVerificationLog, generate_short_code
 from apps.posts.models import Post
 from apps.notifications.models import Notification
 
@@ -44,16 +44,14 @@ def _get_sidebar(user):
 def create_recovery_session_for_post(post):
     """
     Create a RecoverySession immediately when a Lost Post is created.
-    QR is generated right away. No claimant yet (finder is assigned later via accept_match).
+    Token is generated right away. No claimant yet (finder is assigned later via accept_match).
     """
     session = RecoverySession.objects.create(
         post=post,
         owner=post.user,
         claimant=None,
-        status='qr_generated',
+        status='token_generated',
     )
-    session.generate_qr_image()
-    session.save(update_fields=['qr_code'])
     RecoveryVerificationLog.objects.create(
         session=session, action='session_created',
         performed_by=post.user,
@@ -66,16 +64,14 @@ def create_recovery_session_for_post(post):
 def create_finder_recovery_session(post):
     """
     Create a RecoverySession when a Found Post is created.
-    The finder (post creator) is set as claimant, ready to scan the owner's QR.
+    The finder (post creator) is set as claimant, ready to enter the owner's token.
     """
     session = RecoverySession.objects.create(
         post=post,
         owner=post.user,
         claimant=post.user,
-        status='qr_generated',
+        status='token_generated',
     )
-    session.generate_qr_image()
-    session.save(update_fields=['qr_code'])
     RecoveryVerificationLog.objects.create(
         session=session, action='session_created',
         performed_by=post.user,
@@ -109,14 +105,14 @@ def recovery_detail(request, short_code):
     is_owner = request.user == session.owner
     is_finder = request.user == session.claimant
 
-    step_order = ['pending', 'qr_generated', 'qr_scanned', 'completed']
+    step_order = ['pending', 'token_generated', 'token_entered', 'completed']
     try:
         idx = step_order.index(session.status)
     except ValueError:
         idx = 0
     steps = [
-        {'label': 'QR Generated', 'icon': 'bi-qr-code', 'done': idx >= 1 or session.status == 'completed'},
-        {'label': 'QR Scanned', 'icon': 'bi-qr-code-scan', 'done': idx >= 2 or session.status == 'completed'},
+        {'label': 'Token Ready', 'icon': 'bi-key', 'done': idx >= 1 or session.status == 'completed'},
+        {'label': 'Token Entered', 'icon': 'bi-check2-square', 'done': idx >= 2 or session.status == 'completed'},
         {'label': 'Completed', 'icon': 'bi-flag', 'done': session.status == 'completed'},
     ]
 
@@ -130,65 +126,68 @@ def recovery_detail(request, short_code):
 
 
 @login_required
-def generate_qr(request, short_code):
+def regenerate_token(request, short_code):
     if request.method != 'POST':
         return redirect('recovery:detail', short_code=short_code)
     session = get_object_or_404(RecoverySession, short_code=short_code, owner=request.user)
-    if session.status not in ('pending', 'qr_generated'):
-        messages.error(request, 'QR code can only be generated while the session is active.')
+    if session.status not in ('pending', 'token_generated'):
+        messages.error(request, 'Token can only be regenerated while the session is active.')
         return redirect('recovery:detail', short_code=short_code)
-    session.generate_qr_image()
-    session.status = 'qr_generated'
-    session.save(update_fields=['qr_code', 'status'])
+    new_code = generate_short_code()
+    while RecoverySession.objects.filter(short_code=new_code).exists():
+        new_code = generate_short_code()
+    session.short_code = new_code
+    session.status = 'token_generated'
+    session.save(update_fields=['short_code', 'status'])
     RecoveryVerificationLog.objects.create(
-        session=session, action='qr_generated',
+        session=session, action='token_regenerated',
         performed_by=request.user,
         ip_address=request.META.get('REMOTE_ADDR'),
     )
-    messages.success(request, 'QR code generated successfully.')
+    messages.success(request, 'Recovery token regenerated successfully.')
     return redirect('recovery:detail', short_code=short_code)
 
 
 @login_required
-def scan_qr(request, short_code):
+def enter_token(request, short_code):
     session = get_object_or_404(
         RecoverySession.objects.select_related('post', 'claimant', 'owner'),
         short_code=short_code,
     )
     if request.user != session.claimant:
-        messages.error(request, 'Only the authorized finder can scan this QR code.')
+        messages.error(request, 'Only the authorized finder can complete this recovery.')
         return redirect('recovery:list')
-    if session.status != 'qr_generated':
-        messages.error(request, 'This QR code is no longer active.')
+    if session.status != 'token_generated':
+        messages.error(request, 'This recovery session is no longer active.')
         return redirect('recovery:detail', short_code=short_code)
 
     if request.method == 'POST':
         token = (request.POST.get('short_code', '') or '').strip().upper()
 
         if not token:
-            messages.error(request, 'Please enter the owner\'s short code.')
-            return render(request, 'recovery/scan_qr.html', {'session': session, 'sidebar_items': _get_sidebar(request.user)})
+            messages.error(request, 'Please enter the owner\'s recovery token.')
+            return render(request, 'recovery/enter_token.html', {'session': session, 'sidebar_items': _get_sidebar(request.user)})
 
         owner_session = RecoverySession.objects.filter(
-            short_code=token, status='qr_generated',
+            short_code=token, status='token_generated',
         ).exclude(pk=session.pk).select_related('post', 'owner').first()
 
         if not owner_session:
-            messages.error(request, 'Invalid or inactive short code. Please check the code and try again.')
-            return render(request, 'recovery/scan_qr.html', {'session': session, 'sidebar_items': _get_sidebar(request.user)})
+            messages.error(request, 'Invalid or inactive token. Please check the code and try again.')
+            return render(request, 'recovery/enter_token.html', {'session': session, 'sidebar_items': _get_sidebar(request.user)})
 
         with transaction.atomic():
             session.claimant = request.user
             session.status = 'completed'
-            session.qr_scanned_at = timezone.now()
+            session.token_verified_at = timezone.now()
             session.completed_at = timezone.now()
-            session.save(update_fields=['claimant', 'status', 'qr_scanned_at', 'completed_at'])
+            session.save(update_fields=['claimant', 'status', 'token_verified_at', 'completed_at'])
 
             owner_session.claimant = request.user
             owner_session.status = 'completed'
-            owner_session.qr_scanned_at = timezone.now()
+            owner_session.token_verified_at = timezone.now()
             owner_session.completed_at = timezone.now()
-            owner_session.save(update_fields=['claimant', 'status', 'qr_scanned_at', 'completed_at'])
+            owner_session.save(update_fields=['claimant', 'status', 'token_verified_at', 'completed_at'])
 
             for p in [session.post, owner_session.post]:
                 p.status = 'resolved'
@@ -226,7 +225,7 @@ def scan_qr(request, short_code):
         messages.success(request, 'Recovery completed successfully! Both items marked as resolved.')
         return redirect('recovery:detail', short_code=short_code)
 
-    return render(request, 'recovery/scan_qr.html', {
+    return render(request, 'recovery/enter_token.html', {
         'session': session,
         'sidebar_items': _get_sidebar(request.user),
     })
@@ -247,26 +246,26 @@ def scan_qr_match(request, finder_code, owner_code):
         messages.error(request, 'Access denied.')
         return redirect('recovery:list')
 
-    if finder_session.status != 'qr_generated':
+    if finder_session.status != 'token_generated':
         messages.error(request, 'Your recovery session is no longer active.')
         return redirect('recovery:detail', short_code=finder_code)
 
-    if owner_session.status != 'qr_generated':
+    if owner_session.status != 'token_generated':
         messages.error(request, 'The owner session is no longer active.')
         return redirect('recovery:detail', short_code=finder_code)
 
     if request.method == 'POST':
         finder_session.claimant = request.user
         finder_session.status = 'completed'
-        finder_session.qr_scanned_at = timezone.now()
+        finder_session.token_verified_at = timezone.now()
         finder_session.completed_at = timezone.now()
-        finder_session.save(update_fields=['claimant', 'status', 'qr_scanned_at', 'completed_at'])
+        finder_session.save(update_fields=['claimant', 'status', 'token_verified_at', 'completed_at'])
 
         owner_session.claimant = request.user
         owner_session.status = 'completed'
-        owner_session.qr_scanned_at = timezone.now()
+        owner_session.token_verified_at = timezone.now()
         owner_session.completed_at = timezone.now()
-        owner_session.save(update_fields=['claimant', 'status', 'qr_scanned_at', 'completed_at'])
+        owner_session.save(update_fields=['claimant', 'status', 'token_verified_at', 'completed_at'])
 
         finder_post = finder_session.post
         owner_post = owner_session.post
