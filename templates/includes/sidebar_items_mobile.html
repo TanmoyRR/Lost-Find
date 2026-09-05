@@ -1,54 +1,54 @@
 {% if user.role == 'admin' %}
-<a href="/dashboard/admin/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/dashboard/admin/">
+<a href="{% url 'dashboard:admin_home' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'dashboard:admin_home' %}">
     <i class="bi bi-grid-1x2 text-lg" style="min-width:20px;"></i> <span>Dashboard</span>
 </a>
 {% else %}
-<a href="/dashboard/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/dashboard/">
+<a href="{% url 'dashboard:home' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'dashboard:home' %}">
     <i class="bi bi-grid-1x2 text-lg" style="min-width:20px;"></i> <span>Dashboard</span>
 </a>
 {% endif %}
 {% if user.role == 'admin' %}
-<a href="/dashboard/admin/users/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/dashboard/admin/users/">
+<a href="{% url 'dashboard:admin_users' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'dashboard:admin_users' %}">
     <i class="bi bi-people text-lg" style="min-width:20px;"></i> <span>Users</span>
 </a>
 {% endif %}
-<a href="/browse/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/browse/">
+<a href="{% url 'posts:browse' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'posts:browse' %}">
     <i class="bi bi-collection text-lg" style="min-width:20px;"></i> <span>Browse Posts</span>
 </a>
 {% if user.role != 'admin' %}
-<a href="/post/create/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/post/create/">
+<a href="{% url 'posts:create' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'posts:create' %}">
     <i class="bi bi-file-earmark-text text-lg" style="min-width:20px;"></i> <span>Create Post</span>
 </a>
-<a href="/my-posts/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/my-posts/">
+<a href="{% url 'posts:my_posts' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'posts:my_posts' %}">
     <i class="bi bi-file-earmark-text text-lg" style="min-width:20px;"></i> <span>My Posts</span>
 </a>
 {% endif %}
-<a href="/notifications/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/notifications/">
+<a href="{% url 'notifications:list' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'notifications:list' %}">
     <i class="bi bi-bell text-lg" style="min-width:20px;"></i> <span>Notifications</span>
 </a>
 {% if user.role != 'admin' %}
-<a href="/messages/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/messages/">
+<a href="{% url 'messaging:inbox' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'messaging:inbox' %}">
     <i class="bi bi-chat-dots text-lg" style="min-width:20px;"></i> <span>Messages</span>
 </a>
 {% endif %}
 {% if user.is_authenticated and user.role == 'admin' %}
-<a href="/dashboard/admin/memberships/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/dashboard/admin/memberships/">
+<a href="{% url 'dashboard:admin_memberships' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'dashboard:admin_memberships' %}">
 {% else %}
-<a href="/membership/manage/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/membership/manage/">
+<a href="{% url 'membership:manage' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'membership:manage' %}">
 {% endif %}
     <i class="bi bi-gem text-lg" style="min-width:20px;"></i> <span>Membership{% if user.role == 'admin' %}s{% endif %}</span>
 </a>
 {% if user.role == 'admin' %}
-<a href="/dashboard/admin/revenue/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/dashboard/admin/revenue/">
+<a href="{% url 'dashboard:admin_revenue' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'dashboard:admin_revenue' %}">
     <i class="bi bi-currency-dollar text-lg" style="min-width:20px;"></i> <span>Revenue</span>
 </a>
 {% endif %}
 {% if user.role != 'admin' %}
-<a href="/recovery/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/recovery/">
+<a href="{% url 'recovery:list' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'recovery:list' %}">
     <i class="bi bi-shield-check text-lg" style="min-width:20px;"></i> <span>Recovery</span>
 </a>
 {% endif %}
-<a href="/settings/" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="/settings/">
+<a href="{% url 'accounts:settings' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200" data-url="{% url 'accounts:settings' %}">
     <i class="bi bi-gear text-lg" style="min-width:20px;"></i> <span>Settings</span>
 </a>
 

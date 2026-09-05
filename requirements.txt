@@ -34,13 +34,11 @@ django-celery-beat==2.9.0
 # Auth
 django-allauth==65.18.0
 
-# QR
-qrcode==8.2
-
 # Utils
 python-dateutil==2.9.0.post0
 requests==2.34.2
 python-dotenv==1.2.2
+django-ratelimit==4.1.0
 
 # Excel export
 openpyxl==3.1.5

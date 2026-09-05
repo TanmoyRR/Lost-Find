@@ -154,67 +154,67 @@
             </style>
 
             {% if user.role == 'admin' %}
-            <a href="/dashboard/admin/" class="si" data-url="/dashboard/admin/">
+            <a href="{% url 'dashboard:admin_home' %}" class="si" data-url="{% url 'dashboard:admin_home' %}">
                 <i class="bi bi-grid-1x2 sii"></i>
                 <span class="sil nl text-sm font-medium">Dashboard</span>
             </a>
             {% else %}
-            <a href="/dashboard/" class="si" data-url="/dashboard/">
+            <a href="{% url 'dashboard:home' %}" class="si" data-url="{% url 'dashboard:home' %}">
                 <i class="bi bi-grid-1x2 sii"></i>
                 <span class="sil nl text-sm font-medium">Dashboard</span>
             </a>
             {% endif %}
             {% if user.role == 'admin' %}
-            <a href="/dashboard/admin/users/" class="si" data-url="/dashboard/admin/users/">
+            <a href="{% url 'dashboard:admin_users' %}" class="si" data-url="{% url 'dashboard:admin_users' %}">
                 <i class="bi bi-people sii"></i>
                 <span class="sil nl text-sm font-medium">Users</span>
             </a>
             {% endif %}
-            <a href="/browse/" class="si" data-url="/browse/">
+            <a href="{% url 'posts:browse' %}" class="si" data-url="{% url 'posts:browse' %}">
                 <i class="bi bi-collection sii"></i>
                 <span class="sil nl text-sm font-medium">Browse Posts</span>
             </a>
             {% if user.role != 'admin' %}
-            <a href="/post/create/" class="si" data-url="/post/create/">
+            <a href="{% url 'posts:create' %}" class="si" data-url="{% url 'posts:create' %}">
                 <i class="bi bi-file-earmark-text sii"></i>
                 <span class="sil nl text-sm font-medium">Create Post</span>
             </a>
-            <a href="/my-posts/" class="si" data-url="/my-posts/">
+            <a href="{% url 'posts:my_posts' %}" class="si" data-url="{% url 'posts:my_posts' %}">
                 <i class="bi bi-file-earmark-text sii"></i>
                 <span class="sil nl text-sm font-medium">My Posts</span>
             </a>
             {% endif %}
-            <a href="/notifications/" class="si" data-url="/notifications/">
+            <a href="{% url 'notifications:list' %}" class="si" data-url="{% url 'notifications:list' %}">
                 <i class="bi bi-bell sii"></i>
                 <span class="sil nl text-sm font-medium">Notifications</span>
             </a>
             {% if user.role != 'admin' %}
-            <a href="/messages/" class="si" data-url="/messages/">
+            <a href="{% url 'messaging:inbox' %}" class="si" data-url="{% url 'messaging:inbox' %}">
                 <i class="bi bi-chat-dots sii"></i>
                 <span class="sil nl text-sm font-medium">Messages</span>
             </a>
             {% endif %}
             {% if user.is_authenticated and user.role == 'admin' %}
-            <a href="/dashboard/admin/memberships/" class="si" data-url="/dashboard/admin/memberships/">
+            <a href="{% url 'dashboard:admin_memberships' %}" class="si" data-url="{% url 'dashboard:admin_memberships' %}">
             {% else %}
-            <a href="/membership/manage/" class="si" data-url="/membership/manage/">
+            <a href="{% url 'membership:manage' %}" class="si" data-url="{% url 'membership:manage' %}">
             {% endif %}
                 <i class="bi bi-gem sii"></i>
                 <span class="sil nl text-sm font-medium">Membership{% if user.role == 'admin' %}s{% endif %}</span>
             </a>
             {% if user.role == 'admin' %}
-            <a href="/dashboard/admin/revenue/" class="si" data-url="/dashboard/admin/revenue/">
+            <a href="{% url 'dashboard:admin_revenue' %}" class="si" data-url="{% url 'dashboard:admin_revenue' %}">
                 <i class="bi bi-currency-dollar sii"></i>
                 <span class="sil nl text-sm font-medium">Revenue</span>
             </a>
             {% endif %}
             {% if user.role != 'admin' %}
-            <a href="/recovery/" class="si" data-url="/recovery/">
+            <a href="{% url 'recovery:list' %}" class="si" data-url="{% url 'recovery:list' %}">
                 <i class="bi bi-shield-check sii"></i>
                 <span class="sil nl text-sm font-medium">Recovery</span>
             </a>
             {% endif %}
-            <a href="/settings/" class="si" data-url="/settings/">
+            <a href="{% url 'accounts:settings' %}" class="si" data-url="{% url 'accounts:settings' %}">
                 <i class="bi bi-gear sii"></i>
                 <span class="sil nl text-sm font-medium">Settings</span>
             </a>

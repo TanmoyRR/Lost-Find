@@ -5,7 +5,6 @@ import string
 from django.db import models, transaction
 from django.conf import settings
 from django.utils import timezone
-from django.core.validators import MinValueValidator, MaxValueValidator
 
 logger = logging.getLogger(__name__)
 
@@ -123,25 +122,6 @@ class RecoverySession(models.Model):
         return True, 'Recovery completed successfully!'
 
 
-class RecoveryOTP(models.Model):
-    session = models.ForeignKey(RecoverySession, on_delete=models.CASCADE, related_name='otps')
-    otp_code = models.CharField(max_length=6)
-    is_used = models.BooleanField(default=False)
-    attempts = models.PositiveIntegerField(default=0)
-    max_attempts = models.PositiveIntegerField(default=5)
-    expires_at = models.DateTimeField()
-    verified_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = 'Recovery OTP'
-        verbose_name_plural = 'Recovery OTPs'
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"OTP for {self.session.short_code}"
-
-
 class RecoveryVerificationLog(models.Model):
     session = models.ForeignKey(RecoverySession, on_delete=models.CASCADE, related_name='verification_logs')
     action = models.CharField(max_length=50)
@@ -157,24 +137,3 @@ class RecoveryVerificationLog(models.Model):
 
     def __str__(self):
         return f"{self.session.short_code} - {self.action}"
-
-
-class RecoveryConfirmation(models.Model):
-    session = models.OneToOneField(RecoverySession, on_delete=models.CASCADE, related_name='confirmation')
-    confirmed_by_owner = models.BooleanField(default=False)
-    confirmed_by_claimant = models.BooleanField(default=False)
-    owner_confirmed_at = models.DateTimeField(null=True, blank=True)
-    claimant_confirmed_at = models.DateTimeField(null=True, blank=True)
-    owner_signature = models.TextField(blank=True, null=True)
-    claimant_signature = models.TextField(blank=True, null=True)
-    feedback = models.TextField(blank=True, null=True)
-    rating = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = 'Recovery Confirmation'
-        verbose_name_plural = 'Recovery Confirmations'
-
-    def __str__(self):
-        return f"Confirmation for {self.session.short_code}"

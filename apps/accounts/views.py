@@ -13,6 +13,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
+from django_ratelimit.decorators import ratelimit
 import hashlib
 import secrets
 
@@ -60,6 +61,7 @@ def _send_verification_email(user):
     )
 
 
+@ratelimit(key='ip', rate='5/m', method=['POST'], block=True)
 def register(request):
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST)
@@ -68,6 +70,7 @@ def register(request):
             user.role = 'student'
             user.is_membership_paid = False
             user.email_verification_token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+            user.email_verification_sent_at = timezone.now()
             user.save()
             try:
                 _send_verification_email(user)
@@ -81,6 +84,7 @@ def register(request):
     return render(request, 'accounts/register.html', {'form': form})
 
 
+@ratelimit(key='ip', rate='10/m', method=['POST'], block=True)
 def user_login(request):
     if request.user.is_authenticated:
         if request.user.role == 'admin':
@@ -116,9 +120,13 @@ def user_login(request):
 
 def verify_email(request, token):
     user = get_object_or_404(User, email_verification_token=token)
+    if user.email_verification_sent_at and (timezone.now() - user.email_verification_sent_at).total_seconds() > 86400:
+        messages.error(request, 'Verification link has expired. Please sign in and request a new one.')
+        return redirect('accounts:login')
     user.email_verified = True
     user.is_verified = True
     user.email_verification_token = None
+    user.email_verification_sent_at = None
     user.save()
     messages.success(request, 'Email verified successfully! You can now login.')
     return redirect('accounts:login')
@@ -132,12 +140,14 @@ def verify_email_gate(request):
 
 
 @login_required
+@ratelimit(key='ip', rate='3/m', method=['POST'], block=True)
 def resend_verification(request):
     if request.user.email_verified or request.user.role == 'admin':
         return redirect('dashboard:home')
     if request.method == 'POST':
         user = request.user
         user.email_verification_token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+        user.email_verification_sent_at = timezone.now()
         user.save()
         try:
             _send_verification_email(user)
@@ -149,6 +159,7 @@ def resend_verification(request):
     return redirect('accounts:verify_email_gate')
 
 
+@ratelimit(key='ip', rate='5/m', method=['POST'], block=True)
 def forgot_password(request):
     if request.method == 'POST':
         form = PasswordResetRequestForm(request.POST)

@@ -42,6 +42,7 @@ class User(AbstractUser):
     is_membership_paid = models.BooleanField(default=False)
     email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=255, null=True, blank=True)
+    email_verification_sent_at = models.DateTimeField(null=True, blank=True)
     reset_password_token = models.CharField(max_length=255, null=True, blank=True)
     reset_password_sent_at = models.DateTimeField(null=True, blank=True)
     last_activity = models.DateTimeField(auto_now=True)
