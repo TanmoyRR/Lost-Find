@@ -74,8 +74,8 @@ def register(request):
             except Exception:
                 logger.warning('Failed to send verification email for user %s', user.pk, exc_info=True)
             login(request, user)
-            messages.success(request, 'Registration successful! One final step — please complete your membership payment to activate your account.')
-            return redirect('membership:pending_purchase')
+            messages.success(request, 'Registration successful! Please check your email to verify your account.')
+            return redirect('accounts:verify_email_gate')
     else:
         form = UserRegistrationForm()
     return render(request, 'accounts/register.html', {'form': form})
@@ -99,6 +99,9 @@ def user_login(request):
             UserActivity.objects.create(user=user, activity_type='login', description='User logged in')
             if user.role == 'admin':
                 return redirect('dashboard:admin_home')
+            if not user.email_verified:
+                messages.info(request, 'Please verify your email to continue.')
+                return redirect('accounts:verify_email_gate')
             if not user.is_membership_paid:
                 messages.info(request, 'Please complete your membership payment to activate your account.')
                 return redirect('membership:pending_purchase')
@@ -119,6 +122,31 @@ def verify_email(request, token):
     user.save()
     messages.success(request, 'Email verified successfully! You can now login.')
     return redirect('accounts:login')
+
+
+@login_required
+def verify_email_gate(request):
+    if request.user.email_verified or request.user.role == 'admin':
+        return redirect('dashboard:home')
+    return render(request, 'accounts/verify_email_gate.html')
+
+
+@login_required
+def resend_verification(request):
+    if request.user.email_verified or request.user.role == 'admin':
+        return redirect('dashboard:home')
+    if request.method == 'POST':
+        user = request.user
+        user.email_verification_token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+        user.save()
+        try:
+            _send_verification_email(user)
+            messages.success(request, 'Verification email sent! Check your inbox.')
+        except Exception:
+            logger.warning('Failed to resend verification email for user %s', user.pk, exc_info=True)
+            messages.error(request, 'Failed to send email. Please try again later.')
+        return redirect('accounts:verify_email_gate')
+    return redirect('accounts:verify_email_gate')
 
 
 def forgot_password(request):

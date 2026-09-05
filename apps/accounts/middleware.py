@@ -55,3 +55,33 @@ class ActiveUserMiddleware:
             return redirect('accounts:login')
         response = self.get_response(request)
         return response
+
+
+class EmailVerificationMiddleware:
+    ALLOWED_PATH_PREFIXES = [
+        '/verify-email/',
+        '/resend-verification/',
+        '/accounts/logout/',
+        '/forgot-password/',
+        '/reset-password/',
+        '/payments/',
+        '/admin/',
+        '/static/',
+        '/media/',
+        '/favicon.ico',
+    ]
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.user.is_authenticated and not request.user.email_verified:
+            if request.user.role == 'admin' or request.user.is_superuser:
+                response = self.get_response(request)
+                return response
+            path = request.path
+            if not any(path.startswith(prefix) for prefix in self.ALLOWED_PATH_PREFIXES):
+                from django.shortcuts import redirect
+                return redirect('accounts:verify_email_gate')
+        response = self.get_response(request)
+        return response

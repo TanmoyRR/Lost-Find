@@ -63,6 +63,7 @@ MIDDLEWARE = [
     'apps.accounts.middleware.MembershipPendingMiddleware',
     'apps.accounts.middleware.MembershipMiddleware',
     'apps.accounts.middleware.ActiveUserMiddleware',
+    'apps.accounts.middleware.EmailVerificationMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
