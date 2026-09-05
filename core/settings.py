@@ -1,5 +1,4 @@
 import os
-import warnings
 import sys
 from pathlib import Path
 from decouple import config, Csv
@@ -286,8 +285,6 @@ AWS_DEFAULT_ACL = 'public-read'
 AWS_QUERYSTRING_AUTH = False
 AWS_S3_FILE_OVERWRITE = False
 AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Local settings override (for demo/dev - only in local env)
 if os.environ.get('DJANGO_LOCAL', '').lower() in ('1', 'true', 'yes'):

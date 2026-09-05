@@ -18,9 +18,21 @@ class UserRegistrationForm(UserCreationForm):
         model = User
         fields = ['username', 'email', 'password1', 'password2', 'student_id', 'department', 'phone']
 
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError('This email is already registered.')
+        return email
+
+    def clean_student_id(self):
+        student_id = self.cleaned_data.get('student_id')
+        if student_id and User.objects.filter(student_id__iexact=student_id).exists():
+            raise forms.ValidationError('This student ID is already registered.')
+        return student_id
+
 
 class LoginForm(AuthenticationForm):
-    username = forms.CharField(widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Username or Email'}))
+    username = forms.CharField(widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Username'}))
     password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Enter your password'}))
 
 

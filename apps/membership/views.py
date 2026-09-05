@@ -48,6 +48,12 @@ def membership_view(request):
 @login_required
 def purchase_membership(request, plan_id):
     plan = get_object_or_404(MembershipPlan, pk=plan_id, is_active=True)
+    existing_pending = Payment.objects.filter(
+        user=request.user, payment_type='membership', status='pending'
+    ).exists()
+    if existing_pending:
+        messages.warning(request, 'You already have a pending payment. Please complete it first.')
+        return redirect('membership:pending_purchase')
     membership, created = Membership.objects.get_or_create(user=request.user)
     membership.plan = plan
     membership.save()

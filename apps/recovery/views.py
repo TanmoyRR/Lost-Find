@@ -232,88 +232,6 @@ def enter_token(request, short_code):
 
 
 @login_required
-def scan_qr_match(request, finder_code, owner_code):
-    finder_session = get_object_or_404(
-        RecoverySession.objects.select_related('post', 'claimant', 'owner'),
-        short_code=finder_code,
-    )
-    owner_session = get_object_or_404(
-        RecoverySession.objects.select_related('post', 'claimant', 'owner'),
-        short_code=owner_code,
-    )
-
-    if request.user != finder_session.claimant:
-        messages.error(request, 'Access denied.')
-        return redirect('recovery:list')
-
-    if finder_session.status != 'token_generated':
-        messages.error(request, 'Your recovery session is no longer active.')
-        return redirect('recovery:detail', short_code=finder_code)
-
-    if owner_session.status != 'token_generated':
-        messages.error(request, 'The owner session is no longer active.')
-        return redirect('recovery:detail', short_code=finder_code)
-
-    if request.method == 'POST':
-        finder_session.claimant = request.user
-        finder_session.status = 'completed'
-        finder_session.token_verified_at = timezone.now()
-        finder_session.completed_at = timezone.now()
-        finder_session.save(update_fields=['claimant', 'status', 'token_verified_at', 'completed_at'])
-
-        owner_session.claimant = request.user
-        owner_session.status = 'completed'
-        owner_session.token_verified_at = timezone.now()
-        owner_session.completed_at = timezone.now()
-        owner_session.save(update_fields=['claimant', 'status', 'token_verified_at', 'completed_at'])
-
-        finder_post = finder_session.post
-        owner_post = owner_session.post
-        for p in [finder_post, owner_post]:
-            p.status = 'resolved'
-            p.is_resolved = True
-            p.save(update_fields=['status', 'is_resolved'])
-
-        RecoveryVerificationLog.objects.create(
-            session=finder_session, action='recovery_completed',
-            performed_by=request.user,
-            details={'matched_with': owner_code},
-        )
-        RecoveryVerificationLog.objects.create(
-            session=owner_session, action='recovery_completed',
-            performed_by=request.user,
-            details={'matched_with': finder_code},
-        )
-
-        from apps.notifications.models import Notification
-        if owner_session.owner != request.user:
-            Notification.objects.create(
-                user=owner_session.owner,
-                notification_type='post_resolved',
-                title='Item Successfully Recovered',
-                message=f'Your item "{owner_post.title}" has been successfully recovered.',
-                link='/recovery/',
-            )
-        if finder_session.owner != request.user:
-            Notification.objects.create(
-                user=finder_session.owner,
-                notification_type='post_resolved',
-                title='Item Successfully Recovered',
-                message=f'Your found item "{finder_post.title}" has been matched and recovered.',
-                link='/recovery/',
-            )
-
-        messages.success(request, 'Recovery completed successfully! Both items marked as resolved.')
-        return redirect('recovery:detail', short_code=finder_code)
-
-    return render(request, 'recovery/scan_qr_match.html', {
-        'finder_session': finder_session,
-        'owner_session': owner_session,
-        'sidebar_items': _get_sidebar(request.user),
-    })
-
-
-@login_required
 def cancel_recovery(request, short_code):
     if request.method != 'POST':
         return redirect('recovery:detail', short_code=short_code)
@@ -332,6 +250,15 @@ def cancel_recovery(request, short_code):
         details={'reason': request.POST.get('reason', '')},
         ip_address=request.META.get('REMOTE_ADDR'),
     )
+    other_user = session.owner if request.user == session.claimant else session.claimant
+    if other_user:
+        Notification.objects.create(
+            user=other_user,
+            notification_type='recovery_update',
+            title='Recovery Session Cancelled',
+            message=f'The recovery session for "{session.post.title}" has been cancelled.',
+            link='/recovery/',
+        )
     messages.success(request, 'Recovery session cancelled.')
     return redirect('recovery:list')
 

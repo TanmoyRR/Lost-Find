@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.utils import timezone
+from django.db import transaction
 from datetime import timedelta
 from decimal import Decimal
 
@@ -208,7 +209,8 @@ def payment_success(request):
         return redirect('membership:index')
 
     try:
-        payment = Payment.objects.get(sslcommerz_tran_id=tran_id)
+        with transaction.atomic():
+            payment = Payment.objects.select_for_update().get(sslcommerz_tran_id=tran_id)
     except Payment.DoesNotExist:
         logger.error('Payment callback for unknown tran_id: %s', tran_id)
         return redirect('membership:index')

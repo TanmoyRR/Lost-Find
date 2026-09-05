@@ -33,8 +33,29 @@ def inbox(request):
 def conversation_detail(request, pk):
     conv = get_object_or_404(Conversation, pk=pk, participants=request.user)
     messages_qs = conv.messages.all().select_related('sender')
-    Message.objects.filter(conversation=conv, is_read=False).exclude(sender=request.user).update(is_read=True)
     other = conv.other_participants(request.user).first()
+
+    if request.method == 'POST':
+        body = (request.POST.get('body', '') or '').strip()
+        if body:
+            Message.objects.create(
+                conversation=conv,
+                sender=request.user,
+                body=body,
+            )
+            conv.save()  # update updated_at
+            if other:
+                from apps.notifications.models import Notification
+                Notification.objects.create(
+                    user=other,
+                    notification_type='message',
+                    title=f'New message from {request.user.get_full_name() or request.user.username}',
+                    message=body[:200],
+                    link=f'/messages/{conv.pk}/',
+                )
+        return redirect('messaging:detail', pk=pk)
+
+    Message.objects.filter(conversation=conv, is_read=False).exclude(sender=request.user).update(is_read=True)
     return render(request, 'messaging/conversation.html', {
         'conversation': conv,
         'messages': messages_qs,

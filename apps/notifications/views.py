@@ -30,7 +30,9 @@ def mark_read(request, pk):
     notification.is_read = True
     notification.save(update_fields=['is_read'])
     if notification.link:
-        return redirect(notification.link)
+        link = notification.link
+        if link.startswith('/') and not link.startswith('//'):
+            return redirect(link)
     return redirect('notifications:list')
 
 

@@ -111,7 +111,7 @@ def admin_dashboard(request):
     recovery_agg = RecoverySession.objects.aggregate(
         recovery_sessions=Count('id'),
         completed_recoveries=Count('id', filter=Q(status='completed')),
-        pending_recoveries=Count('id', filter=Q(status__in=['pending', 'qr_generated', 'qr_scanned'])),
+        pending_recoveries=Count('id', filter=Q(status__in=['pending', 'token_generated'])),
     )
     recent_activities = UserActivity.objects.all()[:20]
     users = User.objects.exclude(pk=request.user.pk).order_by('-date_joined')[:10]
@@ -750,10 +750,12 @@ def admin_update_membership(request, pk):
         membership.expires_at = expires_at
         membership.save()
     else:
-        Membership.objects.create(
+        membership = Membership.objects.create(
             user=user, plan=plan, is_active=is_active,
             started_at=started_at, expires_at=expires_at
         )
+    user.is_membership_paid = is_active
+    user.save(update_fields=['is_membership_paid'])
     messages.success(request, f'Membership updated for {user.username}.')
     return redirect('dashboard:admin_user_detail', pk=pk)
 
@@ -769,6 +771,8 @@ def admin_toggle_membership(request, pk):
         membership.is_active = False
         membership.expires_at = timezone.now()
         membership.save()
+        user.is_membership_paid = False
+        user.save(update_fields=['is_membership_paid'])
         messages.success(request, f'Membership revoked for {user.username}.')
     else:
         plan = MembershipPlan.objects.filter(is_active=True).first()
@@ -782,11 +786,13 @@ def admin_toggle_membership(request, pk):
             membership.expires_at = timezone.now() + timedelta(days=plan.duration_days)
             membership.save()
         else:
-            Membership.objects.create(
+            membership = Membership.objects.create(
                 user=user, plan=plan, is_active=True,
                 started_at=timezone.now(),
                 expires_at=timezone.now() + timedelta(days=plan.duration_days)
             )
+        user.is_membership_paid = True
+        user.save(update_fields=['is_membership_paid'])
         messages.success(request, f'Membership granted to {user.username}.')
     return redirect('dashboard:admin_user_detail', pk=pk)
 
@@ -820,6 +826,8 @@ def admin_extend_membership(request, pk):
             started_at=timezone.now(),
             expires_at=timezone.now() + timedelta(days=days),
         )
+    user.is_membership_paid = True
+    user.save(update_fields=['is_membership_paid'])
     messages.success(request, f'Membership extended by {days} days for {user.username}.')
     return redirect('dashboard:admin_user_detail', pk=pk)
 

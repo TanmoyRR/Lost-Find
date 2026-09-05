@@ -57,7 +57,7 @@ class ChatConsumer(WebsocketConsumer):
             return
 
         body = data.get('body', '').strip()
-        if not body:
+        if not body or len(body) > 5000:
             return
 
         msg = Message.objects.create(
@@ -66,8 +66,8 @@ class ChatConsumer(WebsocketConsumer):
             body=body,
         )
 
-        # Update conversation timestamp
-        self.conversation.save()
+        # Update conversation timestamp without triggering full save
+        Conversation.objects.filter(pk=self.conversation.pk).update(updated_at=timezone.now())
 
         # Notify the other participant
         other = self.conversation.other_participants(self.user).first()

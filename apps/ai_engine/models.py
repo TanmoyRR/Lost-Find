@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from pgvector.django import VectorField
 
 
@@ -48,6 +49,10 @@ class MatchSuggestion(models.Model):
         indexes = [
             models.Index(fields=['status', '-similarity_score'], name='match_status_score_idx'),
         ]
+
+    def clean(self):
+        if self.post_id and self.matched_post_id and self.post_id == self.matched_post_id:
+            raise ValidationError('A post cannot match itself.')
 
     def __str__(self):
         return f"Match: {self.post.title[:30]} <-> {self.matched_post.title[:30]} ({self.similarity_score:.0%})"

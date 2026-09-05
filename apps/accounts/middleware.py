@@ -36,7 +36,10 @@ class MembershipMiddleware:
             membership = request.user.membership
             if membership.is_active and membership.expires_at and membership.expires_at < timezone.now():
                 membership.is_active = False
-                membership.save()
+                membership.save(update_fields=['is_active'])
+                if request.user.is_membership_paid:
+                    request.user.is_membership_paid = False
+                    request.user.save(update_fields=['is_membership_paid'])
         response = self.get_response(request)
         return response
 
@@ -65,6 +68,7 @@ class EmailVerificationMiddleware:
         '/forgot-password/',
         '/reset-password/',
         '/payments/',
+        '/membership/',
         '/admin/',
         '/static/',
         '/media/',
