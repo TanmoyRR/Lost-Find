@@ -58,80 +58,24 @@
                 <i class="bi bi-bell text-blue-600"></i>
             </div>
             <div>
-                <h3 class="text-base font-semibold text-gray-800">Notification Preferences</h3>
-                <p class="text-xs text-gray-400">Choose what notifications you receive</p>
+                <h3 class="text-base font-semibold text-gray-800">Notifications</h3>
+                <p class="text-xs text-gray-400">Manage your notifications</p>
             </div>
         </div>
-        <form method="POST" class="space-y-4">
-            {% csrf_token %}
-            <div class="space-y-3">
-                <label class="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100/50 transition cursor-pointer">
-                    <div class="flex items-start gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                            <i class="bi bi-check-circle text-emerald-600"></i>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium text-gray-800">Post Resolved</p>
-                            <p class="text-xs text-gray-400">When one of your posts is marked as resolved</p>
-                        </div>
+        <div class="space-y-3">
+            <a href="{% url 'notifications:list' %}" class="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-indigo-50 transition group">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
+                        <i class="bi bi-bell text-indigo-600"></i>
                     </div>
-                    <div class="relative">
-                        <input type="checkbox" name="notify_resolved" {% if user.notify_resolved %}checked{% endif %} class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-indigo-500 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-800">View Notifications</p>
+                        <p class="text-xs text-gray-400">View and manage all your notifications</p>
                     </div>
-                </label>
-                <label class="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100/50 transition cursor-pointer">
-                    <div class="flex items-start gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                            <i class="bi bi-chat-dots text-blue-600"></i>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium text-gray-800">New Messages</p>
-                            <p class="text-xs text-gray-400">When someone sends you a message</p>
-                        </div>
-                    </div>
-                    <div class="relative">
-                        <input type="checkbox" name="notify_messages" {% if user.notify_messages %}checked{% endif %} class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-indigo-500 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-                    </div>
-                </label>
-                <label class="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100/50 transition cursor-pointer">
-                    <div class="flex items-start gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                            <i class="bi bi-robot text-purple-600"></i>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium text-gray-800">AI Match Found</p>
-                            <p class="text-xs text-gray-400">When an AI match is found for your post</p>
-                        </div>
-                    </div>
-                    <div class="relative">
-                        <input type="checkbox" name="notify_ai_matches" {% if user.notify_ai_matches %}checked{% endif %} class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-indigo-500 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-                    </div>
-                </label>
-                <label class="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100/50 transition cursor-pointer">
-                    <div class="flex items-start gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                            <i class="bi bi-megaphone text-amber-600"></i>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium text-gray-800">Marketing Emails</p>
-                            <p class="text-xs text-gray-400">Receive updates about new features and offers</p>
-                        </div>
-                    </div>
-                    <div class="relative">
-                        <input type="checkbox" name="notify_marketing" {% if user.notify_marketing %}checked{% endif %} class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-indigo-500 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-                    </div>
-                </label>
-            </div>
-            <div class="flex justify-end pt-4 border-t border-gray-100">
-                <button type="submit" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition flex items-center gap-2">
-                    <i class="bi bi-check-lg"></i> Save Preferences
-                </button>
-            </div>
-        </form>
+                </div>
+                <i class="bi bi-chevron-right text-gray-400 group-hover:text-indigo-600 transition"></i>
+            </a>
+        </div>
     </div>
 
     <!-- Security -->

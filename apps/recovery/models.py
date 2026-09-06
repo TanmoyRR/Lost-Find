@@ -1,3 +1,4 @@
+import hmac
 import logging
 import secrets
 import string
@@ -5,6 +6,7 @@ import string
 from django.db import models, transaction
 from django.conf import settings
 from django.utils import timezone
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ class RecoverySession(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     token_verified_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -53,73 +56,21 @@ class RecoverySession(models.Model):
     def __str__(self):
         return f"Recovery {self.short_code} - {self.post.title[:50]}"
 
+    def is_expired(self):
+        if self.expires_at and timezone.now() > self.expires_at:
+            return True
+        return False
+
     def save(self, *args, **kwargs):
         if not self.short_code:
             self.short_code = generate_short_code()
             while RecoverySession.objects.filter(short_code=self.short_code).exists():
                 self.short_code = generate_short_code()
+        if not self.expires_at and self.status in ('pending', 'token_generated'):
+            from django.conf import settings
+            ttl_days = getattr(settings, 'RECOVERY_SESSION_TTL_DAYS', 30)
+            self.expires_at = timezone.now() + timedelta(days=ttl_days)
         super().save(*args, **kwargs)
-
-    def verify_and_complete(self, token, scanned_by):
-        """
-        Validate the recovery token and atomically complete the recovery.
-
-        Returns (success: bool, message: str).
-        """
-        from apps.notifications.models import Notification
-        from apps.recovery.models import RecoveryVerificationLog
-
-        if self.status not in ('token_generated',):
-            return False, 'This recovery session is no longer active.'
-
-        if not self.claimant:
-            return False, 'No authorized finder has been assigned to this session.'
-
-        if scanned_by != self.claimant:
-            return False, 'Only the authorized finder can complete this recovery.'
-
-        cleaned = (token or '').strip().upper()
-        if cleaned != self.short_code:
-            return False, 'Invalid recovery token.'
-
-        with transaction.atomic():
-            self.status = 'completed'
-            self.token_verified_at = timezone.now()
-            self.completed_at = timezone.now()
-            self.save(update_fields=['status', 'token_verified_at', 'completed_at'])
-
-            self.post.status = 'resolved'
-            self.post.is_resolved = True
-            self.post.save(update_fields=['status', 'is_resolved'])
-
-            RecoveryVerificationLog.objects.create(
-                session=self, action='token_entered',
-                performed_by=scanned_by,
-                ip_address=None,
-            )
-            RecoveryVerificationLog.objects.create(
-                session=self, action='recovery_completed',
-                performed_by=scanned_by,
-                ip_address=None,
-            )
-
-            Notification.objects.create(
-                user=self.owner,
-                notification_type='post_resolved',
-                title='Item Successfully Recovered',
-                message=f'Your item "{self.post.title}" has been successfully recovered.',
-                link=f'/recovery/',
-            )
-            Notification.objects.create(
-                user=self.claimant,
-                notification_type='post_resolved',
-                title='Recovery Completed',
-                message=f'You have successfully completed the recovery of "{self.post.title}".',
-                link=f'/recovery/',
-            )
-
-        logger.info('Recovery %s completed by finder %s', self.short_code, scanned_by.pk)
-        return True, 'Recovery completed successfully!'
 
 
 class RecoveryVerificationLog(models.Model):

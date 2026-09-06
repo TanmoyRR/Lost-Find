@@ -12,15 +12,24 @@
         <div class="px-6 py-4 border-b border-gray-100">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    {% if other %}
                     <span class="text-blue-600 font-semibold">{{ other.get_full_name|default:other.username|first|upper }}</span>
+                    {% else %}
+                    <span class="text-blue-600 font-semibold">?</span>
+                    {% endif %}
                 </div>
                 <div>
+                    {% if other %}
                     <h2 class="font-semibold text-gray-900">{{ other.get_full_name|default:other.username }}</h2>
+                    {% else %}
+                    <h2 class="font-semibold text-gray-900">Deleted User</h2>
+                    {% endif %}
                     {% if conversation.subject %}
                     <p class="text-xs text-gray-400">{{ conversation.subject }}</p>
                     {% endif %}
                 </div>
-                <div class="ml-auto" id="connection-status">
+                <div class="ml-auto flex items-center gap-3">
+                    <span id="typing-indicator" class="text-xs text-gray-400 hidden italic"></span>
                     <span class="text-xs text-gray-400 flex items-center gap-1">
                         <span class="w-2 h-2 rounded-full bg-gray-300" id="status-dot"></span>
                         <span id="status-text">Connecting...</span>
@@ -28,12 +37,29 @@
                 </div>
             </div>
         </div>
+
+        {% if messages.has_previous %}
+        <div class="px-6 py-2 bg-gray-50 text-center">
+            <a href="?page={{ messages.previous_page_number }}" class="text-xs text-blue-600 hover:text-blue-700">Load older messages</a>
+        </div>
+        {% endif %}
+
         <div class="px-6 py-4 h-96 overflow-y-auto space-y-4" id="message-list">
             {% for msg in messages %}
-            <div class="flex {% if msg.sender == request.user %}justify-end{% endif %}" data-msg-id="{{ msg.pk }}">
-                <div class="max-w-[75%] {% if msg.sender == request.user %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-800{% endif %} rounded-2xl px-4 py-2.5">
-                    <p class="text-sm">{{ msg.body }}</p>
-                    <p class="text-xs mt-1 opacity-70">{{ msg.created_at|time:"g:i A" }}</p>
+            <div class="flex {% if msg.sender == request.user %}justify-end{% endif %} group" data-msg-id="{{ msg.pk }}" data-sender-id="{{ msg.sender.pk }}">
+                <div class="max-w-[75%] {% if msg.sender == request.user %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-800{% endif %} rounded-2xl px-4 py-2.5 relative">
+                    <p class="text-sm" style="white-space: pre-wrap;">{{ msg.body }}</p>
+                    <p class="text-xs mt-1 opacity-70">
+                        {{ msg.created_at|time:"g:i A" }}
+                        {% if msg.is_edited %}<span class="italic">(edited)</span>{% endif %}
+                        {% if msg.sender == request.user %}{% if msg.is_read %}<span>&#10003;&#10003;</span>{% else %}<span>&#10003;</span>{% endif %}{% endif %}
+                    </p>
+                    {% if msg.sender == request.user and not msg.is_deleted %}
+                    <div class="absolute -top-2 -right-2 hidden group-hover:flex gap-1">
+                        <button onclick="editMessage({{ msg.pk }}, '{{ msg.body|escapejs }}')" class="w-6 h-6 rounded-full bg-white shadow text-gray-500 hover:text-blue-600 flex items-center justify-center text-xs"><i class="bi bi-pencil"></i></button>
+                        <button onclick="deleteMessage({{ msg.pk }})" class="w-6 h-6 rounded-full bg-white shadow text-gray-500 hover:text-red-600 flex items-center justify-center text-xs"><i class="bi bi-trash"></i></button>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             {% empty %}
@@ -42,6 +68,13 @@
             </div>
             {% endfor %}
         </div>
+
+        {% if messages.has_next %}
+        <div class="px-6 py-2 bg-gray-50 text-center">
+            <a href="?page={{ messages.next_page_number }}" class="text-xs text-blue-600 hover:text-blue-700">Load newer messages</a>
+        </div>
+        {% endif %}
+
         <div class="px-6 py-4 border-t border-gray-100">
             <form id="chat-form" class="flex gap-3">
                 <input type="text" id="message-input" required placeholder="Type a message..." autocomplete="off"
@@ -67,13 +100,16 @@
     const sendBtn = document.getElementById('send-btn');
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');
+    const typingIndicator = document.getElementById('typing-indicator');
 
-    // Determine ws/wss protocol
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = wsProtocol + '//' + window.location.host + '/ws/messages/' + conversationId + '/';
 
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 10;
+    let typingTimer = null;
+    let isTyping = false;
+    let socket = null;
 
     function scrollToBottom() {
         messageList.scrollTop = messageList.scrollHeight;
@@ -89,27 +125,69 @@
         }
     }
 
-    function createMessageElement(data) {
-        const isMine = data.sender_id === currentUserId;
-        const wrapper = document.createElement('div');
-        wrapper.className = 'flex ' + (isMine ? 'justify-end' : '');
-        wrapper.dataset.msgId = data.message_id;
-        wrapper.innerHTML =
-            '<div class="max-w-[75%] ' + (isMine ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800') + ' rounded-2xl px-4 py-2.5">' +
-            '<p class="text-sm">' + escapeHtml(data.body) + '</p>' +
-            '<p class="text-xs mt-1 opacity-70">' + data.timestamp + '</p>' +
-            '</div>';
-        return wrapper;
-    }
-
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
 
+    function createMessageElement(data) {
+        const isMine = data.sender_id === currentUserId;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex ' + (isMine ? 'justify-end' : '') + ' group';
+        wrapper.dataset.msgId = data.message_id;
+        wrapper.dataset.senderId = data.sender_id;
+        let actions = '';
+        if (isMine) {
+            actions = '<div class="absolute -top-2 -right-2 hidden group-hover:flex gap-1">' +
+                '<button onclick="editMessage(' + data.message_id + ', \'' + escapeHtml(data.body).replace(/'/g, "\\'") + '\')" class="w-6 h-6 rounded-full bg-white shadow text-gray-500 hover:text-blue-600 flex items-center justify-center text-xs"><i class="bi bi-pencil"></i></button>' +
+                '<button onclick="deleteMessage(' + data.message_id + ')" class="w-6 h-6 rounded-full bg-white shadow text-gray-500 hover:text-red-600 flex items-center justify-center text-xs"><i class="bi bi-trash"></i></button>' +
+                '</div>';
+        }
+        wrapper.innerHTML =
+            '<div class="max-w-[75%] ' + (isMine ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800') + ' rounded-2xl px-4 py-2.5 relative">' +
+            '<p class="text-sm" style="white-space: pre-wrap;">' + escapeHtml(data.body) + '</p>' +
+            '<p class="text-xs mt-1 opacity-70">' + data.timestamp + (isMine ? ' <span>&#10003;</span>' : '') + '</p>' +
+            actions +
+            '</div>';
+        return wrapper;
+    }
+
+    window.editMessage = function(msgId, currentBody) {
+        const newBody = prompt('Edit message:', currentBody);
+        if (newBody && newBody.trim() && socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'edit_message', message_id: msgId, body: newBody.trim() }));
+        }
+    };
+
+    window.deleteMessage = function(msgId) {
+        if (confirm('Delete this message?') && socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'delete_message', message_id: msgId }));
+        }
+    };
+
+    function sendTypingStart() {
+        if (!isTyping && socket && socket.readyState === WebSocket.OPEN) {
+            isTyping = true;
+            socket.send(JSON.stringify({ type: 'typing_start' }));
+        }
+    }
+
+    function sendTypingStop() {
+        if (isTyping && socket && socket.readyState === WebSocket.OPEN) {
+            isTyping = false;
+            socket.send(JSON.stringify({ type: 'typing_stop' }));
+        }
+    }
+
+    messageInput.addEventListener('input', function() {
+        sendTypingStart();
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(sendTypingStop, 2000);
+    });
+
     function connect() {
-        const socket = new WebSocket(wsUrl);
+        socket = new WebSocket(wsUrl);
 
         socket.onopen = function() {
             setStatus(true);
@@ -139,12 +217,35 @@
 
         socket.onmessage = function(e) {
             const data = JSON.parse(e.data);
+
             if (data.type === 'chat_message') {
-                // Don't duplicate if already in DOM
                 if (!document.querySelector('[data-msg-id="' + data.message_id + '"]')) {
                     const el = createMessageElement(data);
                     messageList.appendChild(el);
                     scrollToBottom();
+                }
+            } else if (data.type === 'typing_start') {
+                typingIndicator.textContent = data.user_name + ' is typing...';
+                typingIndicator.classList.remove('hidden');
+            } else if (data.type === 'typing_stop') {
+                typingIndicator.classList.add('hidden');
+            } else if (data.type === 'message_edited') {
+                const el = document.querySelector('[data-msg-id="' + data.message_id + '"] p.text-sm');
+                if (el) {
+                    el.textContent = data.body;
+                    el.style.whiteSpace = 'pre-wrap';
+                }
+            } else if (data.type === 'message_deleted') {
+                const el = document.querySelector('[data-msg-id="' + data.message_id + '"]');
+                if (el) {
+                    const bubble = el.querySelector('div > div');
+                    if (bubble) {
+                        bubble.className = bubble.className.replace(/bg-blue-600 text-white|bg-gray-100 text-gray-800/, 'bg-gray-100 text-gray-400');
+                        bubble.querySelector('p.text-sm').textContent = 'This message has been deleted.';
+                        bubble.querySelector('p.text-sm').style.fontStyle = 'italic';
+                    }
+                    const actions = el.querySelector('.group-hover\\:flex');
+                    if (actions) actions.remove();
                 }
             }
         };
@@ -156,6 +257,7 @@
                 socket.send(JSON.stringify({ body: body }));
                 messageInput.value = '';
                 messageInput.focus();
+                sendTypingStop();
             }
         };
     }

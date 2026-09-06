@@ -27,6 +27,34 @@ def pending_membership_purchase(request):
     ).exists()
 
     if has_completed_payment:
+        if not request.user.is_membership_paid:
+            request.user.is_membership_paid = True
+            request.user.save(update_fields=['is_membership_paid'])
+        membership = getattr(request.user, 'membership', None)
+        if not membership:
+            membership = Membership.objects.create(
+                user=request.user, is_active=True,
+                started_at=timezone.now(),
+                expires_at=timezone.now() + timedelta(days=30),
+            )
+        elif not membership.is_active:
+            payment = Payment.objects.filter(
+                user=request.user, payment_type='membership', status='completed'
+            ).order_by('-created_at').first()
+            if payment and payment.reference_id:
+                try:
+                    plan = MembershipPlan.objects.get(pk=payment.reference_id)
+                    membership.plan = plan
+                    membership.is_active = True
+                    membership.started_at = membership.started_at or timezone.now()
+                    membership.expires_at = (membership.expires_at if membership.expires_at and membership.expires_at > timezone.now() else timezone.now()) + timedelta(days=plan.duration_days)
+                    membership.save()
+                except (MembershipPlan.DoesNotExist, TypeError):
+                    membership.is_active = True
+                    membership.started_at = membership.started_at or timezone.now()
+                    if not membership.expires_at or membership.expires_at <= timezone.now():
+                        membership.expires_at = timezone.now() + timedelta(days=30)
+                    membership.save()
         return redirect('membership:success')
 
     return render(request, 'membership/pending_purchase.html', {
@@ -48,15 +76,23 @@ def membership_view(request):
 @login_required
 def purchase_membership(request, plan_id):
     plan = get_object_or_404(MembershipPlan, pk=plan_id, is_active=True)
-    existing_pending = Payment.objects.filter(
-        user=request.user, payment_type='membership', status='pending'
+
+    if request.user.role == 'admin':
+        messages.info(request, 'Admin accounts do not need a membership.')
+        return redirect('membership:manage')
+
+    existing_completed = Payment.objects.filter(
+        user=request.user, payment_type='membership', status='completed'
     ).exists()
-    if existing_pending:
-        messages.warning(request, 'You already have a pending payment. Please complete it first.')
-        return redirect('membership:pending_purchase')
-    membership, created = Membership.objects.get_or_create(user=request.user)
-    membership.plan = plan
-    membership.save()
+    if existing_completed and not request.user.is_membership_paid:
+        request.user.is_membership_paid = True
+        request.user.save(update_fields=['is_membership_paid'])
+
+    Payment.objects.filter(
+        user=request.user, payment_type='membership', status='pending'
+    ).update(status='expired')
+
+    Membership.objects.get_or_create(user=request.user)
 
     from apps.payments.views import initiate_payment
     return initiate_payment(request, plan.price, f'Membership - {plan.name}', 'membership', plan_id)

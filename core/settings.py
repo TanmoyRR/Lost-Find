@@ -7,12 +7,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-dev-key-change-in-production')
 DEBUG = config('DEBUG', default=False, cast=bool)
+
+_INSECURE_KEY = 'django-insecure-dev-key-change-in-production'
+if not DEBUG and SECRET_KEY == _INSECURE_KEY:
+    raise ValueError('SECRET_KEY must be set to a secure value in production (DEBUG=False)')
+
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:8000,http://127.0.0.1:8000', cast=Csv())
 
 INSTALLED_APPS = [
     'daphne',
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -62,7 +66,6 @@ MIDDLEWARE = [
     'apps.accounts.middleware.MembershipPendingMiddleware',
     'apps.accounts.middleware.MembershipMiddleware',
     'apps.accounts.middleware.ActiveUserMiddleware',
-    'apps.accounts.middleware.EmailVerificationMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -100,6 +103,10 @@ if _redis_url:
         },
     }
 else:
+    import logging as _logging
+    _ch_logger = _logging.getLogger('django')
+    if not DEBUG:
+        _ch_logger.warning('REDIS_URL not set — using InMemoryChannelLayer. WebSocket messages will NOT work across multiple workers.')
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels.layers.InMemoryChannelLayer',
@@ -107,6 +114,22 @@ else:
     }
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
+
+# Cache
+REDIS_URL = config('REDIS_URL', default='')
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+        },
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        },
+    }
 
 # Session / Cookie Security
 SESSION_COOKIE_HTTPONLY = True
@@ -128,6 +151,9 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Logging
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOG_DIR, exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -142,27 +168,58 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, 'django.log'),
+            'maxBytes': 10 * 1024 * 1024,
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
     },
     'loggers': {
         'apps.payments': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': 'INFO',
-            'propagate': True,
+            'propagate': False,
         },
         'apps.ai_engine': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': 'INFO',
-            'propagate': True,
+            'propagate': False,
         },
         'apps.accounts': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': 'INFO',
-            'propagate': True,
+            'propagate': False,
+        },
+        'apps.messaging': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps.recovery': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps.notifications': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
         },
         'django.security': {
-            'handlers': ['console'],
-            'level': 'WARNING',
-            'propagate': True,
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
         },
     },
 }
@@ -208,6 +265,8 @@ MEDIA_URL = f'{config("SUPABASE_S3_ENDPOINT", default="https://localhost:8000")}
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+RECOVERY_SESSION_TTL_DAYS = config('RECOVERY_SESSION_TTL_DAYS', default=30, cast=int)
 AUTH_USER_MODEL = 'accounts.User'
 LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'dashboard:home'
@@ -263,7 +322,7 @@ SITE_NAME = config('SITE_NAME', default='IUBAT SmartFind')
 SITE_URL = config('SITE_URL', default='http://localhost:8000')
 
 # Email
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')

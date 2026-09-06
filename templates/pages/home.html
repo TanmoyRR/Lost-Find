@@ -302,19 +302,17 @@
             <div>
                 <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Quick Links</h4>
                 <ul class="space-y-2 text-sm">
-                    <li><a href="#" class="hover:text-white transition">Browse Items</a></li>
-                    <li><a href="#" class="hover:text-white transition">Report Lost</a></li>
-                    <li><a href="#" class="hover:text-white transition">Report Found</a></li>
-                    <li><a href="#" class="hover:text-white transition">AI Search</a></li>
+                    <li><a href="{% url 'posts:browse' %}" class="hover:text-white transition">Browse Items</a></li>
+                    <li><a href="{% url 'posts:create' %}" class="hover:text-white transition">Report Lost</a></li>
+                    <li><a href="{% url 'posts:create' %}" class="hover:text-white transition">Report Found</a></li>
+                    <li><a href="{% url 'ai:search' %}" class="hover:text-white transition">AI Search</a></li>
                 </ul>
             </div>
             <div>
                 <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Support</h4>
                 <ul class="space-y-2 text-sm">
-                    <li><a href="#" class="hover:text-white transition">About Us</a></li>
-                    <li><a href="#" class="hover:text-white transition">Contact</a></li>
-                    <li><a href="#" class="hover:text-white transition">FAQ</a></li>
-                    <li><a href="#" class="hover:text-white transition">Privacy Policy</a></li>
+                    <li><a href="{% url 'pages:about' %}" class="hover:text-white transition">About Us</a></li>
+                    <li><a href="{% url 'pages:contact' %}" class="hover:text-white transition">Contact</a></li>
                 </ul>
             </div>
         </div>

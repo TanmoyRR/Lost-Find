@@ -27,6 +27,10 @@ class Message(models.Model):
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_messages')
     body = models.TextField()
     is_read = models.BooleanField(default=False)
+    is_edited = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -34,3 +38,17 @@ class Message(models.Model):
 
     def __str__(self):
         return f"Message from {self.sender.username} in {self.conversation}"
+
+    def mark_as_deleted(self):
+        from django.utils import timezone
+        self.is_deleted = True
+        self.body = 'This message has been deleted.'
+        self.deleted_at = timezone.now()
+        self.save(update_fields=['is_deleted', 'body', 'deleted_at'])
+
+    def edit_message(self, new_body):
+        self.body = new_body
+        self.is_edited = True
+        from django.utils import timezone
+        self.edited_at = timezone.now()
+        self.save(update_fields=['body', 'is_edited', 'edited_at'])

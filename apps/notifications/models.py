@@ -1,5 +1,11 @@
 from django.db import models
 from django.conf import settings
+from django.core.cache import cache
+
+
+def invalidate_notification_cache(user_id):
+    """Invalidate the notification cache for a user."""
+    cache.delete(f'notif_{user_id}')
 
 
 class Notification(models.Model):
@@ -19,6 +25,7 @@ class Notification(models.Model):
     message = models.TextField()
     link = models.CharField(max_length=500, blank=True, null=True)
     is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -32,3 +39,14 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.title}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        invalidate_notification_cache(self.user_id)
+
+    def mark_as_read(self):
+        if not self.is_read:
+            from django.utils import timezone as tz
+            self.is_read = True
+            self.read_at = tz.now()
+            self.save(update_fields=['is_read', 'read_at'])

@@ -43,7 +43,7 @@
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden">
                                     {% if post.image %}
-                                    <img src="{{ post.image.url }}" alt="" class="w-full h-full object-cover">
+                                    <img src="{{ post.image.url }}" alt="{{ post.title }}" class="w-full h-full object-cover">
                                     {% else %}
                                     <div class="w-full h-full flex items-center justify-center">
                                         <i class="bi bi-image text-gray-300 text-sm"></i>
@@ -78,9 +78,12 @@
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 {% if post.status != 'resolved' %}
-                                <a href="{% url 'posts:resolve' post.pk %}" class="p-2 rounded-lg hover:bg-emerald-100 text-gray-400 hover:text-emerald-600 transition" title="Mark Resolved">
-                                    <i class="bi bi-check-circle"></i>
-                                </a>
+                                <form method="POST" action="{% url 'posts:resolve' post.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="p-2 rounded-lg hover:bg-emerald-100 text-gray-400 hover:text-emerald-600 transition bg-transparent border-0 cursor-pointer" title="Mark Resolved">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                </form>
                                 {% endif %}
                                 <a href="{% url 'posts:delete' post.pk %}" class="p-2 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-600 transition" title="Delete">
                                     <i class="bi bi-trash"></i>

@@ -1,0 +1,36 @@
+{% extends 'base/dashboard_base.html' %}
+{% block page_title %}Active Sessions{% endblock %}
+{% block dashboard_content %}
+<div class="max-w-3xl mx-auto py-8 px-4 space-y-6">
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h1 class="text-xl font-bold text-gray-800 mb-2">Active Sessions</h1>
+        <p class="text-sm text-gray-500">Manage your active login sessions. Revoke any session you don't recognize.</p>
+    </div>
+    {% for session in sessions %}
+    <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl {% if session.is_current %}bg-emerald-100{% else %}bg-gray-100{% endif %} flex items-center justify-center">
+                <i class="bi bi-laptop text-xl {% if session.is_current %}text-emerald-600{% else %}text-gray-500{% endif %}"></i>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-gray-800">
+                    {% if session.is_current %}Current Session{% else %}Session{% endif %}
+                </p>
+                <p class="text-xs text-gray-400">IP: {{ session.ip }}</p>
+                <p class="text-xs text-gray-400">Expires: {{ session.expire_date|date:"M d, Y g:i A" }}</p>
+            </div>
+        </div>
+        {% if not session.is_current %}
+        <form method="POST" action="{% url 'accounts:revoke_session' session.session_key %}">
+            {% csrf_token %}
+            <button type="submit" class="px-4 py-2 text-xs font-medium text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition">Revoke</button>
+        </form>
+        {% endif %}
+    </div>
+    {% empty %}
+    <div class="text-center py-12 bg-white rounded-xl border border-gray-100">
+        <p class="text-gray-400">No active sessions found.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

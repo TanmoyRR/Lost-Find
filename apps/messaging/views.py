@@ -2,8 +2,9 @@ import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q, Count, Max
+from django.db.models import Q, Count, Max, Prefetch
 from django.db import transaction
+from django.core.paginator import Paginator
 
 from .models import Conversation, Message
 from apps.accounts.decorators import membership_required
@@ -15,15 +16,21 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def inbox(request):
+    last_msg_qs = Message.objects.order_by('-created_at')
     conversations = Conversation.objects.filter(
         participants=request.user
-    ).order_by('-updated_at').prefetch_related('participants').annotate(
+    ).order_by('-updated_at').prefetch_related(
+        'participants',
+        Prefetch('messages', queryset=last_msg_qs, to_attr='_last_msgs'),
+    ).annotate(
         last_msg_time=Max('messages__created_at'),
         unread_count=Count(
             'messages',
             filter=Q(messages__is_read=False) & ~Q(messages__sender=request.user)
         )
     )
+    for conv in conversations:
+        conv.last_message = conv._last_msgs[0] if conv._last_msgs else None
     return render(request, 'messaging/inbox.html', {
         'conversations': conversations,
     })
@@ -32,33 +39,58 @@ def inbox(request):
 @login_required
 def conversation_detail(request, pk):
     conv = get_object_or_404(Conversation, pk=pk, participants=request.user)
-    messages_qs = conv.messages.all().select_related('sender')
+    all_messages = conv.messages.all().select_related('sender')
     other = conv.other_participants(request.user).first()
 
+    paginator = Paginator(all_messages, 50)
+    page = request.GET.get('page', 1)
+    messages_page = paginator.get_page(page)
+
     if request.method == 'POST':
-        body = (request.POST.get('body', '') or '').strip()
-        if body:
-            Message.objects.create(
-                conversation=conv,
-                sender=request.user,
-                body=body,
-            )
-            conv.save()  # update updated_at
-            if other:
-                from apps.notifications.models import Notification
-                Notification.objects.create(
-                    user=other,
-                    notification_type='message',
-                    title=f'New message from {request.user.get_full_name() or request.user.username}',
-                    message=body[:200],
-                    link=f'/messages/{conv.pk}/',
+        action = request.POST.get('action', 'send')
+        if action == 'edit':
+            msg_id = request.POST.get('message_id')
+            new_body = (request.POST.get('body', '') or '').strip()
+            if msg_id and new_body:
+                msg = get_object_or_404(Message, pk=msg_id, sender=request.user, conversation=conv)
+                msg.edit_message(new_body)
+                messages.success(request, 'Message edited.')
+            return redirect('messaging:detail', pk=pk)
+        elif action == 'delete':
+            msg_id = request.POST.get('message_id')
+            if msg_id:
+                msg = get_object_or_404(Message, pk=msg_id, sender=request.user, conversation=conv)
+                msg.mark_as_deleted()
+                messages.success(request, 'Message deleted.')
+            return redirect('messaging:detail', pk=pk)
+        else:
+            body = (request.POST.get('body', '') or '').strip()
+            if body:
+                if len(body) > 5000:
+                    messages.error(request, 'Message is too long (max 5000 characters).')
+                    return redirect('messaging:detail', pk=pk)
+                Message.objects.create(
+                    conversation=conv,
+                    sender=request.user,
+                    body=body,
                 )
-        return redirect('messaging:detail', pk=pk)
+                conv.save()
+                if other:
+                    from django.urls import reverse
+                    from apps.notifications.models import Notification
+                    Notification.objects.create(
+                        user=other,
+                        notification_type='message',
+                        title=f'New message from {request.user.get_full_name() or request.user.username}',
+                        message=body[:200],
+                        link=reverse('messaging:detail', args=[conv.pk]),
+                    )
+            return redirect('messaging:detail', pk=pk)
 
     Message.objects.filter(conversation=conv, is_read=False).exclude(sender=request.user).update(is_read=True)
     return render(request, 'messaging/conversation.html', {
         'conversation': conv,
-        'messages': messages_qs,
+        'messages': messages_page,
         'other': other,
     })
 

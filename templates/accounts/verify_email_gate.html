@@ -40,6 +40,19 @@
                 </div>
             </div>
 
+            {% if dev_verify_url %}
+            <div class="bg-amber-50 rounded-xl p-4 mb-6 border border-amber-200">
+                <div class="flex items-start gap-3">
+                    <i class="bi bi-exclamation-triangle text-amber-500 mt-0.5"></i>
+                    <div class="text-sm text-amber-800">
+                        <p class="font-semibold">Dev Mode - Email not configured</p>
+                        <p class="mt-1">Click below to verify your email:</p>
+                        <a href="{{ dev_verify_url }}" class="mt-2 inline-block text-indigo-600 font-medium underline break-all">{{ dev_verify_url }}</a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <form method="POST" action="{% url 'accounts:resend_verification' %}">
                 {% csrf_token %}
                 <button type="submit" class="w-full gradient-primary text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
@@ -48,7 +61,10 @@
             </form>
 
             <p class="mt-6 text-center text-sm text-gray-500">
-                <a href="{% url 'accounts:logout' %}" class="text-indigo-600 hover:text-indigo-500 font-medium transition-colors">Sign out</a>
+                <form method="POST" action="{% url 'accounts:logout' %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="text-indigo-600 hover:text-indigo-500 font-medium transition-colors bg-transparent border-0 cursor-pointer p-0">Sign out</button>
+                </form>
             </p>
         </div>
     </div>

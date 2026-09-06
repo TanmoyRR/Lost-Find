@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, PasswordChangeForm, PasswordResetForm, SetPasswordForm
 from django.contrib.auth import authenticate
+import re
 from .models import User
 from .validators import validate_profile_image
 
@@ -12,11 +13,17 @@ class UserRegistrationForm(UserCreationForm):
     password2 = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Confirm password'}))
     student_id = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Enter your Student ID'}))
     department = forms.ChoiceField(choices=User.DEPARTMENTS, widget=forms.Select(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}))
-    phone = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Enter phone number'}))
+    phone = forms.CharField(required=True, widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'e.g. 01XXXXXXXXX'}))
 
     class Meta:
         model = User
         fields = ['username', 'email', 'password1', 'password2', 'student_id', 'department', 'phone']
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if username and User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError('This username is already taken.')
+        return username
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
@@ -30,9 +37,18 @@ class UserRegistrationForm(UserCreationForm):
             raise forms.ValidationError('This student ID is already registered.')
         return student_id
 
+    def clean_phone(self):
+        phone = self.cleaned_data.get('phone')
+        if not phone:
+            raise forms.ValidationError('Phone number is required.')
+        phone = phone.strip().replace(' ', '').replace('-', '')
+        if not re.match(r'^01[3-9]\d{8}$', phone):
+            raise forms.ValidationError('Enter a valid Bangladeshi phone number (e.g. 01XXXXXXXXX).')
+        return phone
+
 
 class LoginForm(AuthenticationForm):
-    username = forms.CharField(widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Username'}))
+    username = forms.CharField(widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Username'}), label='Username')
     password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Enter your password'}))
 
 
@@ -68,6 +84,18 @@ class UserProfileForm(forms.ModelForm):
             raise forms.ValidationError('Bio must be 500 characters or fewer.')
         return bio
 
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email and User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError('This email is already registered.')
+        return email
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if commit:
+            instance.save()
+        return instance
+
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'email', 'phone', 'department', 'profile_picture', 'cover_photo', 'bio', 'address', 'student_id']
@@ -82,6 +110,18 @@ class UserProfileForm(forms.ModelForm):
 
 
 class UserSettingsForm(forms.ModelForm):
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email and User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError('This email is already registered.')
+        return email
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if commit:
+            instance.save()
+        return instance
+
     class Meta:
         model = User
         fields = ['email', 'phone']

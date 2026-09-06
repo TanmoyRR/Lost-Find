@@ -53,6 +53,12 @@ document.addEventListener('DOMContentLoaded', function() {
             postsContainer.innerHTML = '<div class="col-span-full text-center py-16 text-gray-400"><i class="bi bi-inbox text-5xl block mb-4"></i><p class="text-lg font-medium text-gray-500 mb-1">No posts found</p><p class="text-sm">Try adjusting your filters or search terms</p></div>';
             return;
         }
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(str));
+            return div.innerHTML;
+        }
         let html = '';
         posts.forEach(p => {
             const typeLabel = p.type || p.post_type || 'unknown';
@@ -60,18 +66,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const locationName = p.location || p.location_name || 'N/A';
             const dateStr = p.date || p.date_lost_found || '';
             const imageUrl = p.image || '';
+            const safeTitle = escapeHtml(p.title);
+            const safeDesc = escapeHtml(p.description || '');
+            const safeLocation = escapeHtml(locationName);
+            const safeType = escapeHtml(typeLabel);
+            const safeStatus = escapeHtml(statusLabel);
             html += `
                 <a href="/post/${p.id}/" class="block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                    ${imageUrl ? `<div class="h-48 bg-gray-100 overflow-hidden"><img src="${imageUrl}" alt="${p.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"></div>` : `<div class="h-48 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center"><i class="bi bi-image text-5xl text-gray-300"></i></div>`}
+                    ${imageUrl ? `<div class="h-48 bg-gray-100 overflow-hidden"><img src="${imageUrl}" alt="${safeTitle}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"></div>` : `<div class="h-48 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center"><i class="bi bi-image text-5xl text-gray-300"></i></div>`}
                     <div class="p-4">
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="text-xs font-medium px-2 py-0.5 rounded-full ${typeLabel === 'lost' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}">${typeLabel}</span>
-                            <span class="text-xs font-medium px-2 py-0.5 rounded-full ${statusLabel === 'open' ? 'bg-amber-100 text-amber-700' : statusLabel === 'resolved' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}">${statusLabel}</span>
+                            <span class="text-xs font-medium px-2 py-0.5 rounded-full ${typeLabel === 'lost' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}">${safeType}</span>
+                            <span class="text-xs font-medium px-2 py-0.5 rounded-full ${statusLabel === 'open' ? 'bg-amber-100 text-amber-700' : statusLabel === 'resolved' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}">${safeStatus}</span>
                         </div>
-                        <h3 class="font-semibold text-gray-800 text-sm mb-1 line-clamp-1">${p.title}</h3>
-                        <p class="text-xs text-gray-500 line-clamp-2">${p.description || ''}</p>
+                        <h3 class="font-semibold text-gray-800 text-sm mb-1 line-clamp-1">${safeTitle}</h3>
+                        <p class="text-xs text-gray-500 line-clamp-2">${safeDesc}</p>
                         <div class="flex items-center gap-3 mt-3 text-xs text-gray-400">
-                            <span><i class="bi bi-geo-alt mr-1"></i>${locationName}</span>
+                            <span><i class="bi bi-geo-alt mr-1"></i>${safeLocation}</span>
                             <span><i class="bi bi-calendar mr-1"></i>${dateStr}</span>
                         </div>
                     </div>

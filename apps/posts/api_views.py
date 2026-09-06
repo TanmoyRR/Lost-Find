@@ -12,7 +12,10 @@ def api_posts(request):
     location = request.GET.get('location', '')
     status = request.GET.get('status', '')
 
-    posts = Post.objects.filter(status='open')
+    if status:
+        posts = Post.objects.filter(status=status).select_related('category', 'location')
+    else:
+        posts = Post.objects.filter(status='open').select_related('category', 'location')
 
     if query:
         posts = posts.filter(
@@ -26,8 +29,6 @@ def api_posts(request):
         posts = posts.filter(category__slug=category)
     if location:
         posts = posts.filter(location__slug=location)
-    if status:
-        posts = posts.filter(status=status)
 
     data = {
         'count': posts.count(),
@@ -46,3 +47,14 @@ def api_posts(request):
         ],
     }
     return JsonResponse(data)
+
+
+@login_required
+def api_locations(request):
+    query = request.GET.get('q', '').strip()
+    if len(query) < 2:
+        return JsonResponse({'locations': []})
+    locations = CampusLocation.objects.filter(
+        Q(name__icontains=query) | Q(slug__icontains=query)
+    ).values('name', 'slug')[:10]
+    return JsonResponse({'locations': list(locations)})

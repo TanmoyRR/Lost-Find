@@ -15,5 +15,5 @@ python manage.py collectstatic --noinput --clear
 echo "Seeding initial data..."
 python manage.py seed_data --production
 
-echo "Starting Gunicorn..."
-exec gunicorn core.wsgi:application --workers 4 --bind 0.0.0.0:8000 --timeout 120
+echo "Starting Daphne (ASGI)..."
+exec daphne -b 0.0.0.0 -p 8000 core.asgi:application

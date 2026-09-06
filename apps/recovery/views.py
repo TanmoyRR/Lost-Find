@@ -1,14 +1,17 @@
 import logging
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from django.urls import reverse
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Q
 from django.db import transaction
 from django.core.paginator import Paginator
+from django_ratelimit.decorators import ratelimit
 from .models import RecoverySession, RecoveryVerificationLog, generate_short_code
 from apps.posts.models import Post
 from apps.notifications.models import Notification
+from apps.accounts.decorators import is_admin
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +39,7 @@ MEMBER_SIDEBAR = [
 
 
 def _get_sidebar(user):
-    if user.role == 'admin' or user.is_staff or user.is_superuser:
+    if is_admin(user):
         return ADMIN_SIDEBAR
     return MEMBER_SIDEBAR
 
@@ -145,10 +148,11 @@ def regenerate_token(request, short_code):
         ip_address=request.META.get('REMOTE_ADDR'),
     )
     messages.success(request, 'Recovery token regenerated successfully.')
-    return redirect('recovery:detail', short_code=short_code)
+    return redirect('recovery:detail', short_code=session.short_code)
 
 
 @login_required
+@ratelimit(key='ip', rate='10/m', method='POST', block=True)
 def enter_token(request, short_code):
     session = get_object_or_404(
         RecoverySession.objects.select_related('post', 'claimant', 'owner'),
@@ -211,7 +215,7 @@ def enter_token(request, short_code):
                     notification_type='post_resolved',
                     title='Item Successfully Recovered',
                     message=f'Your item "{owner_session.post.title}" has been successfully recovered.',
-                    link='/recovery/',
+                    link=reverse('recovery:list'),
                 )
             if session.owner != request.user:
                 Notification.objects.create(
@@ -219,7 +223,7 @@ def enter_token(request, short_code):
                     notification_type='post_resolved',
                     title='Item Successfully Recovered',
                     message=f'Your found item "{session.post.title}" has been matched and recovered.',
-                    link='/recovery/',
+                    link=reverse('recovery:list'),
                 )
 
         messages.success(request, 'Recovery completed successfully! Both items marked as resolved.')
@@ -257,17 +261,14 @@ def cancel_recovery(request, short_code):
             notification_type='recovery_update',
             title='Recovery Session Cancelled',
             message=f'The recovery session for "{session.post.title}" has been cancelled.',
-            link='/recovery/',
+            link=reverse('recovery:list'),
         )
     messages.success(request, 'Recovery session cancelled.')
     return redirect('recovery:list')
 
 
-@login_required
+@user_passes_test(is_admin)
 def recovery_admin_list(request):
-    if not (request.user.role == 'admin' or request.user.is_staff or request.user.is_superuser):
-        messages.error(request, 'Access denied.')
-        return redirect('dashboard:home')
     sessions = RecoverySession.objects.all().select_related(
         'post', 'claimant', 'owner'
     ).order_by('-created_at')
@@ -276,5 +277,66 @@ def recovery_admin_list(request):
     sessions_page = paginator.get_page(page)
     return render(request, 'recovery/admin_list.html', {
         'sessions': sessions_page,
-        'sidebar_items': ADMIN_SIDEBAR,
     })
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_force_complete(request, short_code):
+    session = get_object_or_404(RecoverySession, short_code=short_code)
+    if request.method != 'POST':
+        return redirect('recovery:admin_list')
+    session.status = 'completed'
+    from django.utils import timezone as tz
+    session.completed_at = tz.now()
+    session.save(update_fields=['status', 'completed_at'])
+    RecoveryVerificationLog.objects.create(
+        session=session, action='admin_force_completed',
+        performed_by=request.user,
+        details={'reason': 'Admin intervention'},
+    )
+    session.post.status = 'resolved'
+    session.post.is_resolved = True
+    session.post.save(update_fields=['status', 'is_resolved'])
+    messages.success(request, f'Recovery session {session.short_code} force-completed.')
+    return redirect('recovery:admin_list')
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_force_cancel(request, short_code):
+    session = get_object_or_404(RecoverySession, short_code=short_code)
+    if request.method != 'POST':
+        return redirect('recovery:admin_list')
+    session.status = 'cancelled'
+    session.save(update_fields=['status'])
+    RecoveryVerificationLog.objects.create(
+        session=session, action='admin_force_cancelled',
+        performed_by=request.user,
+        details={'reason': 'Admin intervention'},
+    )
+    messages.success(request, f'Recovery session {session.short_code} cancelled.')
+    return redirect('recovery:admin_list')
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_reassign_claimant(request, short_code):
+    session = get_object_or_404(RecoverySession, short_code=short_code)
+    if request.method != 'POST':
+        return redirect('recovery:admin_list')
+    new_claimant_id = request.POST.get('claimant_id')
+    if new_claimant_id:
+        from apps.accounts.models import User
+        new_claimant = get_object_or_404(User, pk=new_claimant_id)
+        session.claimant = new_claimant
+        session.save(update_fields=['claimant'])
+        RecoveryVerificationLog.objects.create(
+            session=session, action='admin_claimant_reassigned',
+            performed_by=request.user,
+            details={'new_claimant_id': new_claimant.pk},
+        )
+        messages.success(request, f'Claimant reassigned to {new_claimant.username}.')
+    else:
+        messages.error(request, 'No claimant specified.')
+    return redirect('recovery:admin_list')

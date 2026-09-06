@@ -18,12 +18,9 @@ from apps.membership.models import Membership, MembershipPlan
 from apps.payments.models import Payment
 from apps.ai_engine.models import PostEmbedding, MatchSuggestion
 from apps.notifications.models import Notification
+from .decorators import is_admin
 
 logger = logging.getLogger(__name__)
-
-
-def is_admin(user):
-    return user.is_authenticated and (user.role == 'admin' or user.is_staff or user.is_superuser)
 
 
 @login_required
@@ -107,6 +104,8 @@ def admin_dashboard(request):
         monthly_revenue = list(Payment.objects.filter(status='completed').annotate(month=TruncMonth('created_at')).values('month').annotate(total=Sum('amount')).order_by('-month')[:12])
     except Exception:
         monthly_revenue = []
+    max_revenue = max((item['total'] for item in monthly_revenue), default=1) or 1
+    max_registrations = max((item['count'] for item in monthly_registrations), default=1) or 1
     from apps.recovery.models import RecoverySession
     recovery_agg = RecoverySession.objects.aggregate(
         recovery_sessions=Count('id'),
@@ -136,6 +135,8 @@ def admin_dashboard(request):
         'posts_by_location': posts_by_location,
         'monthly_registrations': monthly_registrations,
         'monthly_revenue': monthly_revenue,
+        'max_revenue': max_revenue,
+        'max_registrations': max_registrations,
         'recent_activities': recent_activities,
         'users': users,
         'posts': posts,
@@ -160,6 +161,7 @@ def admin_users(request):
 def admin_user_detail(request, pk):
     from apps.payments.models import Payment
     from apps.membership.models import MembershipPlan
+    from django.core.paginator import Paginator
     user = get_object_or_404(User, pk=pk)
     user_posts = Post.objects.filter(user=user).select_related('category', 'location')
     user_payments = Payment.objects.filter(user=user).select_related('user')
@@ -167,12 +169,16 @@ def admin_user_detail(request, pk):
     open_posts = user_posts.filter(status='open').count()
     resolved_posts = user_posts.filter(status='resolved').count()
     payment_count = user_payments.count()
+    posts_paginator = Paginator(user_posts, 20)
+    posts_page = posts_paginator.get_page(request.GET.get('posts_page', 1))
+    payments_paginator = Paginator(user_payments, 20)
+    payments_page = payments_paginator.get_page(request.GET.get('payments_page', 1))
     return render(request, 'admin_dashboard/user_detail.html', {
         'profile_user': user,
-        'user_posts': user_posts,
-        'user_payments': user_payments,
+        'user_posts': posts_page,
+        'user_payments': payments_page,
         'user_activities': user_activities,
-        'posts': user_posts,
+        'posts': posts_page,
         'activities': user_activities,
         'open_posts': open_posts,
         'resolved_posts': resolved_posts,
@@ -243,7 +249,7 @@ def admin_post_reject(request, pk):
     if request.method != 'POST':
         return redirect('dashboard:admin_posts')
     post = get_object_or_404(Post, pk=pk)
-    post.status = 'claimed'
+    post.status = 'rejected'
     post.save(update_fields=['status'])
     messages.success(request, f'Post "{post.title}" rejected.')
     return redirect('dashboard:admin_posts')
@@ -444,7 +450,7 @@ def admin_revenue_export(request):
         ws.column_dimensions[get_column_letter(i)].width = width
     for row in ws.iter_rows(min_row=2):
         row[4].number_format = '"BDT "#,##0.00'
-        row[9].number_format = 'YYYY-MM-DD HH:MM'
+        row[9].number_format = 'YYYY-MM-DD HH:mm'
 
     ws.freeze_panes = 'A2'
     ws.auto_filter.ref = ws.dimensions

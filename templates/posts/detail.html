@@ -130,9 +130,12 @@
                             <i class="bi bi-pencil"></i> Edit Post
                         </a>
                         {% if post.status != 'resolved' %}
-                        <a href="{% url 'posts:resolve' post.pk %}" class="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-emerald-600 hover:bg-emerald-50 transition">
-                            <i class="bi bi-check-circle"></i> Mark Resolved
-                        </a>
+                        <form method="POST" action="{% url 'posts:resolve' post.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-emerald-600 hover:bg-emerald-50 transition bg-transparent border-0 cursor-pointer text-left">
+                                <i class="bi bi-check-circle"></i> Mark Resolved
+                            </button>
+                        </form>
                         {% endif %}
                         <a href="{% url 'posts:delete' post.pk %}" class="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition">
                             <i class="bi bi-trash"></i> Delete Post

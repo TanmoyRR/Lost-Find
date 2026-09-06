@@ -77,7 +77,14 @@
                         <td class="py-3 text-sm text-gray-500">{{ m.expires_at|date:"M d, Y"|default:'—' }}</td>
                         <td class="py-3 text-sm font-medium {% if m.days_remaining <= 0 %}text-red-600{% else %}text-gray-700{% endif %}">{{ m.days_remaining }}</td>
                         <td class="py-3">
-                            <a href="{% url 'dashboard:admin_user_detail' m.user.pk %}" class="text-indigo-500 hover:text-indigo-700 text-sm font-medium">Manage</a>
+                            <div class="flex items-center gap-2">
+                                <a href="{% url 'dashboard:admin_user_detail' m.user.pk %}" class="text-indigo-500 hover:text-indigo-700 text-sm font-medium">Manage</a>
+                                <form method="POST" action="{% url 'dashboard:admin_extend_membership' m.user.pk %}" class="inline" onsubmit="var d=prompt('Extend membership by how many days?','30');if(!d){return false;}this.querySelector('input[name=days]').value=d;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="days" value="30">
+                                    <button type="submit" class="text-amber-500 hover:text-amber-700 text-sm font-medium bg-transparent border-0 cursor-pointer p-0">Extend</button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}

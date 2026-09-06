@@ -45,8 +45,8 @@
             </div>
             <div>
                 <p class="text-2xl font-bold text-gray-800">
-                    {% with last=matches|dictsort:"similarity_score"|last %}
-                    {{ last.similarity_score|to_percent }}%
+                    {% with first=matches|dictsort:"similarity_score"|first %}
+                    {{ first.similarity_score|to_percent }}%
                     {% endwith %}
                 </p>
                 <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Lowest Score</p>
@@ -167,6 +167,15 @@
                             <i class="bi bi-x-lg"></i> Dismiss
                         </button>
                     </form>
+                    {% if match.status == 'accepted' or match.status == 'dismissed' %}
+                    <form method="POST" action="{% url 'ai:undo_match' match.pk %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit"
+                            class="px-4 py-2 rounded-xl text-sm font-medium text-amber-600 hover:bg-amber-50 border border-amber-200 transition inline-flex items-center gap-2">
+                            <i class="bi bi-arrow-counterclockwise"></i> Undo
+                        </button>
+                    </form>
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -1,5 +1,6 @@
 import logging
 from urllib.parse import urlparse
+from datetime import timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
@@ -59,6 +60,10 @@ def _send_verification_email(user):
         context=context,
         recipient=user.email,
     )
+    if settings.DEBUG:
+        logger.info('VERIFICATION LINK (dev): %s', verify_url)
+        return verify_url
+    return None
 
 
 @ratelimit(key='ip', rate='5/m', method=['POST'], block=True)
@@ -69,16 +74,11 @@ def register(request):
             user = form.save(commit=False)
             user.role = 'student'
             user.is_membership_paid = False
-            user.email_verification_token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
-            user.email_verification_sent_at = timezone.now()
+            user.email_verified = True
             user.save()
-            try:
-                _send_verification_email(user)
-            except Exception:
-                logger.warning('Failed to send verification email for user %s', user.pk, exc_info=True)
             login(request, user)
-            messages.success(request, 'Registration successful! Please check your email to verify your account.')
-            return redirect('accounts:verify_email_gate')
+            messages.success(request, 'Registration successful!')
+            return redirect('membership:pending_purchase')
     else:
         form = UserRegistrationForm()
     return render(request, 'accounts/register.html', {'form': form})
@@ -99,13 +99,16 @@ def user_login(request):
             if user.is_suspended:
                 messages.error(request, 'Your account has been suspended.')
                 return render(request, 'accounts/login.html', {'form': form})
+            if user.locked_until and user.locked_until > timezone.now():
+                messages.error(request, 'Account is temporarily locked due to too many failed login attempts. Please try again later.')
+                return render(request, 'accounts/login.html', {'form': form})
             login(request, user)
+            user.failed_login_attempts = 0
+            user.locked_until = None
+            user.save(update_fields=['failed_login_attempts', 'locked_until'])
             UserActivity.objects.create(user=user, activity_type='login', description='User logged in')
             if user.role == 'admin':
                 return redirect('dashboard:admin_home')
-            if not user.email_verified:
-                messages.info(request, 'Please verify your email to continue.')
-                return redirect('accounts:verify_email_gate')
             if not user.is_membership_paid:
                 messages.info(request, 'Please complete your membership payment to activate your account.')
                 return redirect('membership:pending_purchase')
@@ -113,6 +116,18 @@ def user_login(request):
             if next_url and _is_safe_redirect_url(next_url):
                 return redirect(next_url)
             return redirect('dashboard:home')
+        else:
+            username = request.POST.get('username', '')
+            if username:
+                from .models import User as UserModel
+                try:
+                    failed_user = UserModel.objects.get(username=username)
+                    failed_user.failed_login_attempts += 1
+                    if failed_user.failed_login_attempts >= 5:
+                        failed_user.locked_until = timezone.now() + timedelta(minutes=15)
+                    failed_user.save(update_fields=['failed_login_attempts', 'locked_until'])
+                except UserModel.DoesNotExist:
+                    pass
     else:
         form = LoginForm()
     return render(request, 'accounts/login.html', {'form': form})
@@ -136,7 +151,10 @@ def verify_email(request, token):
 def verify_email_gate(request):
     if request.user.email_verified or request.user.role == 'admin':
         return redirect('dashboard:home')
-    return render(request, 'accounts/verify_email_gate.html')
+    context = {}
+    if settings.DEBUG and request.user.email_verification_token:
+        context['dev_verify_url'] = f'{settings.SITE_URL}/verify-email/{request.user.email_verification_token}/'
+    return render(request, 'accounts/verify_email_gate.html', context)
 
 
 @login_required
@@ -155,7 +173,10 @@ def resend_verification(request):
         except Exception:
             logger.warning('Failed to resend verification email for user %s', user.pk, exc_info=True)
             messages.error(request, 'Failed to send email. Please try again later.')
-        return redirect('accounts:verify_email_gate')
+        context = {}
+        if settings.DEBUG and user.email_verification_token:
+            context['dev_verify_url'] = f'{settings.SITE_URL}/verify-email/{user.email_verification_token}/'
+        return render(request, 'accounts/verify_email_gate.html', context)
     return redirect('accounts:verify_email_gate')
 
 
@@ -179,6 +200,8 @@ def forgot_password(request):
                     user.email
                 )
                 messages.success(request, 'Password reset link sent to your email.')
+                if settings.DEBUG:
+                    messages.info(request, f'Dev reset link: {reset_url}')
             except User.DoesNotExist:
                 messages.success(request, 'If an account exists with this email, a reset link has been sent.')
             return redirect('accounts:login')
@@ -187,6 +210,7 @@ def forgot_password(request):
     return render(request, 'accounts/forgot_password.html', {'form': form})
 
 
+@ratelimit(key='ip', rate='10/m', method=['POST'], block=True)
 def reset_password(request, token):
     user = get_object_or_404(User, reset_password_token=token)
     if user.reset_password_sent_at and (timezone.now() - user.reset_password_sent_at).total_seconds() > 3600:
@@ -223,7 +247,7 @@ def profile_view(request):
     membership = getattr(user, 'membership', None)
     membership_days = membership.days_remaining() if membership and membership.is_active else 0
     recent_activities = UserActivity.objects.filter(user=user)[:10]
-    all_activities = UserActivity.objects.filter(user=user).order_by('-created_at')
+    all_activities = UserActivity.objects.filter(user=user).order_by('-created_at')[:50]
     from apps.recovery.models import RecoverySession
     recovery_sessions = RecoverySession.objects.filter(Q(claimant=user)|Q(owner=user)).count()
     recovery_rate = round((resolved_posts / total_posts * 100) if total_posts > 0 else 0, 1)
@@ -266,6 +290,8 @@ def change_password(request):
         if form.is_valid():
             form.save()
             update_session_auth_hash(request, form.user)
+            request.user.reset_password_token = ''
+            request.user.save(update_fields=['reset_password_token'])
             UserActivity.objects.create(user=request.user, activity_type='password_changed', description='Password changed')
             messages.success(request, 'Password changed successfully!')
             return redirect('accounts:profile')
@@ -293,7 +319,44 @@ def delete_account(request):
         return redirect('accounts:settings')
     user = request.user
     username = user.username
-    logout(request)
     user.delete()
-    messages.success(request, f'Account "{username}" has been permanently deleted.')
-    return redirect('pages:home')
+    response = redirect('pages:home')
+    response.set_cookie('account_deleted_msg', username, max_age=10)
+    logout(request)
+    return response
+
+
+@login_required
+def active_sessions(request):
+    from django.contrib.sessions.models import Session
+    from django.utils import timezone
+    sessions = Session.objects.filter(expire_date__gte=timezone.now()).order_by('-expire_date')
+    user_sessions = []
+    current_session_key = request.session.session_key
+    for s in sessions:
+        data = s.get_decoded()
+        if data.get('_auth_user_id') == str(request.user.pk):
+            user_sessions.append({
+                'session_key': s.session_key,
+                'expire_date': s.expire_date,
+                'is_current': s.session_key == current_session_key,
+                'ip': data.get('ip_address', 'Unknown'),
+                'user_agent': data.get('user_agent', 'Unknown'),
+            })
+    return render(request, 'accounts/sessions.html', {'sessions': user_sessions})
+
+
+@login_required
+def revoke_session(request, session_key):
+    from django.contrib.sessions.models import Session
+    if request.method != 'POST':
+        return redirect('accounts:sessions')
+    if session_key == request.session.session_key:
+        messages.error(request, 'You cannot revoke your current session.')
+        return redirect('accounts:sessions')
+    try:
+        Session.objects.get(session_key=session_key).delete()
+        messages.success(request, 'Session revoked successfully.')
+    except Session.DoesNotExist:
+        messages.error(request, 'Session not found.')
+    return redirect('accounts:sessions')

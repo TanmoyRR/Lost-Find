@@ -48,6 +48,8 @@ class Post(models.Model):
         ('open', 'Open'),
         ('claimed', 'Claimed'),
         ('resolved', 'Resolved'),
+        ('rejected', 'Rejected'),
+        ('closed', 'Closed'),
     )
 
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='posts')
@@ -109,6 +111,22 @@ class PostImage(models.Model):
         verbose_name = 'Post Image'
         verbose_name_plural = 'Post Images'
         ordering = ['-is_primary', 'created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['post'],
+                condition=models.Q(is_primary=True),
+                name='unique_primary_image_per_post',
+            ),
+        ]
+
+    def clean(self):
+        if self.is_primary:
+            existing = PostImage.objects.filter(
+                post=self.post, is_primary=True
+            ).exclude(pk=self.pk)
+            if existing.exists():
+                from django.core.exceptions import ValidationError
+                raise ValidationError('Only one image can be marked as primary per post.')
 
     def __str__(self):
         return f"Image for {self.post.title[:30]}"
@@ -122,7 +140,9 @@ class PostTag(models.Model):
     class Meta:
         verbose_name = 'Post Tag'
         verbose_name_plural = 'Post Tags'
-        unique_together = ['post', 'name']
+        constraints = [
+            models.UniqueConstraint(fields=['post', 'name'], name='unique_post_tag'),
+        ]
 
     def __str__(self):
         return self.name

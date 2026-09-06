@@ -21,6 +21,12 @@
                 </button>
             </form>
             {% endif %}
+            <form method="POST" action="{% url 'notifications:delete_all_read' %}">
+                {% csrf_token %}
+                <button type="submit" class="px-4 py-2 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 border border-red-200 hover:border-red-300 transition flex items-center gap-2">
+                    <i class="bi bi-trash"></i> Delete Read
+                </button>
+            </form>
             <a href="{% url 'accounts:settings' %}" class="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:border-indigo-300 transition">
                 <i class="bi bi-gear"></i>
             </a>
@@ -49,16 +55,22 @@
                         </div>
                         <div class="text-right flex-shrink-0">
                             <p class="text-xs text-gray-400 whitespace-nowrap">{{ notification.created_at|timesince }} ago</p>
-                            {% if not notification.is_read %}
-                            <form method="POST" action="{% url 'notifications:mark_read' notification.pk %}" class="mt-1">
-                                {% csrf_token %}
-                                <button type="submit" class="text-xs text-indigo-500 hover:text-indigo-700 inline-block cursor-pointer">Mark as Read</button>
-                            </form>
-                            {% endif %}
+                            <div class="flex items-center gap-2 mt-1">
+                                {% if not notification.is_read %}
+                                <form method="POST" action="{% url 'notifications:mark_read' notification.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-xs text-indigo-500 hover:text-indigo-700 cursor-pointer">Mark as Read</button>
+                                </form>
+                                {% endif %}
+                                <form method="POST" action="{% url 'notifications:delete' notification.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-xs text-red-400 hover:text-red-600 cursor-pointer"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </div>
                         </div>
                     </div>
-                    {% if notification.action_url %}
-                    <a href="{{ notification.action_url }}" class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 mt-2">
+                    {% if notification.link %}
+                    <a href="{{ notification.link }}" class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 mt-2">
                         View Details <i class="bi bi-arrow-right"></i>
                     </a>
                     {% endif %}

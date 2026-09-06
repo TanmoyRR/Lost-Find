@@ -8,6 +8,7 @@ from django.core.paginator import Paginator
 from .models import Post, Category, CampusLocation
 from .forms import PostForm
 from apps.accounts.models import UserActivity
+from apps.accounts.decorators import is_admin
 from apps.accounts.decorators import membership_required
 from apps.ai_engine.utils import find_matches_for_post, refresh_post_embedding, build_text_for_post
 
@@ -61,30 +62,14 @@ def browse_posts(request):
 @login_required
 def post_detail(request, pk):
     post = get_object_or_404(Post.objects.select_related('category', 'location', 'user'), pk=pk)
-    Post.objects.filter(pk=pk).update(views_count=F('views_count') + 1)
-
-    if post.post_type == 'lost' and post.status != 'resolved':
-        try:
-            from apps.recovery.models import RecoverySession
-            if not RecoverySession.objects.filter(post=post).exists():
-                from apps.recovery.views import create_recovery_session_for_post
-                create_recovery_session_for_post(post)
-        except Exception:
-            pass
-    elif post.post_type == 'found' and post.status != 'resolved':
-        try:
-            from apps.recovery.models import RecoverySession
-            if not RecoverySession.objects.filter(post=post).exists():
-                from apps.recovery.views import create_finder_recovery_session
-                create_finder_recovery_session(post)
-        except Exception:
-            pass
+    if post.user != request.user:
+        Post.objects.filter(pk=pk).update(views_count=F('views_count') + 1)
 
     can_view_full = False
     if request.user.is_authenticated:
         if request.user == post.user:
             can_view_full = True
-        elif request.user.is_superuser or request.user.is_staff:
+        elif is_admin(request.user):
             can_view_full = True
         else:
             membership = getattr(request.user, 'membership', None)
@@ -111,7 +96,7 @@ def post_detail(request, pk):
 
 @membership_required
 def create_post(request):
-    if request.user.is_staff or request.user.is_superuser:
+    if is_admin(request.user):
         messages.error(request, 'Admins manage posts; they cannot create new posts.')
         return redirect('dashboard:admin_home')
     if request.method == 'POST':
@@ -147,7 +132,7 @@ def create_post(request):
 
 @membership_required
 def edit_post(request, pk):
-    if request.user.is_staff or request.user.is_superuser:
+    if is_admin(request.user):
         post = get_object_or_404(Post, pk=pk)
     else:
         post = get_object_or_404(Post, pk=pk, user=request.user)
@@ -188,6 +173,8 @@ def mark_resolved(request, pk):
         post.status = 'resolved'
         post.is_resolved = True
         post.save()
+        from apps.recovery.models import RecoverySession
+        RecoverySession.objects.filter(post=post, status='in_progress').update(status='completed')
         UserActivity.objects.create(user=request.user, activity_type='post_resolved', description=f'Resolved post: {post.title}')
         messages.success(request, 'Post marked as resolved!')
     return redirect('posts:detail', pk=pk)

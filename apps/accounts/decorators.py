@@ -4,12 +4,16 @@ from django.contrib import messages
 from functools import wraps
 
 
+def is_admin(user):
+    return user.is_authenticated and user.role == 'admin'
+
+
 def membership_required(view_func=None, redirect_to='membership:index'):
     def decorator(view_func):
         @wraps(view_func)
         @login_required
         def _wrapped_view(request, *args, **kwargs):
-            if request.user.is_superuser or request.user.is_staff:
+            if is_admin(request.user):
                 return view_func(request, *args, **kwargs)
             membership = getattr(request.user, 'membership', None)
             if membership and membership.is_active:

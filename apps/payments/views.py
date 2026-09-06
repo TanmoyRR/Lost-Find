@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.conf import settings
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
 from django.utils import timezone
 from django.db import transaction
 from datetime import timedelta
@@ -56,42 +56,44 @@ def _validate_payment_result(result, payment):
         )
         return False, 'Payment verification failed.'
 
-    # Verify amount matches (only if amount is present in the response)
+    # Verify amount matches (fail-closed if missing)
     returned_amount = result.get('amount')
-    if returned_amount is not None:
-        try:
-            returned_amount = Decimal(str(returned_amount))
-            if returned_amount != payment.amount:
-                logger.warning(
-                    'Payment amount mismatch: expected %s, got %s for tran_id=%s',
-                    payment.amount, returned_amount, payment.sslcommerz_tran_id,
-                )
-                return False, 'Payment amount mismatch.'
-        except (ValueError, TypeError) as e:
-            logger.error('Payment amount parsing error: %s', e)
-            return False, 'Invalid payment amount.'
+    if returned_amount is None:
+        logger.warning('Payment verification missing amount for tran_id=%s', payment.sslcommerz_tran_id)
+        return False, 'Incomplete payment verification response.'
+    try:
+        returned_amount = Decimal(str(returned_amount))
+        if returned_amount != payment.amount:
+            logger.warning(
+                'Payment amount mismatch: expected %s, got %s for tran_id=%s',
+                payment.amount, returned_amount, payment.sslcommerz_tran_id,
+            )
+            return False, 'Payment amount mismatch.'
+    except (ValueError, TypeError) as e:
+        logger.error('Payment amount parsing error: %s', e)
+        return False, 'Invalid payment amount.'
 
-    # Verify currency (only if currency is present in the response)
+    # Verify currency (fail-closed if missing)
     currency = result.get('currency')
-    if currency and currency.upper() != 'BDT':
+    if not currency or currency.upper() != 'BDT':
         logger.warning(
             'Payment currency mismatch: expected BDT, got %s for tran_id=%s',
             currency, payment.sslcommerz_tran_id,
         )
         return False, 'Invalid payment currency.'
 
-    # Verify transaction ID matches (only if tran_id is in the response)
+    # Verify transaction ID matches (fail-closed if missing)
     returned_tran_id = result.get('tran_id')
-    if returned_tran_id and returned_tran_id != payment.sslcommerz_tran_id:
+    if not returned_tran_id or returned_tran_id != payment.sslcommerz_tran_id:
         logger.warning(
             'Transaction ID mismatch: expected %s, got %s',
             payment.sslcommerz_tran_id, returned_tran_id,
         )
         return False, 'Transaction ID mismatch.'
 
-    # Verify store_id (only if store_id is in the response)
+    # Verify store_id (fail-closed if missing)
     returned_store = result.get('store_id')
-    if returned_store and returned_store != settings.SSLCOMMERZ_STORE_ID:
+    if not returned_store or returned_store != settings.SSLCOMMERZ_STORE_ID:
         logger.warning(
             'Store ID mismatch: expected %s, got %s',
             settings.SSLCOMMERZ_STORE_ID, returned_store,
@@ -102,7 +104,7 @@ def _validate_payment_result(result, payment):
 
 
 def initiate_payment(request, amount, purpose, payment_type, reference_id=None):
-    tran_id = str(uuid.uuid4())[:20]
+    tran_id = uuid.uuid4().hex[:20]
 
     payment = Payment.objects.create(
         user=request.user,
@@ -119,9 +121,10 @@ def initiate_payment(request, amount, purpose, payment_type, reference_id=None):
         'total_amount': str(amount),
         'currency': 'BDT',
         'tran_id': tran_id,
-        'success_url': request.build_absolute_uri(reverse('payments:success')),
-        'fail_url': request.build_absolute_uri(reverse('payments:fail')),
-        'cancel_url': request.build_absolute_uri(reverse('payments:cancel')),
+        'success_url': request.build_absolute_uri(reverse('payments:success')) + f'?tran_id={tran_id}',
+        'fail_url': request.build_absolute_uri(reverse('payments:fail')) + f'?tran_id={tran_id}',
+        'cancel_url': request.build_absolute_uri(reverse('payments:cancel')) + f'?tran_id={tran_id}',
+        'notify_url': request.build_absolute_uri(reverse('payments:notify')),
         'cus_name': request.user.get_full_name() or request.user.username,
         'cus_email': request.user.email,
         'cus_phone': request.user.phone or 'N/A',
@@ -132,36 +135,6 @@ def initiate_payment(request, amount, purpose, payment_type, reference_id=None):
         'product_category': 'Membership',
         'product_profile': 'general',
     }
-
-    # Development fallback: skip SSLCommerz if using demo/dev credentials
-    if settings.SSLCOMMERZ_STORE_ID in ('', 'demo') or settings.SSLCOMMERZ_STORE_PASS in ('', 'demo'):
-        payment.status = 'completed'
-        payment.transaction_id = f'DEV-{tran_id}'
-        payment.save()
-
-        membership, _ = Membership.objects.get_or_create(user=request.user)
-        plan = MembershipPlan.objects.filter(is_active=True).first()
-        if plan:
-            membership.plan = plan
-            membership.is_active = True
-            # Extend from current expiry if still active, otherwise start fresh
-            base_time = membership.expires_at if membership.is_active and membership.expires_at and membership.expires_at > timezone.now() else timezone.now()
-            membership.started_at = membership.started_at or timezone.now()
-            membership.expires_at = base_time + timedelta(days=plan.duration_days)
-            membership.save()
-
-        if not request.user.is_membership_paid:
-            request.user.is_membership_paid = True
-            request.user.save(update_fields=['is_membership_paid'])
-
-        UserActivity.objects.create(
-            user=request.user,
-            activity_type='membership_purchased',
-            description=f'Membership purchased for {amount} BDT (dev mode)'
-        )
-
-        messages.success(request, 'Membership activated successfully! (Development mode)')
-        return redirect('membership:success')
 
     try:
         response = requests.post(
@@ -189,70 +162,99 @@ def initiate_payment(request, amount, purpose, payment_type, reference_id=None):
 
 
 @csrf_exempt
-def payment_success(request):
-    """SSLCommerz IPN callback. Validated server-side via SSLCommerz API."""
+def payment_notify(request):
+    """SSLCommerz IPN callback (server-to-server). Returns 200 OK."""
     if request.method != 'POST':
-        return redirect('membership:index')
+        return HttpResponseNotAllowed(['POST'])
 
     val_id = request.POST.get('val_id')
     tran_id = request.POST.get('tran_id')
 
     if not val_id or not tran_id:
-        logger.warning('Payment callback missing val_id or tran_id')
-        return redirect('membership:index')
+        logger.warning('IPN missing val_id or tran_id')
+        return HttpResponse('OK', status=200)
 
-    # Verify payment with SSLCommerz server
     result = verify_sslcommerz_payment(val_id)
     if result is None:
-        logger.error('SSLCommerz verification unreachable for tran_id=%s', tran_id)
-        messages.error(request, 'Could not verify payment. Please contact support.')
-        return redirect('membership:index')
+        logger.error('IPN verification unreachable for tran_id=%s', tran_id)
+        return HttpResponse('OK', status=200)
+
+    if result.get('status') != 'VALID' or not result.get('amount') or not result.get('currency'):
+        logger.warning('IPN pre-validation failed for tran_id=%s', tran_id)
+        return HttpResponse('OK', status=200)
 
     try:
         with transaction.atomic():
             payment = Payment.objects.select_for_update().get(sslcommerz_tran_id=tran_id)
+
+            if payment.status == 'completed':
+                if not payment.user.is_membership_paid:
+                    payment.user.is_membership_paid = True
+                    payment.user.save(update_fields=['is_membership_paid'])
+                return HttpResponse('OK', status=200)
+
+            if payment.status != 'pending':
+                logger.warning('IPN rejected non-pending payment: status=%s, tran_id=%s', payment.status, tran_id)
+                return HttpResponse('OK', status=200)
+
+            is_valid, error_msg = _validate_payment_result(result, payment)
+            if not is_valid:
+                logger.warning('IPN validation failed for tran_id=%s: %s', tran_id, error_msg)
+                return HttpResponse('OK', status=200)
+
+            payment.transaction_id = result.get('bank_tran_id') or None
+            payment.sslcommerz_session = json.dumps(result)
+            payment.save(update_fields=['transaction_id', 'sslcommerz_session', 'updated_at'])
+            _complete_membership_payment(payment)
+
+        logger.info('IPN payment completed: tran_id=%s, user=%s', tran_id, payment.user.username)
+        return HttpResponse('OK', status=200)
+
     except Payment.DoesNotExist:
-        logger.error('Payment callback for unknown tran_id: %s', tran_id)
-        return redirect('membership:index')
+        logger.error('IPN for unknown tran_id: %s', tran_id)
+        return HttpResponse('OK', status=200)
 
-    # Validate result against our payment record
-    is_valid, error_msg = _validate_payment_result(result, payment)
-    if not is_valid:
-        logger.warning('Payment validation failed for tran_id=%s: %s', tran_id, error_msg)
-        messages.error(request, 'Payment verification failed. Please contact support if you were charged.')
-        return redirect('membership:index')
 
-    # Already completed - just ensure membership is set
+def _complete_membership_payment(payment):
+    """Mark a pending payment as completed and activate the user's membership.
+
+    Returns True if the payment was successfully completed, False otherwise.
+    """
     if payment.status == 'completed':
         if not payment.user.is_membership_paid:
             payment.user.is_membership_paid = True
             payment.user.save(update_fields=['is_membership_paid'])
-        return redirect('membership:success')
+        membership = getattr(payment.user, 'membership', None)
+        if membership and not membership.is_active:
+            try:
+                plan = MembershipPlan.objects.get(pk=payment.reference_id)
+                membership.plan = plan
+                membership.is_active = True
+                membership.started_at = membership.started_at or timezone.now()
+                membership.expires_at = (membership.expires_at if membership.expires_at and membership.expires_at > timezone.now() else timezone.now()) + timedelta(days=plan.duration_days)
+                membership.save()
+            except (MembershipPlan.DoesNotExist, TypeError):
+                membership.is_active = True
+                membership.started_at = membership.started_at or timezone.now()
+                if not membership.expires_at or membership.expires_at <= timezone.now():
+                    membership.expires_at = timezone.now() + timedelta(days=30)
+                membership.save()
+        return True
 
-    # Only allow transition from pending
     if payment.status != 'pending':
-        logger.warning(
-            'Payment status transition rejected: current=%s, tran_id=%s',
-            payment.status, tran_id,
-        )
-        messages.error(request, 'Payment cannot be processed.')
-        return redirect('membership:index')
+        return False
+
+    plan = MembershipPlan.objects.get(pk=payment.reference_id)
+    membership, _ = Membership.objects.get_or_create(user=payment.user)
+    membership.plan = plan
+    membership.is_active = True
+    base_time = membership.expires_at if membership.is_active and membership.expires_at and membership.expires_at > timezone.now() else timezone.now()
+    membership.started_at = membership.started_at or timezone.now()
+    membership.expires_at = base_time + timedelta(days=plan.duration_days)
+    membership.save()
 
     payment.status = 'completed'
-    payment.transaction_id = result.get('bank_tran_id', '')
-    payment.sslcommerz_session = json.dumps(result)
-    payment.save()
-
-    membership, _ = Membership.objects.get_or_create(user=payment.user)
-    plan = MembershipPlan.objects.filter(is_active=True).first()
-    if plan:
-        membership.plan = plan
-        membership.is_active = True
-        # Extend from current expiry if still active, otherwise start fresh
-        base_time = membership.expires_at if membership.is_active and membership.expires_at and membership.expires_at > timezone.now() else timezone.now()
-        membership.started_at = membership.started_at or timezone.now()
-        membership.expires_at = base_time + timedelta(days=plan.duration_days)
-        membership.save()
+    payment.save(update_fields=['status', 'updated_at'])
 
     if not payment.user.is_membership_paid:
         payment.user.is_membership_paid = True
@@ -263,50 +265,164 @@ def payment_success(request):
         activity_type='membership_purchased',
         description=f'Membership purchased for {payment.amount} BDT'
     )
+    return True
 
-    logger.info('Payment completed successfully: tran_id=%s, user=%s', tran_id, payment.user.username)
-    return redirect('membership:success')
+
+@csrf_exempt
+def payment_success(request):
+    """SSLCommerz browser redirect after payment. Processes as fallback, then shows success page."""
+    tran_id = request.POST.get('tran_id') or request.GET.get('tran_id', '')
+    val_id = request.POST.get('val_id') or request.GET.get('val_id', '')
+
+    payment_completed = False
+    lookup_user = request.user if request.user.is_authenticated else None
+
+    if tran_id and val_id:
+        result = verify_sslcommerz_payment(val_id)
+        if result and result.get('status') == 'VALID':
+            try:
+                with transaction.atomic():
+                    payment = Payment.objects.select_for_update().get(sslcommerz_tran_id=tran_id)
+                    is_valid, _ = _validate_payment_result(result, payment)
+                    if is_valid:
+                        payment.transaction_id = result.get('bank_tran_id') or None
+                        payment.sslcommerz_session = json.dumps(result)
+                        if payment.status == 'pending':
+                            payment.save(update_fields=['transaction_id', 'sslcommerz_session', 'updated_at'])
+                        else:
+                            payment.save(update_fields=['transaction_id', 'sslcommerz_session'])
+                        payment_completed = _complete_membership_payment(payment)
+                        logger.info('Payment completed via browser redirect: tran_id=%s', tran_id)
+            except (Payment.DoesNotExist, MembershipPlan.DoesNotExist) as e:
+                logger.error('Browser redirect processing error: %s', e)
+            except Exception as e:
+                logger.error('Browser redirect unexpected error: %s', e)
+
+    if not payment_completed and request.user.is_authenticated:
+        membership = getattr(request.user, 'membership', None)
+        if membership and membership.is_active:
+            payment_completed = True
+        else:
+            completed_payment = Payment.objects.filter(
+                user=request.user, payment_type='membership', status='completed'
+            ).order_by('-created_at').first()
+            if completed_payment:
+                if not request.user.is_membership_paid:
+                    request.user.is_membership_paid = True
+                    request.user.save(update_fields=['is_membership_paid'])
+                if membership and not membership.is_active:
+                    try:
+                        plan = MembershipPlan.objects.get(pk=completed_payment.reference_id)
+                        membership.plan = plan
+                        membership.is_active = True
+                        membership.started_at = membership.started_at or timezone.now()
+                        membership.expires_at = (membership.expires_at if membership.expires_at and membership.expires_at > timezone.now() else timezone.now()) + timedelta(days=plan.duration_days)
+                        membership.save()
+                    except (MembershipPlan.DoesNotExist, TypeError):
+                        membership.is_active = True
+                        membership.started_at = membership.started_at or timezone.now()
+                        if not membership.expires_at or membership.expires_at <= timezone.now():
+                            membership.expires_at = timezone.now() + timedelta(days=30)
+                        membership.save()
+                payment_completed = True
+
+    if not payment_completed and settings.SSLCOMMERZ_IS_SANDBOX:
+        pending = None
+        if tran_id:
+            pending = Payment.objects.filter(
+                sslcommerz_tran_id=tran_id, payment_type='membership', status='pending'
+            ).select_related('user').first()
+            if pending:
+                lookup_user = pending.user
+        elif lookup_user:
+            pending = Payment.objects.filter(
+                user=lookup_user, payment_type='membership', status='pending'
+            ).order_by('-created_at').first()
+        if pending:
+            with transaction.atomic():
+                pending = Payment.objects.select_for_update().get(pk=pending.pk)
+                if pending.status == 'pending':
+                    payment_completed = _complete_membership_payment(pending)
+                    if not lookup_user.is_membership_paid:
+                        lookup_user.is_membership_paid = True
+                        lookup_user.save(update_fields=['is_membership_paid'])
+                    logger.info('Sandbox auto-completed payment: tran_id=%s', pending.sslcommerz_tran_id)
+
+    if payment_completed:
+        effective_user = lookup_user if not request.user.is_authenticated else request.user
+        membership = getattr(effective_user, 'membership', None) if effective_user else None
+        payment = Payment.objects.filter(user=effective_user, status='completed').order_by('-created_at').first() if effective_user else None
+        try:
+            return render(request, 'membership/success.html', {
+                'membership': membership,
+                'payment': payment,
+            })
+        except Exception:
+            return HttpResponse('Payment successful. You may close this page.', status=200)
+
+    if request.user.is_authenticated:
+        messages.warning(request, 'Payment verification is pending. Please check your membership status shortly.')
+        return redirect('membership:pending_purchase')
+    return HttpResponse('Payment verification pending. Please check your membership status later.', status=200)
 
 
 @csrf_exempt
 def payment_fail(request):
-    """SSLCommerz fail callback."""
+    """SSLCommerz fail callback. Verifies with SSLCommerz, then shows fail page."""
     tran_id = request.POST.get('tran_id') or request.GET.get('tran_id', '')
-    if tran_id:
+    val_id = request.POST.get('val_id') or request.GET.get('val_id', '')
+    if tran_id and val_id:
+        result = verify_sslcommerz_payment(val_id)
+        if result and result.get('status') == 'VALID':
+            logger.warning('Fail callback received but payment is VALID: tran_id=%s', tran_id)
+        elif result and result.get('status') in ('FAILED', 'CANCELLED'):
+            try:
+                payment = Payment.objects.get(sslcommerz_tran_id=tran_id)
+                if payment.status == 'pending':
+                    payment.status = 'failed'
+                    payment.save(update_fields=['status', 'updated_at'])
+                    logger.info('Payment marked as failed: tran_id=%s', tran_id)
+            except Payment.DoesNotExist:
+                logger.warning('Fail callback for unknown tran_id: %s', tran_id)
+    elif tran_id:
         try:
             payment = Payment.objects.get(sslcommerz_tran_id=tran_id)
             if payment.status == 'pending':
                 payment.status = 'failed'
-                payment.save()
-                logger.info('Payment marked as failed: tran_id=%s', tran_id)
-            else:
-                logger.warning(
-                    'Fail callback ignored for non-pending payment: status=%s, tran_id=%s',
-                    payment.status, tran_id,
-                )
+                payment.save(update_fields=['status', 'updated_at'])
         except Payment.DoesNotExist:
-            logger.warning('Fail callback for unknown tran_id: %s', tran_id)
+            pass
+
     messages.error(request, 'Payment failed. Please try again.')
-    return redirect('membership:index')
+    return redirect('membership:manage')
 
 
 @csrf_exempt
 def payment_cancel(request):
-    """SSLCommerz cancel callback."""
+    """SSLCommerz cancel callback. Verifies with SSLCommerz, then shows cancel page."""
     tran_id = request.POST.get('tran_id') or request.GET.get('tran_id', '')
-    if tran_id:
+    val_id = request.POST.get('val_id') or request.GET.get('val_id', '')
+    if tran_id and val_id:
+        result = verify_sslcommerz_payment(val_id)
+        if result and result.get('status') == 'VALID':
+            logger.warning('Cancel callback received but payment is VALID: tran_id=%s', tran_id)
+        elif result and result.get('status') in ('FAILED', 'CANCELLED'):
+            try:
+                payment = Payment.objects.get(sslcommerz_tran_id=tran_id)
+                if payment.status == 'pending':
+                    payment.status = 'cancelled'
+                    payment.save(update_fields=['status', 'updated_at'])
+                    logger.info('Payment cancelled: tran_id=%s', tran_id)
+            except Payment.DoesNotExist:
+                logger.warning('Cancel callback for unknown tran_id: %s', tran_id)
+    elif tran_id:
         try:
             payment = Payment.objects.get(sslcommerz_tran_id=tran_id)
             if payment.status == 'pending':
                 payment.status = 'cancelled'
-                payment.save()
-                logger.info('Payment cancelled: tran_id=%s', tran_id)
-            else:
-                logger.warning(
-                    'Cancel callback ignored for non-pending payment: status=%s, tran_id=%s',
-                    payment.status, tran_id,
-                )
+                payment.save(update_fields=['status', 'updated_at'])
         except Payment.DoesNotExist:
-            logger.warning('Cancel callback for unknown tran_id: %s', tran_id)
+            pass
+
     messages.warning(request, 'Payment was cancelled.')
-    return redirect('membership:index')
+    return redirect('membership:manage')

@@ -1,6 +1,7 @@
 import logging
 
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
@@ -61,13 +62,13 @@ def my_matches(request):
         'post__location', 'matched_post__location',
     ).order_by('-similarity_score')[:50]
 
+    matches = list(matches_qs)
+
     MatchSuggestion.objects.filter(
         Q(post__user=request.user) | Q(matched_post__user=request.user),
         status='pending',
         is_viewed=False,
     ).update(is_viewed=True)
-
-    matches = list(matches_qs)
 
     return render(request, 'ai_engine/matches.html', {
         'matches': matches,
@@ -107,6 +108,23 @@ def accept_match(request, match_id):
     match.is_accepted = True
     match.save(update_fields=['status', 'is_accepted'])
 
+    lost_post = match.post if match.post.post_type == 'lost' else match.matched_post
+    found_post = match.matched_post if match.post.post_type == 'lost' else match.post
+    lost_post.status = 'claimed'
+    lost_post.save(update_fields=['status'])
+
+    try:
+        from apps.notifications.models import Notification
+        Notification.objects.create(
+            user=lost_post.user,
+            notification_type='post_claimed',
+            title='Post Claimed',
+            message=f'Your post "{lost_post.title}" has been claimed by {found_post.user.get_full_name() or found_post.user.username}.',
+            link=reverse('posts:detail', args=[lost_post.pk]),
+        )
+    except Exception:
+        logger.exception('Failed to send post_claimed notification')
+
     try:
         from apps.recovery.models import RecoverySession, RecoveryVerificationLog
         from apps.notifications.models import Notification
@@ -124,17 +142,18 @@ def accept_match(request, match_id):
                 notification_type='recovery_update',
                 title='Finder Claimed Your Item',
                 message=f'{finder.get_full_name() or finder.username} has been assigned as the finder for "{lost_post.title}". They can now enter the recovery token to complete recovery.',
-                link=f'/recovery/{session.short_code}/',
+                link=reverse('recovery:detail', args=[session.short_code]),
             )
             Notification.objects.create(
                 user=finder,
                 notification_type='recovery_update',
                 title='You Are Now the Finder',
                 message=f'You have been assigned as the finder for "{lost_post.title}". Go to the recovery session to enter the recovery token.',
-                link=f'/recovery/{session.short_code}/',
+                link=reverse('recovery:detail', args=[session.short_code]),
             )
     except Exception:
-        pass
+        import logging
+        logging.getLogger(__name__).exception('Failed to update recovery session or send notifications for match %s', match.pk)
 
     messages.success(request, 'Match accepted! You can now view the matched item details and start a conversation.')
     return redirect('ai:matches')
@@ -166,3 +185,22 @@ def api_matches_count(request):
         status='pending', is_viewed=False,
     ).count()
     return JsonResponse({'count': count})
+
+
+@login_required
+def undo_match(request, match_id):
+    if request.method != 'POST':
+        messages.error(request, 'Invalid request method.')
+        return redirect('ai:matches')
+    match = get_object_or_404(MatchSuggestion, pk=match_id)
+    if request.user not in [match.post.user, match.matched_post.user]:
+        messages.error(request, 'You are not part of this match.')
+        return redirect('ai:matches')
+    if match.status not in ('accepted', 'dismissed'):
+        messages.warning(request, 'This match cannot be undone.')
+        return redirect('ai:matches')
+    match.status = 'pending'
+    match.is_accepted = False
+    match.save(update_fields=['status', 'is_accepted'])
+    messages.success(request, 'Match restored to pending.')
+    return redirect('ai:matches')

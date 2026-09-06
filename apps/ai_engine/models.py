@@ -44,7 +44,9 @@ class MatchSuggestion(models.Model):
     class Meta:
         verbose_name = 'Match Suggestion'
         verbose_name_plural = 'Match Suggestions'
-        unique_together = ['post', 'matched_post']
+        constraints = [
+            models.UniqueConstraint(fields=['post', 'matched_post'], name='unique_match_suggestion'),
+        ]
         ordering = ['-similarity_score']
         indexes = [
             models.Index(fields=['status', '-similarity_score'], name='match_status_score_idx'),
@@ -61,29 +63,34 @@ class MatchSuggestion(models.Model):
         is_new = self.pk is None
         super().save(*args, **kwargs)
         if is_new:
-            from apps.notifications.models import Notification
-            strength_label = self.get_match_strength_display()
-            pct = int(round(self.similarity_score * 100))
-            msg = (
-                f'AI {strength_label}: "{self.post.title}" may match '
-                f'"{self.matched_post.title}" ({pct}% similarity)'
-            )
+            try:
+                from apps.notifications.models import Notification
+                from django.urls import reverse
+                strength_label = self.get_match_strength_display()
+                pct = int(round(self.similarity_score * 100))
+                msg = (
+                    f'AI {strength_label}: "{self.post.title}" may match '
+                    f'"{self.matched_post.title}" ({pct}% similarity)'
+                )
 
-            Notification.objects.create(
-                user=self.post.user,
-                notification_type='match_found',
-                title='Potential Match Found!',
-                message=msg,
-                link=self.matched_post.get_absolute_url() if hasattr(self.matched_post, 'get_absolute_url') else f'/post/{self.matched_post.pk}/',
-            )
-            if self.matched_post.user_id and self.matched_post.user_id != self.post.user_id:
                 Notification.objects.create(
-                    user=self.matched_post.user,
+                    user=self.post.user,
                     notification_type='match_found',
                     title='Potential Match Found!',
-                    message=(
-                        f'AI {strength_label}: "{self.matched_post.title}" may match '
-                        f'"{self.post.title}" ({pct}% similarity)'
-                    ),
-                    link=self.post.get_absolute_url() if hasattr(self.post, 'get_absolute_url') else f'/post/{self.post.pk}/',
+                    message=msg,
+                    link=reverse('posts:detail', args=[self.matched_post.pk]),
                 )
+                if self.matched_post.user_id and self.matched_post.user_id != self.post.user_id:
+                    Notification.objects.create(
+                        user=self.matched_post.user,
+                        notification_type='match_found',
+                        title='Potential Match Found!',
+                        message=(
+                            f'AI {strength_label}: "{self.matched_post.title}" may match '
+                            f'"{self.post.title}" ({pct}% similarity)'
+                        ),
+                        link=reverse('posts:detail', args=[self.post.pk]),
+                    )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception('Failed to create match notification')

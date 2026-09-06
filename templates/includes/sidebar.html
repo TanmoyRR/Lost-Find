@@ -56,18 +56,22 @@
         </nav>
         <!-- Mobile logout -->
         <div class="p-3 border-t border-white/[0.06]">
-            <a href="{% url 'accounts:logout' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200">
-                <i class="bi bi-box-arrow-right text-lg"></i>
-                <span>Log Out</span>
-            </a>
+            <form method="POST" action="{% url 'accounts:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 w-full bg-transparent border-0 cursor-pointer">
+                    <i class="bi bi-box-arrow-right text-lg"></i>
+                    <span>Log Out</span>
+                </button>
+            </form>
         </div>
     </div>
 
     <!-- Desktop sidebar: expands on hover -->
     <div class="sd fixed left-0 top-0 h-screen flex flex-col bg-[#0b1120] z-30"
-         x-data="{ expanded: false, hoverTimer: null }"
-         @mouseenter="hoverTimer = setTimeout(() => { expanded = true }, 150)"
-         @mouseleave="clearTimeout(hoverTimer); expanded = false"
+         x-data="{ expanded: false, enterTimer: null, leaveTimer: null }"
+         x-init="$watch('expanded', v => $dispatch('sidebar-toggle', { expanded: v }))"
+         @mouseenter="clearTimeout(leaveTimer); enterTimer = setTimeout(() => { expanded = true }, 200)"
+         @mouseleave="clearTimeout(enterTimer); leaveTimer = setTimeout(() => { expanded = false }, 300)"
          :class="expanded ? 'sd-expanded' : ''"
          :style="expanded ? 'width: 260px;' : 'width: 72px;'"
          style="width: 72px;">
@@ -222,13 +226,16 @@
 
         <!-- Logout -->
         <div class="flex-shrink-0 border-t border-white/[0.06] px-3 pt-1 pb-2">
-            <a href="{% url 'accounts:logout' %}"
-               class="si"
-               :style="expanded ? 'gap: 12px;' : 'justify-content: center; gap: 0;'"
-               style="justify-content: center; gap: 0;">
-                <i class="bi bi-box-arrow-right sii text-red-400/70"></i>
-                <span class="sil nl text-sm font-medium text-red-400/70" :class="expanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'">Log Out</span>
-            </a>
+            <form method="POST" action="{% url 'accounts:logout' %}">
+                {% csrf_token %}
+                <button type="submit"
+                   class="si bg-transparent border-0 cursor-pointer w-full"
+                   :style="expanded ? 'gap: 12px;' : 'justify-content: center; gap: 0;'"
+                   style="justify-content: center; gap: 0;">
+                    <i class="bi bi-box-arrow-right sii text-red-400/70"></i>
+                    <span class="sil nl text-sm font-medium text-red-400/70" :class="expanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'">Log Out</span>
+                </button>
+            </form>
         </div>
     </div>
 </div>

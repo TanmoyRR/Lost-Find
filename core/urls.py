@@ -1,11 +1,9 @@
-from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.defaults import page_not_found, server_error, permission_denied
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
     path('', include('apps.accounts.urls', namespace='accounts')),
     path('', include('apps.posts.urls', namespace='posts')),
     path('membership/', include('apps.membership.urls', namespace='membership')),

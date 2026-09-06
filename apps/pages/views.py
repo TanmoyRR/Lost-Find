@@ -22,11 +22,18 @@ def home(request):
     }
     recent_posts = Post.objects.select_related('location', 'category').all()[:6] if request.user.is_authenticated else []
     categories = Category.objects.all()
-    return render(request, 'pages/home.html', {
+
+    deleted_username = request.COOKIES.get('account_deleted_msg')
+    if deleted_username:
+        messages.success(request, f'Account "{deleted_username}" has been permanently deleted.')
+    response = render(request, 'pages/home.html', {
         'stats': stats,
         'recent_posts': recent_posts,
         'categories': categories,
     })
+    if deleted_username:
+        response.delete_cookie('account_deleted_msg')
+    return response
 
 
 def about(request):

@@ -4,6 +4,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.conf import settings as django_settings
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
@@ -47,6 +48,7 @@ class TestRegistration(TestCase):
             'email': 'test2@example.com',
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
+            'phone': '01700000000',
         }
         response = self.client.post(self.register_url, data)
         self.assertEqual(response.status_code, 200)
@@ -58,6 +60,7 @@ class TestRegistration(TestCase):
             'email': 'test2@example.com',
             'password1': 'ComplexPass123!',
             'password2': 'DifferentPass456!',
+            'phone': '01700000001',
         }
         response = self.client.post(self.register_url, data)
         self.assertEqual(response.status_code, 200)
@@ -71,6 +74,7 @@ class TestRegistration(TestCase):
             'password2': 'ComplexPass123!',
             'student_id': '',
             'department': 'cse',
+            'phone': '01700000002',
         }
         response = self.client.post(self.register_url, data)
         self.assertEqual(response.status_code, 302)
@@ -653,6 +657,8 @@ class TestMembership(TestCase):
         self.assertContains(response, 'Annual Membership')
 
     def test_purchase_initiation_creates_membership(self):
+        self.user.is_membership_paid = False
+        self.user.save(update_fields=['is_membership_paid'])
         response = self.client.get(reverse('membership:purchase', kwargs={'plan_id': self.plan.pk}))
         self.assertEqual(response.status_code, 302)
         from apps.membership.models import Membership
@@ -692,14 +698,19 @@ class TestPayments(TestCase):
         payment = Payment.objects.create(
             user=self.user, transaction_id='TXN123', amount=Decimal('100.00'),
             payment_type='membership', status='pending', sslcommerz_tran_id='SSL-TXN-001',
+            reference_id=str(plan.pk),
         )
-        mock_verify.return_value = {'status': 'VALID', 'bank_tran_id': 'BANK001'}
+        mock_verify.return_value = {
+            'status': 'VALID', 'bank_tran_id': 'BANK001',
+            'amount': '100.00', 'currency': 'BDT', 'tran_id': 'SSL-TXN-001',
+            'store_id': django_settings.SSLCOMMERZ_STORE_ID,
+        }
         response = self.client.post(reverse('payments:success'), {
             'tran_id': 'SSL-TXN-001',
             'status': 'VALID',
             'val_id': 'VAL001',
         })
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
         payment.refresh_from_db()
         self.assertEqual(payment.status, 'completed')
         self.user.refresh_from_db()
@@ -1305,6 +1316,7 @@ class TestTwoStepRegistration(TestCase):
             'password2': 'ComplexPass123!',
             'student_id': '2021-001-002',
             'department': 'cse',
+            'phone': '01710000001',
         }
         response = self.client.post(self.register_url, data)
         self.assertEqual(response.status_code, 302)
@@ -1319,6 +1331,7 @@ class TestTwoStepRegistration(TestCase):
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'bba',
+            'phone': '01710000002',
         }
         response = self.client.post(self.register_url, data)
         self.assertEqual(response.status_code, 302)
@@ -1331,6 +1344,7 @@ class TestTwoStepRegistration(TestCase):
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'cse',
+            'phone': '01710000003',
         }
         self.client.post(self.register_url, data)
         user = User.objects.get(username='pendinguser')
@@ -1348,6 +1362,7 @@ class TestTwoStepRegistration(TestCase):
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'cse',
+            'phone': '01710000004',
         }
         self.client.post(self.register_url, data)
         user = User.objects.get(username='blockeduser')
@@ -1364,6 +1379,7 @@ class TestTwoStepRegistration(TestCase):
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'cse',
+            'phone': '01710000005',
         }
         self.client.post(self.register_url, data)
         user = User.objects.get(username='blockeduser2')
@@ -1380,6 +1396,7 @@ class TestTwoStepRegistration(TestCase):
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'cse',
+            'phone': '01710000006',
         }
         self.client.post(self.register_url, data)
         user = User.objects.get(username='canaccess')
@@ -1397,6 +1414,7 @@ class TestTwoStepRegistration(TestCase):
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'cse',
+            'phone': '01710000007',
         }
         self.client.post(self.register_url, data)
         user = User.objects.get(username='canlogout')
@@ -1413,20 +1431,28 @@ class TestTwoStepRegistration(TestCase):
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'cse',
+            'phone': '01710000008',
         }
         self.client.post(self.register_url, data)
         user = User.objects.get(username='payuser')
         self.assertFalse(user.is_membership_paid)
+        from apps.membership.models import MembershipPlan
+        plan = MembershipPlan.objects.create(name='TestPlan', price=Decimal('500'), duration_days=30)
         payment = Payment.objects.create(
             user=user, amount=Decimal('500.00'), payment_type='membership',
             status='pending', sslcommerz_tran_id='TEST-TRAN-001',
+            reference_id=str(plan.pk),
         )
         with patch('apps.payments.views.verify_sslcommerz_payment') as mock_verify:
-            mock_verify.return_value = {'status': 'VALID', 'bank_tran_id': 'BANK001'}
+            mock_verify.return_value = {
+                'status': 'VALID', 'bank_tran_id': 'BANK001',
+                'amount': '500.00', 'currency': 'BDT', 'tran_id': 'TEST-TRAN-001',
+                'store_id': django_settings.SSLCOMMERZ_STORE_ID,
+            }
             response = self.client.post(reverse('payments:success'), {
                 'tran_id': 'TEST-TRAN-001', 'val_id': 'VAL001',
             })
-            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.status_code, 200)
         user.refresh_from_db()
         self.assertTrue(user.is_membership_paid)
 
@@ -1459,26 +1485,33 @@ class TestTwoStepRegistration(TestCase):
 
     def test_duplicate_payment_not_doubled(self):
         from apps.payments.models import Payment
+        from apps.membership.models import MembershipPlan
         data = {
             'username': 'dupuser',
             'email': 'dup@student.com',
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'cse',
+            'phone': '01710000009',
         }
         self.client.post(self.register_url, data)
         user = User.objects.get(username='dupuser')
+        plan = MembershipPlan.objects.create(name='DupPlan', price=Decimal('500'), duration_days=30)
         payment = Payment.objects.create(
             user=user, amount=Decimal('500.00'), payment_type='membership',
             status='completed', sslcommerz_tran_id='COMPLETED-001',
-            transaction_id='BANK-COMPLETE',
+            transaction_id='BANK-COMPLETE', reference_id=str(plan.pk),
         )
         with patch('apps.payments.views.verify_sslcommerz_payment') as mock_verify:
-            mock_verify.return_value = {'status': 'VALID', 'bank_tran_id': 'BANK001'}
+            mock_verify.return_value = {
+                'status': 'VALID', 'bank_tran_id': 'BANK001',
+                'amount': '500.00', 'currency': 'BDT', 'tran_id': 'COMPLETED-001',
+                'store_id': django_settings.SSLCOMMERZ_STORE_ID,
+            }
             response = self.client.post(reverse('payments:success'), {
                 'tran_id': 'COMPLETED-001', 'val_id': 'VAL001',
             })
-            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.status_code, 200)
         user.refresh_from_db()
         self.assertTrue(user.is_membership_paid)
 
@@ -1490,6 +1523,7 @@ class TestTwoStepRegistration(TestCase):
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'cse',
+            'phone': '01710000010',
         }
         self.client.post(self.register_url, data)
         user = User.objects.get(username='failuser')
@@ -1514,6 +1548,7 @@ class TestTwoStepRegistration(TestCase):
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'cse',
+            'phone': '01710000011',
         }
         self.client.post(self.register_url, data)
         user = User.objects.get(username='canceluser')
@@ -1538,6 +1573,7 @@ class TestTwoStepRegistration(TestCase):
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
             'department': 'cse',
+            'phone': '01710000012',
         }
         self.client.post(self.register_url, data)
         user = User.objects.get(username='retryuser')
@@ -1550,3 +1586,164 @@ class TestTwoStepRegistration(TestCase):
         response = self.client.get(reverse('membership:pending_purchase'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Purchase Membership')
+
+
+# ========================
+# PASSWORD RESET
+# ========================
+
+class TestPasswordReset(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='resetuser', email='reset@test.com', password='TestPass123!'
+        )
+
+    def test_forgot_password_page_loads(self):
+        response = self.client.get(reverse('accounts:forgot_password'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'accounts/forgot_password.html')
+
+    def test_forgot_password_sends_email(self):
+        response = self.client.post(reverse('accounts:forgot_password'), {
+            'email': 'reset@test.com',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.reset_password_token)
+
+    def test_forgot_password_nonexistent_email(self):
+        response = self.client.post(reverse('accounts:forgot_password'), {
+            'email': 'nonexistent@test.com',
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def test_reset_password_with_valid_token(self):
+        import hashlib, secrets
+        token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+        self.user.reset_password_token = token
+        self.user.reset_password_sent_at = timezone.now()
+        self.user.save()
+        response = self.client.post(reverse('accounts:reset_password', args=[token]), {
+            'new_password1': 'NewPass456!',
+            'new_password2': 'NewPass456!',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.reset_password_token)
+
+    def test_reset_password_with_expired_token(self):
+        import hashlib, secrets
+        token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+        self.user.reset_password_token = token
+        self.user.reset_password_sent_at = timezone.now() - timedelta(hours=2)
+        self.user.save()
+        response = self.client.post(reverse('accounts:reset_password', args=[token]), {
+            'new_password1': 'NewPass456!',
+            'new_password2': 'NewPass456!',
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def test_reset_password_invalid_token(self):
+        response = self.client.get(reverse('accounts:reset_password', args=['invalid-token']))
+        self.assertEqual(response.status_code, 404)
+
+
+# ========================
+# EMAIL VERIFICATION
+# ========================
+
+class TestEmailVerification(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='verifyuser', email='verify@test.com', password='TestPass123!',
+            email_verified=False, is_verified=False, is_membership_paid=True
+        )
+
+    def test_verify_email_page_loads(self):
+        self.client.login(username='verifyuser', password='TestPass123!')
+        response = self.client.get(reverse('accounts:verify_email_gate'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'accounts/verify_email_gate.html')
+
+    def test_verify_email_with_valid_token(self):
+        import hashlib, secrets
+        token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+        self.user.email_verification_token = token
+        self.user.email_verification_sent_at = timezone.now()
+        self.user.save()
+        response = self.client.get(reverse('accounts:verify_email', args=[token]))
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.email_verified)
+        self.assertTrue(self.user.is_verified)
+        self.assertIsNone(self.user.email_verification_token)
+
+    def test_verify_email_with_expired_token(self):
+        import hashlib, secrets
+        token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+        self.user.email_verification_token = token
+        self.user.email_verification_sent_at = timezone.now() - timedelta(hours=25)
+        self.user.save()
+        response = self.client.get(reverse('accounts:verify_email', args=[token]))
+        self.assertEqual(response.status_code, 302)
+
+    def test_verify_email_invalid_token(self):
+        response = self.client.get(reverse('accounts:verify_email', args=['invalid-token']))
+        self.assertEqual(response.status_code, 404)
+
+    def test_resend_verification(self):
+        self.client.login(username='verifyuser', password='TestPass123!')
+        response = self.client.post(reverse('accounts:resend_verification'))
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.email_verification_token)
+
+    def test_verified_user_redirected_from_gate(self):
+        self.user.email_verified = True
+        self.user.save()
+        self.client.login(username='verifyuser', password='TestPass123!')
+        response = self.client.get(reverse('accounts:verify_email_gate'))
+        self.assertEqual(response.status_code, 302)
+
+
+# ========================
+# DELETE ACCOUNT
+# ========================
+
+class TestDeleteAccount(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='deleteuser', email='delete@test.com', password='TestPass123!',
+            is_membership_paid=True, email_verified=True
+        )
+
+    def test_delete_account_post(self):
+        self.client.login(username='deleteuser', password='TestPass123!')
+        response = self.client.post(reverse('accounts:delete_account'))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(User.objects.filter(username='deleteuser').exists())
+
+    def test_delete_account_get_redirects(self):
+        self.client.login(username='deleteuser', password='TestPass123!')
+        response = self.client.get(reverse('accounts:delete_account'))
+        self.assertEqual(response.status_code, 302)
+
+
+# ========================
+# LOGOUT POST
+# ========================
+
+class TestLogout(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='logoutuser', email='logout@test.com', password='TestPass123!'
+        )
+
+    def test_logout_post(self):
+        self.client.login(username='logoutuser', password='TestPass123!')
+        response = self.client.post(reverse('accounts:logout'))
+        self.assertEqual(response.status_code, 302)

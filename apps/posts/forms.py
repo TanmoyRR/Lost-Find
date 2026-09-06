@@ -1,4 +1,6 @@
 from django import forms
+from io import BytesIO
+from PIL import Image as PILImage
 from .models import Post, Category, CampusLocation
 from apps.accounts.validators import validate_post_image
 
@@ -69,13 +71,36 @@ class PostForm(forms.ModelForm):
             raise forms.ValidationError('Location is required.')
         return name
 
+    def _compress_image(self, image):
+        try:
+            img = PILImage.open(image)
+            if img.mode in ('RGBA', 'P'):
+                img = img.convert('RGB')
+            max_size = (1200, 1200)
+            if img.width > max_size[0] or img.height > max_size[1]:
+                img.thumbnail(max_size, PILImage.LANCZOS)
+            buf = BytesIO()
+            img.save(buf, format='JPEG', quality=80, optimize=True)
+            buf.seek(0)
+            from django.core.files.uploadedfile import InMemoryUploadedFile
+            return InMemoryUploadedFile(
+                buf, 'image', f'{image.name.rsplit(".", 1)[0]}.jpg',
+                'image/jpeg', buf.getbuffer().nbytes, None,
+            )
+        except Exception:
+            return image
+
     def save(self, commit=True):
         instance = super().save(commit=False)
+        image = self.cleaned_data.get('image')
+        if image and hasattr(image, 'file'):
+            instance.image = self._compress_image(image)
         location_name = self.cleaned_data.get('location_name', '').strip()
         if location_name:
+            slug = location_name.lower().replace(' ', '-').replace(',', '').strip()[:100]
             location_obj, _ = CampusLocation.objects.get_or_create(
-                name=location_name,
-                defaults={'slug': location_name.lower().replace(' ', '-').replace(',', '')[:100]},
+                slug=slug,
+                defaults={'name': location_name, 'slug': slug},
             )
             instance.location = location_obj
         if commit:

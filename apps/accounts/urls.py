@@ -7,9 +7,6 @@ urlpatterns = [
     path('register/', views.register, name='register'),
     path('login/', views.user_login, name='login'),
     path('logout/', views.user_logout, name='logout'),
-    path('verify-email/<str:token>/', views.verify_email, name='verify_email'),
-    path('verify-email/', views.verify_email_gate, name='verify_email_gate'),
-    path('resend-verification/', views.resend_verification, name='resend_verification'),
     path('forgot-password/', views.forgot_password, name='forgot_password'),
     path('reset-password/<str:token>/', views.reset_password, name='reset_password'),
     path('profile/', views.profile_view, name='profile'),
@@ -18,4 +15,6 @@ urlpatterns = [
     path('profile/change-password/', views.change_password, name='change_password'),
     path('settings/', views.settings_view, name='settings'),
     path('profile/delete/', views.delete_account, name='delete_account'),
+    path('sessions/', views.active_sessions, name='sessions'),
+    path('sessions/<str:session_key>/revoke/', views.revoke_session, name='revoke_session'),
 ]

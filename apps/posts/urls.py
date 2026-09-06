@@ -12,6 +12,7 @@ urlpatterns = [
     path('post/<int:pk>/resolve/', views.mark_resolved, name='resolve'),
     path('my-posts/', views.my_posts, name='my_posts'),
     path('api/posts/', api_views.api_posts, name='api_posts'),
+    path('api/locations/', api_views.api_locations, name='api_locations'),
     path('success-stories/', success_views.success_stories, name='success_stories'),
     path('success-stories/<int:pk>/', success_views.success_story_detail, name='success_story_detail'),
     path('post/<int:post_id>/report/', trust_views.report_item, name='report_item'),

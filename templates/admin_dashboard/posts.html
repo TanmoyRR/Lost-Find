@@ -120,21 +120,33 @@
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 {% if post.status == 'open' %}
-                                <a href="{% url 'dashboard:admin_post_reject' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600" title="Reject" onclick="return confirm('Reject this post?')">
-                                    <i class="bi bi-x-circle"></i>
-                                </a>
+                                <form method="POST" action="{% url 'dashboard:admin_post_reject' post.pk %}" class="inline" onsubmit="return confirm('Reject this post?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600 bg-transparent border-0 cursor-pointer" title="Reject">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </form>
                                 {% endif %}
                                 {% if post.is_active %}
-                                <a href="{% url 'dashboard:admin_post_soft_delete' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600" title="Soft Delete" onclick="return confirm('Soft delete this post?')">
-                                    <i class="bi bi-archive"></i>
-                                </a>
+                                <form method="POST" action="{% url 'dashboard:admin_post_soft_delete' post.pk %}" class="inline" onsubmit="return confirm('Soft delete this post?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600 bg-transparent border-0 cursor-pointer" title="Soft Delete">
+                                        <i class="bi bi-archive"></i>
+                                    </button>
+                                </form>
                                 {% else %}
-                                <a href="{% url 'dashboard:admin_post_restore' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-emerald-600" title="Restore">
-                                    <i class="bi bi-arrow-counterclockwise"></i>
-                                </a>
-                                <a href="{% url 'dashboard:admin_post_permanent_delete' post.pk %}" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600" title="Permanent Delete" onclick="return confirm('Permanently delete this post? This cannot be undone.')">
-                                    <i class="bi bi-trash3"></i>
-                                </a>
+                                <form method="POST" action="{% url 'dashboard:admin_post_restore' post.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-emerald-600 bg-transparent border-0 cursor-pointer" title="Restore">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="{% url 'dashboard:admin_post_permanent_delete' post.pk %}" class="inline" onsubmit="return confirm('Permanently delete this post? This cannot be undone.')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600 bg-transparent border-0 cursor-pointer" title="Permanent Delete">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </form>
                                 {% endif %}
                             </div>
                         </td>

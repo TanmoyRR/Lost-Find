@@ -44,7 +44,7 @@
     {% endif %}
 
     <!-- Annual Membership Plan -->
-    {% with annual_plan=plans|dictsort:"price"|last %}
+    {% with annual_plan=plans|dictsortreversed:"duration_days"|first %}
     <div class="max-w-md mx-auto">
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
             <div class="p-6">
@@ -86,6 +86,10 @@
                     </div>
                     {% if membership.plan %}
                     <a href="{% url 'membership:purchase' membership.plan.pk %}" class="block w-full py-2.5 rounded-xl text-sm font-medium text-center gradient-primary text-white hover:shadow-lg hover:shadow-indigo-500/25 transition">
+                        <i class="bi bi-arrow-repeat"></i> Extend Membership
+                    </a>
+                    {% elif annual_plan %}
+                    <a href="{% url 'membership:purchase' annual_plan.pk %}" class="block w-full py-2.5 rounded-xl text-sm font-medium text-center gradient-primary text-white hover:shadow-lg hover:shadow-indigo-500/25 transition">
                         <i class="bi bi-arrow-repeat"></i> Extend Membership
                     </a>
                     {% endif %}

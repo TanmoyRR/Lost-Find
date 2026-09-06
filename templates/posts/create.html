@@ -148,6 +148,7 @@
         const removeBtn = document.getElementById('remove-image');
         const imageLabel = document.getElementById('image-required-label');
         const postTypeInputs = document.querySelectorAll('input[name="post_type"]');
+        const locationInput = document.querySelector('input[name="location_name"]');
 
         function updateImageLabel() {
             const selected = document.querySelector('input[name="post_type"]:checked');
@@ -187,6 +188,49 @@
                     previewImg.src = '';
                 });
             }
+        }
+
+        if (locationInput) {
+            let debounceTimer;
+            let suggestionsEl = document.createElement('div');
+            suggestionsEl.className = 'absolute z-10 w-full bg-white border border-gray-200 rounded-xl shadow-lg mt-1 hidden max-h-48 overflow-y-auto';
+            locationInput.parentNode.style.position = 'relative';
+            locationInput.parentNode.appendChild(suggestionsEl);
+            locationInput.setAttribute('autocomplete', 'off');
+
+            locationInput.addEventListener('input', function() {
+                clearTimeout(debounceTimer);
+                const q = this.value.trim();
+                if (q.length < 2) { suggestionsEl.classList.add('hidden'); return; }
+                debounceTimer = setTimeout(function() {
+                    fetch('/posts/api/locations/?q=' + encodeURIComponent(q))
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (!data.locations || data.locations.length === 0) {
+                                suggestionsEl.classList.add('hidden');
+                                return;
+                            }
+                            suggestionsEl.innerHTML = '';
+                            data.locations.forEach(function(loc) {
+                                const item = document.createElement('div');
+                                item.className = 'px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 cursor-pointer';
+                                item.textContent = loc.name;
+                                item.addEventListener('click', function() {
+                                    locationInput.value = loc.name;
+                                    suggestionsEl.classList.add('hidden');
+                                });
+                                suggestionsEl.appendChild(item);
+                            });
+                            suggestionsEl.classList.remove('hidden');
+                        });
+                }, 300);
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!locationInput.contains(e.target) && !suggestionsEl.contains(e.target)) {
+                    suggestionsEl.classList.add('hidden');
+                }
+            });
         }
     });
 </script>

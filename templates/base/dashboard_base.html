@@ -2,11 +2,11 @@
 {% load static %}
 
 {% block content %}
-<div class="flex h-screen overflow-hidden bg-gray-50" x-data="{ mobileOpen: false }">
+<div class="flex h-screen overflow-hidden bg-gray-50" x-data="{ mobileOpen: false, sidebarExpanded: false }" @sidebar-toggle.window="sidebarExpanded = $event.detail.expanded">
     {% include 'includes/sidebar.html' %}
 
     <!-- Main Content Area - offset for fixed sidebar -->
-    <div class="pl-[80px] flex-1 flex flex-col overflow-hidden min-w-0">
+    <div class="pl-[72px] lg:pl-[72px] flex-1 flex flex-col overflow-hidden min-w-0 transition-all duration-[280ms] ease-[cubic-bezier(0.4,0,0.2,1)]" :class="sidebarExpanded ? 'lg:pl-[260px]' : ''">
         <header class="sticky top-0 z-20 bg-white border-b border-gray-200/60 shadow-sm">
             <div class="px-6 lg:px-8 py-3 flex items-center justify-between">
                 <div class="flex items-center gap-4">
@@ -36,7 +36,26 @@
                             <div class="max-h-64 overflow-y-auto">
                                 {% if recent_notifications %}
                                 {% for n in recent_notifications %}
-                                <a href="{{ n.link|default:'#' }}" class="flex items-start gap-3 p-3 hover:bg-gray-50 transition border-b border-gray-50 {% if not n.is_read %}bg-indigo-50/50{% endif %}">
+                                {% if n.link %}
+                                <form method="POST" action="{% url 'notifications:mark_read' n.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ n.link }}">
+                                    <button type="submit" class="w-full flex items-start gap-3 p-3 hover:bg-gray-50 transition border-b border-gray-50 text-left {% if not n.is_read %}bg-indigo-50/50{% endif %}">
+                                        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 {% if n.notification_type == 'match_found' %}bg-emerald-100 text-emerald-600{% elif n.notification_type == 'membership_expiring' %}bg-amber-100 text-amber-600{% else %}bg-indigo-100 text-indigo-600{% endif %}">
+                                            <i class="bi {% if n.notification_type == 'match_found' %}bi-people{% elif n.notification_type == 'membership_expiring' %}bi-clock{% elif n.notification_type == 'post_claimed' %}bi-hand-index{% else %}bi-info{% endif %} text-xs"></i>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-sm font-medium text-gray-800 truncate">{{ n.title }}</p>
+                                            <p class="text-xs text-gray-500 truncate">{{ n.message }}</p>
+                                            <p class="text-[10px] text-gray-400 mt-0.5">{{ n.created_at|timesince }} ago</p>
+                                        </div>
+                                        {% if not n.is_read %}
+                                        <span class="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0 mt-1.5"></span>
+                                        {% endif %}
+                                    </button>
+                                </form>
+                                {% else %}
+                                <div class="flex items-start gap-3 p-3 border-b border-gray-50 {% if not n.is_read %}bg-indigo-50/50{% endif %}">
                                     <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 {% if n.notification_type == 'match_found' %}bg-emerald-100 text-emerald-600{% elif n.notification_type == 'membership_expiring' %}bg-amber-100 text-amber-600{% else %}bg-indigo-100 text-indigo-600{% endif %}">
                                         <i class="bi {% if n.notification_type == 'match_found' %}bi-people{% elif n.notification_type == 'membership_expiring' %}bi-clock{% elif n.notification_type == 'post_claimed' %}bi-hand-index{% else %}bi-info{% endif %} text-xs"></i>
                                     </div>
@@ -48,7 +67,8 @@
                                     {% if not n.is_read %}
                                     <span class="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0 mt-1.5"></span>
                                     {% endif %}
-                                </a>
+                                </div>
+                                {% endif %}
                                 {% endfor %}
                                 {% else %}
                                 <div class="p-6 text-center text-gray-400">
