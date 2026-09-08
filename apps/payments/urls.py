@@ -8,4 +8,5 @@ urlpatterns = [
     path('fail/', views.payment_fail, name='fail'),
     path('cancel/', views.payment_cancel, name='cancel'),
     path('notify/', views.payment_notify, name='notify'),
+    path('invoice/<int:payment_id>/', views.download_invoice, name='download_invoice'),
 ]

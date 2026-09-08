@@ -2,6 +2,7 @@ import json
 import uuid
 import logging
 import requests
+from io import BytesIO
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -426,3 +427,130 @@ def payment_cancel(request):
 
     messages.warning(request, 'Payment was cancelled.')
     return redirect('membership:manage')
+
+
+@login_required
+def download_invoice(request, payment_id):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.colors import HexColor
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    payment = get_object_or_404(Payment, pk=payment_id, user=request.user, status='completed')
+    membership = getattr(request.user, 'membership', None)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=25*mm, leftMargin=25*mm, topMargin=25*mm, bottomMargin=25*mm)
+    styles = getSampleStyleSheet()
+
+    primary_color = HexColor('#4F46E5')
+    success_color = HexColor('#059669')
+    text_color = HexColor('#374151')
+    light_gray = HexColor('#F3F4F6')
+
+    title_style = ParagraphStyle('InvoiceTitle', parent=styles['Title'], fontSize=28, textColor=primary_color, spaceAfter=5*mm, alignment=TA_LEFT)
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=10, textColor=HexColor('#6B7280'), alignment=TA_LEFT)
+    heading_style = ParagraphStyle('Heading', parent=styles['Normal'], fontSize=12, textColor=primary_color, spaceBefore=6*mm, spaceAfter=3*mm)
+    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=9, textColor=HexColor('#6B7280'))
+    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=11, textColor=text_color)
+    value_bold = ParagraphStyle('ValueBold', parent=styles['Normal'], fontSize=11, textColor=text_color, fontName='Helvetica-Bold')
+    right_style = ParagraphStyle('Right', parent=styles['Normal'], fontSize=11, textColor=text_color, alignment=TA_RIGHT)
+    right_bold = ParagraphStyle('RightBold', parent=styles['Normal'], fontSize=11, textColor=text_color, alignment=TA_RIGHT, fontName='Helvetica-Bold')
+    total_style = ParagraphStyle('Total', parent=styles['Normal'], fontSize=14, textColor=primary_color, alignment=TA_RIGHT, fontName='Helvetica-Bold')
+    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=HexColor('#9CA3AF'), alignment=TA_CENTER, spaceBefore=10*mm)
+
+    elements = []
+
+    header_data = [[
+        Paragraph(settings.SITE_NAME, title_style),
+        Paragraph('INVOICE', ParagraphStyle('InvoiceLabel', parent=styles['Normal'], fontSize=32, textColor=HexColor('#E5E7EB'), alignment=TA_RIGHT, fontName='Helvetica-Bold')),
+    ]]
+    header_table = Table(header_data, colWidths=[doc.width*0.6, doc.width*0.4])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 3*mm))
+
+    elements.append(Paragraph(settings.SITE_URL, subtitle_style))
+    elements.append(Spacer(1, 8*mm))
+
+    now = timezone.now()
+    info_left = [
+        [Paragraph('BILL TO', label_style)],
+        [Paragraph(f'{request.user.get_full_name() or request.user.username}', value_bold)],
+        [Paragraph(f'{request.user.email}', value_style)],
+        [Paragraph(f'{request.user.phone or "N/A"}', value_style)],
+    ]
+    info_right = [
+        [Paragraph('INVOICE DETAILS', label_style)],
+        [Paragraph(f'Invoice #: {payment.sslcommerz_tran_id or payment.transaction_id or f"INV-{payment.pk:06d}"}', value_bold)],
+        [Paragraph(f'Date: {now.strftime("%B %d, %Y")}', value_style)],
+        [Paragraph(f'Payment Method: SSLCommerz', value_style)],
+        [Paragraph(f'Status: <font color="#059669"><b>PAID</b></font>', value_style)],
+    ]
+
+    info_table = Table([[info_left, info_right]], colWidths=[doc.width*0.5, doc.width*0.5])
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 10*mm))
+
+    table_data = [
+        [Paragraph('<b>Description</b>', ParagraphStyle('TH', parent=styles['Normal'], fontSize=9, textColor=HexColor('#FFFFFF'))),
+         Paragraph('<b>Plan</b>', ParagraphStyle('TH', parent=styles['Normal'], fontSize=9, textColor=HexColor('#FFFFFF'), alignment=TA_CENTER)),
+         Paragraph('<b>Duration</b>', ParagraphStyle('TH', parent=styles['Normal'], fontSize=9, textColor=HexColor('#FFFFFF'), alignment=TA_CENTER)),
+         Paragraph('<b>Amount</b>', ParagraphStyle('TH', parent=styles['Normal'], fontSize=9, textColor=HexColor('#FFFFFF'), alignment=TA_RIGHT))],
+        [Paragraph('Membership', value_style),
+         Paragraph(f'{membership.plan.name if membership and membership.plan else "Annual Membership"}', ParagraphStyle('TC', parent=value_style, alignment=TA_CENTER)),
+         Paragraph(f'{membership.plan.duration_days if membership and membership.plan else 365} days', ParagraphStyle('TC', parent=value_style, alignment=TA_CENTER)),
+         Paragraph(f'{payment.amount} BDT', right_style)],
+    ]
+
+    items_table = Table(table_data, colWidths=[doc.width*0.35, doc.width*0.25, doc.width*0.20, doc.width*0.20])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), primary_color),
+        ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#FFFFFF')),
+        ('BACKGROUND', (0, 1), (-1, 1), HexColor('#FAFAFA')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#FAFAFA'), light_gray]),
+        ('TOPPADDING', (0, 0), (-1, -1), 3*mm),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3*mm),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3*mm),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3*mm),
+        ('LINEBELOW', (0, 0), (-1, -1), 0.5, HexColor('#E5E7EB')),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 5*mm))
+
+    total_data = [
+        ['', '', Paragraph('Subtotal:', value_style), Paragraph(f'{payment.amount} BDT', right_style)],
+        ['', '', Paragraph('Tax:', value_style), Paragraph('0.00 BDT', right_style)],
+        ['', '', Paragraph('<b>TOTAL:</b>', total_style), Paragraph(f'<b>{payment.amount} BDT</b>', total_style)],
+    ]
+    total_table = Table(total_data, colWidths=[doc.width*0.35, doc.width*0.25, doc.width*0.20, doc.width*0.20])
+    total_table.setStyle(TableStyle([
+        ('TOPPADDING', (0, 0), (-1, -1), 1*mm),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1*mm),
+        ('LINEABOVE', (2, 2), (-1, 2), 1, primary_color),
+    ]))
+    elements.append(total_table)
+    elements.append(Spacer(1, 15*mm))
+
+    elements.append(Paragraph('Thank you for your payment!', ParagraphStyle('Thanks', parent=styles['Normal'], fontSize=12, textColor=success_color, alignment=TA_CENTER, fontName='Helvetica-Bold')))
+    elements.append(Spacer(1, 3*mm))
+    elements.append(Paragraph('This is a computer-generated invoice. No signature is required.', footer_style))
+    elements.append(Paragraph(f'{settings.SITE_NAME} | {settings.SITE_URL}', footer_style))
+
+    doc.build(elements)
+
+    buffer.seek(0)
+    filename = f"invoice_{payment.sslcommerz_tran_id or payment.pk}.pdf"
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response

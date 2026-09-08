@@ -26,9 +26,11 @@
                 <a href="{% url 'dashboard:home' %}" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition flex items-center gap-2">
                     <i class="bi bi-grid-1x2"></i> Go to Dashboard
                 </a>
-                <a href="{% url 'posts:create' %}" class="px-6 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 transition flex items-center gap-2">
-                    <i class="bi bi-plus-circle"></i> Create a Post
+                {% if payment %}
+                <a href="{% url 'payments:download_invoice' payment.pk %}" class="px-6 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 transition flex items-center gap-2">
+                    <i class="bi bi-download"></i> Download Invoice
                 </a>
+                {% endif %}
             </div>
         </div>
 
