@@ -118,6 +118,8 @@ def start_conversation(request, post_id, user_id):
 
 def _initiate_recovery(post, finder, owner):
     from apps.recovery.models import RecoverySession, RecoveryVerificationLog
+    if post.status == 'resolved':
+        return
     session = RecoverySession.objects.filter(
         post=post, status__in=('pending', 'token_generated'),
     ).first()
@@ -146,6 +148,8 @@ def _initiate_recovery(post, finder, owner):
 
 def _link_found_recovery(post, finder, owner):
     from apps.recovery.models import RecoverySession, RecoveryVerificationLog
+    if post.status == 'resolved':
+        return
     session = RecoverySession.objects.filter(
         post=post, status__in=('pending', 'token_generated'),
     ).first()

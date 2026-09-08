@@ -27,9 +27,10 @@
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <select name="type" class="filter-select px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
-                        <option value="">All Types</option>
-                        <option value="lost" {% if current_type == 'lost' %}selected{% endif %}>Lost Items</option>
-                        <option value="found" {% if current_type == 'found' %}selected{% endif %}>Found Items</option>
+                        <option value="">All</option>
+                        <option value="lost" {% if current_type == 'lost' %}selected{% endif %}>Lost</option>
+                        <option value="found" {% if current_type == 'found' %}selected{% endif %}>Found</option>
+                        <option value="resolved" {% if current_type == 'resolved' %}selected{% endif %}>Resolved</option>
                     </select>
                     <select name="category" class="filter-select px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
                         <option value="">All Categories</option>

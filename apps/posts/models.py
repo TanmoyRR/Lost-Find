@@ -66,6 +66,11 @@ class Post(models.Model):
     is_resolved = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     views_count = models.PositiveIntegerField(default=0)
+    matched_post = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='matched_by', verbose_name='Matched Post',
+        help_text='The Lost/Found post this item has been matched with through recovery token verification.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

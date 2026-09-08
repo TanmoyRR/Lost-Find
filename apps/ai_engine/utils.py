@@ -150,8 +150,11 @@ def semantic_search_posts(query_vector, limit=None, min_score=None, **filters):
     if post_type:
         qs = qs.filter(post__post_type=post_type)
     status = filters.get('status')
+    status_filter = filters.get('status_filter', 'active')
     if status:
         qs = qs.filter(post__status=status)
+    elif status_filter == 'active':
+        qs = qs.filter(post__status__in=['open', 'claimed'])
     category_slug = filters.get('category_slug')
     if category_slug:
         qs = qs.filter(post__category__slug=category_slug)
@@ -182,8 +185,11 @@ def keyword_search_posts(query, **filters):
     if post_type:
         qs = qs.filter(post_type=post_type)
     status = filters.get('status')
+    status_filter = filters.get('status_filter', 'active')
     if status:
         qs = qs.filter(status=status)
+    elif status_filter == 'active':
+        qs = qs.filter(status__in=['open', 'claimed'])
     category_slug = filters.get('category_slug')
     if category_slug:
         qs = qs.filter(category__slug=category_slug)
@@ -265,7 +271,7 @@ def _ranked_candidates(post, query_vector):
         from pgvector.django import CosineDistance
         qs = (
             PostEmbedding.objects
-            .filter(post__post_type=opposite_type, post__status='open')
+            .filter(post__post_type=opposite_type, post__status__in=['open', 'claimed'])
             .exclude(post__pk=post.pk)
             .select_related('post', 'post__category', 'post__location')
             .annotate(distance=CosineDistance('embedding', query_vector))
@@ -278,7 +284,7 @@ def _ranked_candidates(post, query_vector):
 
     candidates = (
         Post.objects
-        .filter(post_type=opposite_type, status='open')
+        .filter(post_type=opposite_type, status__in=['open', 'claimed'])
         .exclude(pk=post.pk)
         .select_related('category', 'location')
         .prefetch_related('tags')[:limit]

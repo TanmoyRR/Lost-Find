@@ -37,6 +37,11 @@ class PostForm(forms.ModelForm):
     image = forms.ImageField(required=False, widget=forms.FileInput(attrs={
         'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'
     }))
+    recovery_token = forms.CharField(required=False, widget=forms.TextInput(attrs={
+        'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition font-mono tracking-widest uppercase',
+        'placeholder': 'LF-XXXXXX',
+        'maxlength': 10,
+    }), help_text='Optional. If you have a recovery token from the owner, enter it here to link your found post to their lost post.')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

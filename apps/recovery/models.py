@@ -66,10 +66,6 @@ class RecoverySession(models.Model):
             self.short_code = generate_short_code()
             while RecoverySession.objects.filter(short_code=self.short_code).exists():
                 self.short_code = generate_short_code()
-        if not self.expires_at and self.status in ('pending', 'token_generated'):
-            from django.conf import settings
-            ttl_days = getattr(settings, 'RECOVERY_SESSION_TTL_DAYS', 30)
-            self.expires_at = timezone.now() + timedelta(days=ttl_days)
         super().save(*args, **kwargs)
 
 

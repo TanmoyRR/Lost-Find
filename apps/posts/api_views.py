@@ -10,12 +10,18 @@ def api_posts(request):
     post_type = request.GET.get('type', '')
     category = request.GET.get('category', '')
     location = request.GET.get('location', '')
-    status = request.GET.get('status', '')
 
-    if status:
-        posts = Post.objects.filter(status=status).select_related('category', 'location')
+    posts = Post.objects.select_related('category', 'location')
+
+    if post_type:
+        if post_type == 'resolved':
+            posts = posts.filter(status='resolved')
+        elif post_type == 'lost':
+            posts = posts.filter(post_type='lost', status__in=['open', 'claimed'])
+        elif post_type == 'found':
+            posts = posts.filter(post_type='found', status__in=['open', 'claimed'])
     else:
-        posts = Post.objects.filter(status='open').select_related('category', 'location')
+        posts = posts.filter(status__in=['open', 'claimed', 'resolved'])
 
     if query:
         posts = posts.filter(
@@ -23,8 +29,6 @@ def api_posts(request):
             Q(description__icontains=query) |
             Q(category__name__icontains=query)
         )
-    if post_type:
-        posts = posts.filter(post_type=post_type)
     if category:
         posts = posts.filter(category__slug=category)
     if location:

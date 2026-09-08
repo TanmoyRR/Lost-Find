@@ -20,12 +20,22 @@ logger = logging.getLogger('apps.ai_engine')
 @login_required
 def ai_search(request):
     query = request.GET.get('q', '').strip()
+    raw_type = request.GET.get('type', '')
     filters = {
-        'post_type': request.GET.get('type', ''),
         'category_slug': request.GET.get('category', ''),
         'location_slug': request.GET.get('location', ''),
-        'status': request.GET.get('status', 'open'),
     }
+
+    if raw_type == 'resolved':
+        filters['status'] = 'resolved'
+    elif raw_type == 'lost':
+        filters['post_type'] = 'lost'
+        filters['status_filter'] = 'active'
+    elif raw_type == 'found':
+        filters['post_type'] = 'found'
+        filters['status_filter'] = 'active'
+    else:
+        filters['status_filter'] = 'all'
 
     results = []
     used_fallback = False
@@ -102,6 +112,11 @@ def accept_match(request, match_id):
 
     lost_post = match.post if match.post.post_type == 'lost' else match.matched_post
     found_post = match.matched_post if match.post.post_type == 'lost' else match.post
+
+    if lost_post.status == 'resolved' or found_post.status == 'resolved':
+        messages.error(request, 'This match involves a resolved post and cannot be accepted.')
+        return redirect('ai:matches')
+
     finder = found_post.user
 
     match.status = 'accepted'

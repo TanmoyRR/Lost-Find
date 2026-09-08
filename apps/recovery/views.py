@@ -180,6 +180,10 @@ def enter_token(request, short_code):
             messages.error(request, 'Invalid or inactive token. Please check the code and try again.')
             return render(request, 'recovery/enter_token.html', {'session': session, 'sidebar_items': _get_sidebar(request.user)})
 
+        if owner_session.post.status == 'resolved':
+            messages.error(request, 'This recovery token has already been used for a resolved case.')
+            return render(request, 'recovery/enter_token.html', {'session': session, 'sidebar_items': _get_sidebar(request.user)})
+
         with transaction.atomic():
             session.claimant = request.user
             session.status = 'completed'
@@ -193,10 +197,15 @@ def enter_token(request, short_code):
             owner_session.completed_at = timezone.now()
             owner_session.save(update_fields=['claimant', 'status', 'token_verified_at', 'completed_at'])
 
-            for p in [session.post, owner_session.post]:
-                p.status = 'resolved'
-                p.is_resolved = True
-                p.save(update_fields=['status', 'is_resolved'])
+            session.post.status = 'resolved'
+            session.post.is_resolved = True
+            session.post.matched_post = owner_session.post
+            session.post.save(update_fields=['status', 'is_resolved', 'matched_post'])
+
+            owner_session.post.status = 'resolved'
+            owner_session.post.is_resolved = True
+            owner_session.post.matched_post = session.post
+            owner_session.post.save(update_fields=['status', 'is_resolved', 'matched_post'])
 
             RecoveryVerificationLog.objects.create(
                 session=session, action='recovery_completed',

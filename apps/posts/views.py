@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q, F
+from django.db import transaction
 from django.core.paginator import Paginator
 
 from .models import Post, Category, CampusLocation
@@ -21,9 +22,18 @@ def browse_posts(request):
     post_type = request.GET.get('type', '')
     category = request.GET.get('category', '')
     location = request.GET.get('location', '')
-    status = request.GET.get('status', '')
 
     posts = Post.objects.select_related('category', 'location', 'user')
+
+    if post_type:
+        if post_type == 'resolved':
+            posts = posts.filter(status='resolved')
+        elif post_type == 'lost':
+            posts = posts.filter(post_type='lost', status__in=['open', 'claimed'])
+        elif post_type == 'found':
+            posts = posts.filter(post_type='found', status__in=['open', 'claimed'])
+    else:
+        posts = posts.filter(status__in=['open', 'claimed', 'resolved'])
 
     if query:
         posts = posts.filter(
@@ -31,14 +41,10 @@ def browse_posts(request):
             Q(description__icontains=query) |
             Q(category__name__icontains=query)
         )
-    if post_type:
-        posts = posts.filter(post_type=post_type)
     if category:
         posts = posts.filter(category__slug=category)
     if location:
         posts = posts.filter(location__slug=location)
-    if status:
-        posts = posts.filter(status=status)
 
     paginator = Paginator(posts, 12)
     page = request.GET.get('page', 1)
@@ -114,12 +120,39 @@ def create_post(request):
                 except Exception:
                     pass
             elif post.post_type == 'found':
-                try:
-                    from apps.recovery.views import create_finder_recovery_session
-                    session = create_finder_recovery_session(post)
-                    messages.info(request, f'Recovery token ready: {session.short_code}')
-                except Exception:
-                    pass
+                recovery_token = form.cleaned_data.get('recovery_token', '').strip().upper()
+                token_linked = False
+                if recovery_token:
+                    from apps.recovery.models import RecoverySession, RecoveryVerificationLog
+                    owner_session = RecoverySession.objects.filter(
+                        short_code=recovery_token,
+                        status='token_generated',
+                        post__status__in=['open', 'claimed'],
+                    ).select_related('post', 'owner').exclude(post=post).first()
+                    if owner_session and not owner_session.claimant:
+                        with transaction.atomic():
+                            owner_session.claimant = request.user
+                            owner_session.save(update_fields=['claimant'])
+                            post.matched_post = owner_session.post
+                            post.save(update_fields=['matched_post'])
+                            owner_session.post.matched_post = post
+                            owner_session.post.save(update_fields=['matched_post'])
+                            RecoveryVerificationLog.objects.create(
+                                session=owner_session, action='token_linked_on_creation',
+                                performed_by=request.user,
+                                details={'found_post_id': post.id, 'found_post_title': post.title},
+                            )
+                        messages.success(request, f'Post linked to lost item "{owner_session.post.title}" via recovery token.')
+                        token_linked = True
+                    else:
+                        messages.warning(request, 'Invalid or already-used recovery token. Your post was created without linking.')
+                if not token_linked:
+                    try:
+                        from apps.recovery.views import create_finder_recovery_session
+                        session = create_finder_recovery_session(post)
+                        messages.info(request, f'Recovery token ready: {session.short_code}')
+                    except Exception:
+                        pass
             try:
                 find_matches_for_post(post)
             except Exception:
