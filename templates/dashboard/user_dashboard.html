@@ -180,7 +180,7 @@
             <a href="{% url 'posts:my_posts' %}" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition">View All</a>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="w-full text-sm hidden md:table">
                 <thead>
                     <tr class="text-left text-gray-400 border-b border-gray-50 bg-gray-50/50">
                         <th class="px-6 py-3 font-semibold text-xs uppercase tracking-wider">Title</th>
@@ -242,6 +242,31 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+        <!-- Mobile card layout -->
+        <div class="md:hidden divide-y divide-gray-50">
+            {% for post in posts %}
+            <div class="px-4 py-3 flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                    {% if post.image %}
+                    <img src="{{ post.image.url }}" alt="{{ post.title }}" class="w-full h-full object-cover">
+                    {% else %}
+                    <div class="w-full h-full flex items-center justify-center"><i class="bi bi-image text-gray-300"></i></div>
+                    {% endif %}
+                </div>
+                <div class="min-w-0 flex-1">
+                    <a href="{% url 'posts:detail' post.pk %}" class="text-sm font-medium text-gray-800 hover:text-indigo-600 truncate block">{{ post.title|truncatechars:35 }}</a>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded {% if post.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ post.get_post_type_display }}</span>
+                        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded {% if post.status == 'open' %}bg-amber-100 text-amber-700{% elif post.status == 'resolved' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ post.get_status_display }}</span>
+                        <span class="text-[10px] text-gray-400">{{ post.created_at|date:"M d" }}</span>
+                    </div>
+                </div>
+                <a href="{% url 'posts:edit' post.pk %}" class="p-2 rounded-lg hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 flex-shrink-0"><i class="bi bi-pencil"></i></a>
+            </div>
+            {% empty %}
+            <div class="px-4 py-8 text-center text-gray-400 text-sm">No posts yet</div>
+            {% endfor %}
         </div>
     </div>
 </div>

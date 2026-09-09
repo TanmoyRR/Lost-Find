@@ -1,0 +1,62 @@
+{% extends 'base/dashboard_base.html' %}
+
+{% block page_title %}Messages{% endblock %}
+
+{% block dashboard_content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Messages</h1>
+        <span class="text-sm text-gray-500">{{ conversations|length }} conversation{{ conversations|length|pluralize }}</span>
+    </div>
+
+    {% if conversations %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
+        {% for conv in conversations %}
+        <a href="{% url 'messaging:detail' conv.pk %}"
+           class="flex items-center gap-4 px-4 sm:px-6 py-4 hover:bg-gray-50 transition group">
+            <div class="w-11 h-11 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                {% with other=conv.other_participants.0 %}
+                <span class="text-indigo-600 font-semibold text-sm">{{ other.get_full_name|default:other.username|first|upper }}</span>
+                {% endwith %}
+            </div>
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-2">
+                    <h3 class="text-sm font-semibold text-gray-900 truncate group-hover:text-indigo-600 transition">
+                        {% with other=conv.other_participants.0 %}
+                        {{ other.get_full_name|default:other.username }}
+                        {% endwith %}
+                    </h3>
+                    <span class="text-xs text-gray-400 flex-shrink-0">{{ conv.last_message.created_at|timesince }} ago</span>
+                </div>
+                {% if conv.subject %}
+                <p class="text-xs text-gray-400 truncate">{{ conv.subject }}</p>
+                {% endif %}
+                <p class="text-sm text-gray-500 truncate mt-0.5">
+                    {% if conv.last_message %}
+                        {% if conv.last_message.sender == request.user %}You: {% endif %}
+                        {{ conv.last_message.body|truncatewords:12 }}
+                    {% else %}
+                        No messages yet
+                    {% endif %}
+                </p>
+            </div>
+            {% if conv.unread_count > 0 %}
+            <span class="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{{ conv.unread_count }}</span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <i class="bi bi-chat-dots text-3xl text-gray-300"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-700 mb-2">No conversations yet</h3>
+        <p class="text-sm text-gray-500 mb-6">Start a conversation by contacting someone on a post.</p>
+        <a href="{% url 'posts:browse' %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition">
+            <i class="bi bi-search"></i> Browse Posts
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

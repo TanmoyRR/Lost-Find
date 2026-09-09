@@ -157,7 +157,7 @@
             <a href="{% url 'dashboard:admin_users' %}" class="text-indigo-500 text-sm font-medium hover:underline">View All</a>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="w-full text-sm hidden md:table">
                 <thead>
                     <tr class="text-left text-gray-500 border-b border-gray-100">
                         <th class="pb-3 font-medium">User</th>
@@ -194,6 +194,22 @@
                 </tbody>
             </table>
         </div>
+        <!-- Mobile card layout -->
+        <div class="md:hidden divide-y divide-gray-50">
+            {% for u in users %}
+            <div class="px-4 py-3 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-medium flex-shrink-0">{{ u.get_full_name|default:u.username|first|upper }}</div>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-gray-800 truncate">{{ u.get_full_name|default:u.username }}</p>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded {% if u.role == 'admin' %}bg-purple-100 text-purple-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ u.get_role_display }}</span>
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded {% if u.is_suspended %}bg-red-100 text-red-700{% elif u.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-600{% endif %}">{% if u.is_suspended %}Suspended{% elif u.is_active %}Active{% else %}Inactive{% endif %}</span>
+                    </div>
+                </div>
+                <a href="{% url 'dashboard:admin_user_detail' u.pk %}" class="text-xs text-indigo-500 font-medium flex-shrink-0">View</a>
+            </div>
+            {% endfor %}
+        </div>
     </div>
 
     <!-- Recent Posts -->
@@ -203,7 +219,7 @@
             <a href="{% url 'dashboard:admin_posts' %}" class="text-indigo-500 text-sm font-medium hover:underline">View All</a>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="w-full text-sm hidden md:table">
                 <thead>
                     <tr class="text-left text-gray-500 border-b border-gray-100">
                         <th class="pb-3 font-medium">Title</th>
@@ -239,6 +255,28 @@
                 </tbody>
             </table>
         </div>
+        <!-- Mobile card layout -->
+        <div class="md:hidden divide-y divide-gray-50">
+            {% for p in posts %}
+            <div class="px-4 py-3 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                    {% if p.image %}
+                    <img src="{{ p.image.url }}" alt="" class="w-full h-full object-cover">
+                    {% else %}
+                    <div class="w-full h-full flex items-center justify-center"><i class="bi bi-image text-gray-300"></i></div>
+                    {% endif %}
+                </div>
+                <div class="min-w-0 flex-1">
+                    <a href="{% url 'posts:detail' p.pk %}" class="text-sm font-medium text-gray-800 hover:text-indigo-600 truncate block">{{ p.title|truncatechars:35 }}</a>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded {% if p.post_type == 'lost' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ p.get_post_type_display }}</span>
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded {% if p.status == 'open' %}bg-amber-100 text-amber-700{% elif p.status == 'resolved' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ p.get_status_display }}</span>
+                        <span class="text-[10px] text-gray-400">{{ p.created_at|date:"M d" }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
 
     <!-- Recent Payments -->
@@ -248,7 +286,7 @@
             <a href="{% url 'dashboard:admin_revenue' %}" class="text-indigo-500 text-sm font-medium hover:underline">View All</a>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="w-full text-sm hidden md:table">
                 <thead>
                     <tr class="text-left text-gray-500 border-b border-gray-100">
                         <th class="pb-3 font-medium">User</th>
@@ -268,6 +306,21 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+        <!-- Mobile card layout -->
+        <div class="md:hidden divide-y divide-gray-50">
+            {% for p in payments %}
+            <div class="px-4 py-3 flex items-center justify-between">
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-gray-800 truncate">{{ p.user.get_full_name|default:p.user.username }}</p>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-xs font-medium text-gray-700">{{ p.amount }} BDT</span>
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded {% if p.status == 'completed' %}bg-emerald-100 text-emerald-700{% elif p.status == 'pending' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">{{ p.get_status_display }}</span>
+                    </div>
+                </div>
+                <span class="text-xs text-gray-400 flex-shrink-0 ml-3">{{ p.created_at|date:"M d" }}</span>
+            </div>
+            {% endfor %}
         </div>
     </div>
 </div>
