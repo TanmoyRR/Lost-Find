@@ -64,26 +64,6 @@ def create_recovery_session_for_post(post):
     return session
 
 
-def create_finder_recovery_session(post):
-    """
-    Create a RecoverySession when a Found Post is created.
-    The finder (post creator) is set as claimant, ready to enter the owner's token.
-    """
-    session = RecoverySession.objects.create(
-        post=post,
-        owner=post.user,
-        claimant=post.user,
-        status='token_generated',
-    )
-    RecoveryVerificationLog.objects.create(
-        session=session, action='session_created',
-        performed_by=post.user,
-        details={'post_id': post.id, 'post_title': post.title, 'role': 'finder'},
-    )
-    logger.info('Finder recovery session %s created for found post %s', session.short_code, post.pk)
-    return session
-
-
 @login_required
 def recovery_list(request):
     sessions = RecoverySession.objects.filter(

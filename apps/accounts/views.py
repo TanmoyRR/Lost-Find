@@ -50,22 +50,6 @@ def _send_email(subject, template, context, recipient):
     send_mail(subject, plain, settings.DEFAULT_FROM_EMAIL, [recipient], html_message=html)
 
 
-def _send_verification_email(user):
-    token = user.email_verification_token
-    verify_url = f'{settings.SITE_URL}/verify-email/{token}/'
-    context = {'user': user, 'verify_url': verify_url, 'site_name': settings.SITE_NAME}
-    _send_email(
-        subject=f'Verify your email - {settings.SITE_NAME}',
-        template='accounts/emails/email_verification.html',
-        context=context,
-        recipient=user.email,
-    )
-    if settings.DEBUG:
-        logger.info('VERIFICATION LINK (dev): %s', verify_url)
-        return verify_url
-    return None
-
-
 @ratelimit(key='ip', rate='5/m', method=['POST'], block=True)
 def register(request):
     if request.method == 'POST':
@@ -131,53 +115,6 @@ def user_login(request):
     else:
         form = LoginForm()
     return render(request, 'accounts/login.html', {'form': form})
-
-
-def verify_email(request, token):
-    user = get_object_or_404(User, email_verification_token=token)
-    if user.email_verification_sent_at and (timezone.now() - user.email_verification_sent_at).total_seconds() > 86400:
-        messages.error(request, 'Verification link has expired. Please sign in and request a new one.')
-        return redirect('accounts:login')
-    user.email_verified = True
-    user.is_verified = True
-    user.email_verification_token = None
-    user.email_verification_sent_at = None
-    user.save()
-    messages.success(request, 'Email verified successfully! You can now login.')
-    return redirect('accounts:login')
-
-
-@login_required
-def verify_email_gate(request):
-    if request.user.email_verified or request.user.role == 'admin':
-        return redirect('dashboard:home')
-    context = {}
-    if settings.DEBUG and request.user.email_verification_token:
-        context['dev_verify_url'] = f'{settings.SITE_URL}/verify-email/{request.user.email_verification_token}/'
-    return render(request, 'accounts/verify_email_gate.html', context)
-
-
-@login_required
-@ratelimit(key='ip', rate='3/m', method=['POST'], block=True)
-def resend_verification(request):
-    if request.user.email_verified or request.user.role == 'admin':
-        return redirect('dashboard:home')
-    if request.method == 'POST':
-        user = request.user
-        user.email_verification_token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
-        user.email_verification_sent_at = timezone.now()
-        user.save()
-        try:
-            _send_verification_email(user)
-            messages.success(request, 'Verification email sent! Check your inbox.')
-        except Exception:
-            logger.warning('Failed to resend verification email for user %s', user.pk, exc_info=True)
-            messages.error(request, 'Failed to send email. Please try again later.')
-        context = {}
-        if settings.DEBUG and user.email_verification_token:
-            context['dev_verify_url'] = f'{settings.SITE_URL}/verify-email/{user.email_verification_token}/'
-        return render(request, 'accounts/verify_email_gate.html', context)
-    return redirect('accounts:verify_email_gate')
 
 
 @ratelimit(key='ip', rate='5/m', method=['POST'], block=True)
@@ -319,10 +256,10 @@ def delete_account(request):
         return redirect('accounts:settings')
     user = request.user
     username = user.username
+    logout(request)
     user.delete()
     response = redirect('pages:home')
     response.set_cookie('account_deleted_msg', username, max_age=10)
-    logout(request)
     return response
 
 

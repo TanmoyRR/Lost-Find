@@ -245,7 +245,11 @@ def _complete_membership_payment(payment):
     if payment.status != 'pending':
         return False
 
-    plan = MembershipPlan.objects.get(pk=payment.reference_id)
+    try:
+        plan = MembershipPlan.objects.get(pk=payment.reference_id)
+    except (MembershipPlan.DoesNotExist, ValueError):
+        logger.error('Plan %s not found for payment %s', payment.reference_id, payment.pk)
+        return False
     membership, _ = Membership.objects.get_or_create(user=payment.user)
     membership.plan = plan
     membership.is_active = True
