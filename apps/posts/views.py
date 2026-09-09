@@ -33,7 +33,7 @@ def browse_posts(request):
         elif post_type == 'found':
             posts = posts.filter(post_type='found', status__in=['open', 'claimed'])
     else:
-        posts = posts.filter(status__in=['open', 'claimed', 'resolved'])
+        posts = posts.filter(status__in=['open', 'claimed'])
 
     if query:
         posts = posts.filter(
@@ -61,7 +61,7 @@ def browse_posts(request):
         'current_type': post_type,
         'current_category': category,
         'current_location': location,
-        'current_status': status,
+        'current_status': post_type,
     })
 
 
@@ -86,7 +86,9 @@ def post_detail(request, pk):
     ai_matches_qs = MatchSuggestion.objects.select_related(
         'post', 'matched_post', 'post__category', 'matched_post__category'
     ).filter(
-        Q(post=post) | Q(matched_post=post)
+        Q(post=post) | Q(matched_post=post),
+        post__status__in=['open', 'claimed'],
+        matched_post__status__in=['open', 'claimed'],
     ).order_by('-similarity_score')[:5]
     ai_matches = []
     for m in ai_matches_qs:
@@ -147,12 +149,7 @@ def create_post(request):
                     else:
                         messages.warning(request, 'Invalid or already-used recovery token. Your post was created without linking.')
                 if not token_linked:
-                    try:
-                        from apps.recovery.views import create_finder_recovery_session
-                        session = create_finder_recovery_session(post)
-                        messages.info(request, f'Recovery token ready: {session.short_code}')
-                    except Exception:
-                        pass
+                    messages.info(request, 'Your found post was created. An owner can link it using their recovery token.')
             try:
                 find_matches_for_post(post)
             except Exception:

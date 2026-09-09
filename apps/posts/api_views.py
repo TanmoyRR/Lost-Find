@@ -21,7 +21,7 @@ def api_posts(request):
         elif post_type == 'found':
             posts = posts.filter(post_type='found', status__in=['open', 'claimed'])
     else:
-        posts = posts.filter(status__in=['open', 'claimed', 'resolved'])
+        posts = posts.filter(status__in=['open', 'claimed'])
 
     if query:
         posts = posts.filter(
