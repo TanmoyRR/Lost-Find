@@ -38,6 +38,8 @@ ai_cache/
 
 # Environment
 .env
+.env.*.bak
+.env.bak
 
 # Logs
 *.log
