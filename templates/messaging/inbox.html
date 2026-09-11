@@ -15,14 +15,14 @@
         <a href="{% url 'messaging:detail' conv.pk %}"
            class="flex items-center gap-4 px-4 sm:px-6 py-4 hover:bg-gray-50 transition group">
             <div class="w-11 h-11 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                {% with other=conv.other_participants.0 %}
+                {% with other=conv._other_participants.0 %}
                 <span class="text-indigo-600 font-semibold text-sm">{{ other.get_full_name|default:other.username|first|upper }}</span>
                 {% endwith %}
             </div>
             <div class="min-w-0 flex-1">
                 <div class="flex items-center justify-between gap-2">
                     <h3 class="text-sm font-semibold text-gray-900 truncate group-hover:text-indigo-600 transition">
-                        {% with other=conv.other_participants.0 %}
+                        {% with other=conv._other_participants.0 %}
                         {{ other.get_full_name|default:other.username }}
                         {% endwith %}
                     </h3>

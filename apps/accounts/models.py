@@ -46,7 +46,7 @@ class User(AbstractUser):
     reset_password_sent_at = models.DateTimeField(null=True, blank=True)
     failed_login_attempts = models.IntegerField(default=0)
     locked_until = models.DateTimeField(null=True, blank=True)
-    last_activity = models.DateTimeField(auto_now=True)
+    last_activity = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

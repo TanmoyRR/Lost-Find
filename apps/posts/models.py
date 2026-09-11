@@ -94,6 +94,7 @@ class Post(models.Model):
         return self.location_name or 'N/A'
 
     def save(self, *args, **kwargs):
+        self.is_resolved = (self.status == 'resolved')
         is_new = self.pk is None
         super().save(*args, **kwargs)
         if is_new:

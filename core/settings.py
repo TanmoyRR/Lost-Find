@@ -63,9 +63,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.accounts.middleware.ActiveUserMiddleware',
     'apps.accounts.middleware.MembershipPendingMiddleware',
     'apps.accounts.middleware.MembershipMiddleware',
-    'apps.accounts.middleware.ActiveUserMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -282,6 +282,7 @@ CRISPY_TEMPLATE_PACK = 'tailwind'
 SSLCOMMERZ_STORE_ID = config('SSLCOMMERZ_STORE_ID', default='')
 SSLCOMMERZ_STORE_PASS = config('SSLCOMMERZ_STORE_PASS', default='')
 SSLCOMMERZ_IS_SANDBOX = config('SSLCOMMERZ_IS_SANDBOX', default=True, cast=bool)
+SSLCOMMERZ_SANDBOX_AUTO_COMPLETE = config('SSLCOMMERZ_SANDBOX_AUTO_COMPLETE', default=False, cast=bool)
 SSLCOMMERZ_BASE_URL = 'https://sandbox.sslcommerz.com' if SSLCOMMERZ_IS_SANDBOX else 'https://secure.sslcommerz.com'
 
 # Celery (optional)
@@ -336,7 +337,10 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@iubat-smartfi
 # Supabase Storage (S3-compatible)
 SUPABASE_BUCKET = config('SUPABASE_BUCKET', default='smartfind-media')
 
-import storages.backends.s3boto3  # noqa - ensure storage backend is available
+try:
+    import storages.backends.s3boto3  # noqa - ensure storage backend is available
+except ImportError:
+    pass
 
 AWS_ACCESS_KEY_ID = config('SUPABASE_S3_ACCESS_KEY', default='')
 AWS_SECRET_ACCESS_KEY = config('SUPABASE_S3_SECRET_KEY', default='')

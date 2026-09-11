@@ -1,7 +1,11 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from pgvector.django import VectorField
+
+try:
+    from pgvector.django import VectorField
+except ImportError:
+    from django.db.models import JSONField as VectorField
 
 
 class PostEmbedding(models.Model):
@@ -52,14 +56,9 @@ class MatchSuggestion(models.Model):
             models.Index(fields=['status', '-similarity_score'], name='match_status_score_idx'),
         ]
 
-    def clean(self):
+    def save(self, *args, **kwargs):
         if self.post_id and self.matched_post_id and self.post_id == self.matched_post_id:
             raise ValidationError('A post cannot match itself.')
-
-    def __str__(self):
-        return f"Match: {self.post.title[:30]} <-> {self.matched_post.title[:30]} ({self.similarity_score:.0%})"
-
-    def save(self, *args, **kwargs):
         is_new = self.pk is None
         super().save(*args, **kwargs)
         if is_new:
@@ -94,3 +93,6 @@ class MatchSuggestion(models.Model):
             except Exception:
                 import logging
                 logging.getLogger(__name__).exception('Failed to create match notification')
+
+    def __str__(self):
+        return f"Match: {self.post.title[:30]} <-> {self.matched_post.title[:30]} ({self.similarity_score:.0%})"

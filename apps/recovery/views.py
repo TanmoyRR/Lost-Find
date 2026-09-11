@@ -85,8 +85,21 @@ def recovery_detail(request, short_code):
         messages.error(request, 'You do not have access to this recovery session.')
         return redirect('recovery:list')
 
-    is_owner = request.user == session.owner
-    is_finder = request.user == session.claimant
+    if session.post.post_type == 'found':
+        actual_finder = session.post.user
+        if session.owner != session.post.user:
+            actual_owner = session.owner
+        elif session.claimant and session.claimant != session.post.user:
+            actual_owner = session.claimant
+        else:
+            actual_owner = session.owner
+        is_owner = request.user == actual_owner
+        is_finder = request.user == actual_finder
+    else:
+        actual_finder = session.claimant
+        actual_owner = session.owner
+        is_owner = request.user == session.owner
+        is_finder = request.user == session.claimant
 
     step_order = ['pending', 'token_generated', 'token_entered', 'completed']
     try:
@@ -99,11 +112,23 @@ def recovery_detail(request, short_code):
         {'label': 'Completed', 'icon': 'bi-flag', 'done': session.status == 'completed'},
     ]
 
+    owner_lost_session = None
+    if session.post.post_type == 'found' and is_owner:
+        owner_lost_session = RecoverySession.objects.filter(
+            post__user=actual_owner,
+            post__post_type='lost',
+            post__status='open',
+            status='token_generated',
+        ).exclude(pk=session.pk).select_related('post').first()
+
     return render(request, 'recovery/recovery_detail.html', {
         'session': session,
         'steps': steps,
         'is_owner': is_owner,
         'is_finder': is_finder,
+        'actual_owner': actual_owner,
+        'actual_finder': actual_finder,
+        'owner_lost_session': owner_lost_session,
         'sidebar_items': _get_sidebar(request.user),
     })
 
@@ -164,6 +189,12 @@ def enter_token(request, short_code):
             messages.error(request, 'This recovery token has already been used for a resolved case.')
             return render(request, 'recovery/enter_token.html', {'session': session, 'sidebar_items': _get_sidebar(request.user)})
 
+        involved_users = {session.owner_id, session.claimant_id, owner_session.owner_id, owner_session.claimant_id}
+        involved_users.discard(None)
+        if len(involved_users) > 2:
+            messages.error(request, 'This token does not match your recovery session. Please check the code and try again.')
+            return render(request, 'recovery/enter_token.html', {'session': session, 'sidebar_items': _get_sidebar(request.user)})
+
         with transaction.atomic():
             session.claimant = request.user
             session.status = 'completed'
@@ -178,14 +209,12 @@ def enter_token(request, short_code):
             owner_session.save(update_fields=['claimant', 'status', 'token_verified_at', 'completed_at'])
 
             session.post.status = 'resolved'
-            session.post.is_resolved = True
             session.post.matched_post = owner_session.post
-            session.post.save(update_fields=['status', 'is_resolved', 'matched_post'])
+            session.post.save(update_fields=['status', 'matched_post'])
 
             owner_session.post.status = 'resolved'
-            owner_session.post.is_resolved = True
             owner_session.post.matched_post = session.post
-            owner_session.post.save(update_fields=['status', 'is_resolved', 'matched_post'])
+            owner_session.post.save(update_fields=['status', 'matched_post'])
 
             RecoveryVerificationLog.objects.create(
                 session=session, action='recovery_completed',
@@ -285,8 +314,19 @@ def admin_force_complete(request, short_code):
         details={'reason': 'Admin intervention'},
     )
     session.post.status = 'resolved'
-    session.post.is_resolved = True
-    session.post.save(update_fields=['status', 'is_resolved'])
+    session.post.save(update_fields=['status'])
+
+    paired_session = RecoverySession.objects.filter(
+        post__matched_post=session.post,
+        status__in=['pending', 'token_generated', 'token_entered'],
+    ).exclude(pk=session.pk).first()
+    if paired_session and paired_session.post_id:
+        paired_session.status = 'completed'
+        paired_session.completed_at = tz.now()
+        paired_session.save(update_fields=['status', 'completed_at'])
+        paired_session.post.status = 'resolved'
+        paired_session.post.save(update_fields=['status'])
+
     messages.success(request, f'Recovery session {session.short_code} force-completed.')
     return redirect('recovery:admin_list')
 

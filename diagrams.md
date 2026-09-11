@@ -245,128 +245,247 @@ classDiagram
 
 ```mermaid
 erDiagram
-    USERS ||--o{ USERS_ACTIVITY : logs
-    USERS ||--o| MEMBERSHIP : has
-    USERS ||--o{ PAYMENTS : makes
-    USERS ||--o{ POSTS : creates
-    USERS ||--o{ CONVERSATIONS : joins
-    USERS ||--o{ NOTIFICATIONS : receives
-    USERS ||--o{ TRUST_REPORT : report / reported
+    USER ||--o{ USER_ACTIVITY : "generates"
+    USER ||--o| MEMBERSHIP : "has"
+    USER ||--o{ PAYMENT : "makes"
+    USER ||--o{ POST : "creates"
+    USER ||--o{ CONVERSATION : "participates in"
+    USER ||--o{ NOTIFICATION : "receives"
+    USER ||--o{ TRUST_REPORT : "reports"
+    USER ||--o{ MESSAGE : "sends"
+    USER ||--o{ RECOVERY_SESSION : "claims"
+    USER ||--o{ RECOVERY_VERIFICATION_LOG : "performs"
 
-    MEMBERSHIPPLAN ||--o{ MEMBERSHIP : defines
-    MEMBERSHIP }o--|| MEMBERSHIPPLAN : "plan ->"
+    MEMBERSHIPPLAN ||--o{ MEMBERSHIP : "defines"
 
-    CATEGORY ||--o{ POSTS : categorizes
-    CAMPUSLOCATION ||--o{ POSTS : places
+    CATEGORY ||--o{ POST : "categorizes"
+    CAMPUS_LOCATION ||--o{ POST : "places"
 
-    POSTS ||--o{ POST_IMAGES : has
-    POSTS ||--o{ POST_TAGS : has
-    POSTS |o--o| SUCCESS_STORIES : produces
-    POSTS ||--o{ RECOVERY_SESSIONS : recovered_by
-    POSTS ||--o{ MATCH_SUGGESTIONS : matched
-    POSTS ||--o{ CONVERSATIONS : sourced
+    POST ||--o{ POST_IMAGE : "has"
+    POST ||--o{ POST_TAG : "has"
+    POST ||--o| SUCCESS_STORY : "produces"
+    POST ||--o| POST_EMBEDDING : "has embedding"
+    POST ||--o{ MATCH_SUGGESTION : "suggests matches"
+    POST ||--o{ RECOVERY_SESSION : "recovered via"
+    POST ||--o{ TRUST_REPORT : "reported for"
+    POST ||--o{ CONVERSATION : "sourced from"
+    POST ||--o{ POST : "matched with"
 
-    RECOVERY_SESSIONS ||--o| RECOVERY_CONFIRMATIONS : confirms
-    RECOVERY_SESSIONS ||--o{ RECOVERY_OTPS : verifies
-    RECOVERY_SESSIONS ||--o{ RECOVERY_LOG : traces
+    CONVERSATION ||--o{ MESSAGE : "contains"
+    CONVERSATION }o--|| USER : "has participants"
 
-    CONVERSATIONS ||--o{ MESSAGES : contains
+    RECOVERY_SESSION ||--o{ RECOVERY_VERIFICATION_LOG : "verified by"
 
-    USERS {
+    USER {
         uuid uid PK
-        varchar username
+        varchar username UK
+        varchar email UK
         varchar password
-        varchar email
-        varchar role
-        varchar student_id
+        varchar role "guest | student | admin"
+        varchar student_id UK
         varchar department
         varchar phone
+        text bio
+        text address
+        json social_links
         int reputation_score
         bool is_verified
         bool is_active
         bool is_suspended
         bool is_membership_paid
         bool email_verified
-        int last_activity FK
+        varchar email_verification_token
+        varchar reset_password_token
+        int failed_login_attempts
+        timestamp locked_until
+        timestamp last_activity
     }
+
+    USER_ACTIVITY {
+        bigint id PK
+        bigint user_id FK
+        varchar activity_type
+        text description
+        json metadata
+        timestamp created_at
+    }
+
+    MEMBERSHIPPLAN {
+        bigint id PK
+        varchar name
+        decimal price
+        int duration_days
+        text description
+        bool is_active
+    }
+
     MEMBERSHIP {
-        int id PK
-        int user_id FK
-        int plan_id FK
+        bigint id PK
+        bigint user_id FK "OneToOne"
+        bigint plan_id FK
         bool is_active
         timestamp started_at
         timestamp expires_at
     }
-    MEMBERSHIPPLAN {
-        int id PK
+
+    PAYMENT {
+        bigint id PK
+        bigint user_id FK
+        varchar transaction_id
+        decimal amount
+        varchar payment_type "membership | reward"
+        varchar status "pending | processing | completed | failed | cancelled"
+        text sslcommerz_session
+        varchar sslcommerz_tran_id
+        varchar reference_id
+        json metadata
+    }
+
+    CATEGORY {
+        bigint id PK
         varchar name
-        decimal price
-        int duration_days
+        varchar slug UK
+        text description
+        varchar icon
         bool is_active
     }
-    PAYMENTS {
-        int id PK
-        int user_id FK
-        decimal amount
-        varchar payment_type
-        varchar status
-        varchar transaction_id
-        varchar sslcommerz_tran_id
-        text sslcommerz_session
-    }
-    POSTS {
-        int id PK
-        int user_id FK
-        int category_id FK
-        int location_id FK
-        varchar title
+
+    CAMPUS_LOCATION {
+        bigint id PK
+        varchar name
+        varchar slug UK
         text description
-        varchar post_type
-        date date_lost_found
-        varchar status
-        bool is_resolved
-        int views_count
-    }
-    CATEGORY {
-        int id PK
-        varchar name
-        varchar slug
-    }
-    CAMPUSLOCATION {
-        int id PK
-        varchar name
         varchar building
         varchar floor
+        bool is_active
     }
-    CONVERSATIONS {
-        int id PK
-        int user1_id FK
-        int user2_id FK
+
+    POST {
+        bigint id PK
+        bigint user_id FK
+        bigint category_id FK
+        bigint location_id FK
+        varchar title
+        text description
+        varchar post_type "lost | found"
+        date date_lost_found
+        varchar location_name
+        varchar image
+        text contact_info
+        varchar status "open | claimed | resolved | rejected | closed"
+        bool is_resolved
+        bool is_active
+        int views_count
+        bigint matched_post_id FK "self-ref"
+    }
+
+    POST_IMAGE {
+        bigint id PK
+        bigint post_id FK
+        varchar image
+        varchar caption
+        bool is_primary
+    }
+
+    POST_TAG {
+        bigint id PK
+        bigint post_id FK
+        varchar name
+    }
+
+    SUCCESS_STORY {
+        bigint id PK
+        bigint post_id FK "OneToOne"
+        varchar title
+        text story
+        varchar finder_name
+        varchar owner_name
+        text finder_message
+        text owner_message
+        bool is_featured
+        bool is_published
+    }
+
+    POST_EMBEDDING {
+        bigint id PK
+        bigint post_id FK "OneToOne"
+        vector embedding "256 dimensions"
+    }
+
+    MATCH_SUGGESTION {
+        bigint id PK
+        bigint post_id FK
+        bigint matched_post_id FK
+        float similarity_score
+        float semantic_score
+        float metadata_score
+        varchar match_strength "strong | possible"
+        varchar status "pending | accepted | dismissed"
+        bool is_viewed
+        bool is_accepted
+    }
+
+    CONVERSATION {
+        bigint id PK
+        bigint post_id FK
         varchar subject
     }
-    NOTIFICATIONS {
-        int id PK
-        int user_id FK
+
+    MESSAGE {
+        bigint id PK
+        bigint conversation_id FK
+        bigint sender_id FK
+        text body
+        bool is_read
+        bool is_edited
+        bool is_deleted
+        timestamp edited_at
+        timestamp deleted_at
+    }
+
+    NOTIFICATION {
+        bigint id PK
+        bigint user_id FK
+        varchar notification_type
         varchar title
         text message
+        varchar link
         bool is_read
+        timestamp read_at
     }
-    RECOVERY_SESSIONS {
-        uuid uid PK
-        int post_id FK
-        int claimant_id FK
-        int owner_id FK
-        varchar status
-        varchar qr_token
-        timestamp qr_expires_at
-    }
-    TRUST_REPORTS {
-        int id PK
-        int reporter_id FK
-        int reported_user_id FK
-        int post_id FK
+
+    TRUST_REPORT {
+        bigint id PK
+        bigint reporter_id FK
+        bigint reported_user_id FK
+        bigint post_id FK
         varchar report_type
+        text description
         varchar status
+        bigint reviewed_by_id FK
+        text resolution_notes
+    }
+
+    RECOVERY_SESSION {
+        bigint id PK
+        bigint post_id FK
+        bigint owner_id FK
+        bigint claimant_id FK
+        varchar short_code UK "e.g. LF-7K29QX"
+        varchar status "pending | token_generated | token_entered | completed | expired | cancelled"
+        timestamp token_verified_at
+        timestamp completed_at
+        timestamp expires_at
+        text notes
+    }
+
+    RECOVERY_VERIFICATION_LOG {
+        bigint id PK
+        bigint session_id FK
+        varchar action
+        bigint performed_by_id FK
+        json details
+        varchar ip_address
     }
 ```
 

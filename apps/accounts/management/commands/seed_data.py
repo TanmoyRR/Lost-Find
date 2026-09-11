@@ -20,10 +20,20 @@ class Command(BaseCommand):
             action='store_true',
             help='Skip admin user creation in production',
         )
+        parser.add_argument(
+            '--if-not-exists',
+            action='store_true',
+            help='Skip seeding if data already exists',
+        )
 
     def handle(self, *args, **options):
         self.stdout.write('Seeding data...')
         is_production = options.get('production', False) or os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('PRODUCTION')
+        if_not_exists = options.get('if_not_exists', False)
+
+        if if_not_exists and Category.objects.exists():
+            self.stdout.write(self.style.SUCCESS('Data already exists. Skipping seed.'))
+            return
 
         # Create admin only in development
         if not is_production:

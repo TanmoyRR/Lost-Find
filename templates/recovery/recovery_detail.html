@@ -94,7 +94,22 @@
             </div>
             {% endif %}
 
-            {% if session.status != 'completed' %}
+            {% if session.status != 'completed' and is_owner %}
+            {% if session.post.post_type == 'found' and owner_lost_session %}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Your Lost Post Token</h2>
+                <div class="flex flex-col sm:flex-row items-start gap-6">
+                    <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-200 text-center">
+                        <p class="font-mono text-3xl font-bold text-indigo-700 tracking-widest">{{ owner_lost_session.short_code }}</p>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm text-gray-600 mb-1">Recovery Token: <strong class="font-mono text-lg text-indigo-600">{{ owner_lost_session.short_code }}</strong></p>
+                        <p class="text-sm text-gray-500 mb-2">Share this token with the finder when they come to claim the item. They will enter it to complete the recovery.</p>
+                        <p class="text-xs text-gray-400 mt-3">This token is from your lost post "<strong>{{ owner_lost_session.post.title }}</strong>".</p>
+                    </div>
+                </div>
+            </div>
+            {% elif session.post.post_type == 'lost' %}
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4">Recovery Token</h2>
                 <div class="flex flex-col sm:flex-row items-start gap-6">
@@ -103,15 +118,12 @@
                     </div>
                     <div class="flex-1">
                         <p class="text-sm text-gray-600 mb-1">Recovery Token: <strong class="font-mono text-lg text-indigo-600">{{ session.short_code }}</strong></p>
-                        {% if is_owner %}
                         <p class="text-sm text-gray-500 mb-2">Share this token with the finder when they come to claim the item.</p>
-                        {% elif is_finder %}
-                        <p class="text-sm text-gray-500 mb-2">Enter this token to complete the recovery.</p>
-                        {% endif %}
                         <p class="text-xs text-gray-400 mt-3">This token is unique to this recovery session.</p>
                     </div>
                 </div>
             </div>
+            {% endif %}
             {% endif %}
         </div>
 
@@ -121,17 +133,17 @@
                 <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">People</h3>
                 <div class="space-y-4">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold">{{ session.owner.get_full_name|default:session.owner.username|first|upper }}</div>
+                        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold">{{ actual_owner.get_full_name|default:actual_owner.username|first|upper }}</div>
                         <div>
-                            <p class="text-sm font-medium text-gray-900">{{ session.owner.get_full_name|default:session.owner.username }} <span class="text-gray-400 font-normal">(Owner)</span></p>
+                            <p class="text-sm font-medium text-gray-900">{{ actual_owner.get_full_name|default:actual_owner.username }} <span class="text-gray-400 font-normal">(Owner)</span></p>
                             {% if is_owner %}<p class="text-xs text-indigo-600">This is you</p>{% endif %}
                         </div>
                     </div>
-                    {% if session.claimant %}
+                    {% if actual_finder %}
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-semibold">{{ session.claimant.get_full_name|default:session.claimant.username|first|upper }}</div>
+                        <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-semibold">{{ actual_finder.get_full_name|default:actual_finder.username|first|upper }}</div>
                         <div>
-                            <p class="text-sm font-medium text-gray-900">{{ session.claimant.get_full_name|default:session.claimant.username }} <span class="text-gray-400 font-normal">(Finder)</span></p>
+                            <p class="text-sm font-medium text-gray-900">{{ actual_finder.get_full_name|default:actual_finder.username }} <span class="text-gray-400 font-normal">(Finder)</span></p>
                             {% if is_finder %}<p class="text-xs text-indigo-600">This is you</p>{% endif %}
                         </div>
                     </div>

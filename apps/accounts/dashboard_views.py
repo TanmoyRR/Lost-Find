@@ -29,9 +29,11 @@ def user_dashboard(request):
     posts = Post.objects.select_related('location', 'category').filter(user=user).order_by('-created_at')
     recent_activities = UserActivity.objects.filter(user=user)[:10]
     membership = getattr(user, 'membership', None)
-    matches = MatchSuggestion.objects.select_related('post', 'matched_post').filter(post__user=user)[:5]
+    matches = MatchSuggestion.objects.select_related('post', 'matched_post').filter(
+        post__user=user, post__status='open', matched_post__status='open',
+    )[:5]
     unread_notifications = Notification.objects.filter(user=user, is_read=False).count()
-    site_agg = Post.objects.aggregate(
+    user_agg = Post.objects.filter(user=user).aggregate(
         total_posts=Count('id'),
         open_posts=Count('id', filter=Q(status='open')),
         resolved_posts=Count('id', filter=Q(status='resolved')),
@@ -40,11 +42,11 @@ def user_dashboard(request):
     )
 
     context = {
-        'total_posts': site_agg['total_posts'],
-        'open_posts': site_agg['open_posts'],
-        'resolved_posts': site_agg['resolved_posts'],
-        'lost_posts': site_agg['lost_posts'],
-        'found_posts': site_agg['found_posts'],
+        'total_posts': user_agg['total_posts'],
+        'open_posts': user_agg['open_posts'],
+        'resolved_posts': user_agg['resolved_posts'],
+        'lost_posts': user_agg['lost_posts'],
+        'found_posts': user_agg['found_posts'],
         'unread_notifications': unread_notifications,
         'posts': posts,
         'recent_activities': recent_activities,

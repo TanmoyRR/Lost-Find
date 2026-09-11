@@ -16,9 +16,9 @@ urlpatterns = [
     path('messages/', include('apps.messaging.urls', namespace='messaging')),
 ]
 
-handler404 = 'django.views.defaults.page_not_found'
-handler403 = 'django.views.defaults.permission_denied'
-handler500 = 'django.views.defaults.server_error'
+handler404 = 'apps.pages.views.handler404'
+handler403 = 'apps.pages.views.handler403'
+handler500 = 'apps.pages.views.handler500'
 
 if settings.DEBUG:
     try:

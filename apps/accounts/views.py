@@ -159,6 +159,8 @@ def reset_password(request, token):
             form.save()
             user.reset_password_token = None
             user.reset_password_sent_at = None
+            user.failed_login_attempts = 0
+            user.locked_until = None
             user.save()
             messages.success(request, 'Password reset successful! Please login.')
             return redirect('accounts:login')
@@ -227,7 +229,7 @@ def change_password(request):
         if form.is_valid():
             form.save()
             update_session_auth_hash(request, form.user)
-            request.user.reset_password_token = ''
+            request.user.reset_password_token = None
             request.user.save(update_fields=['reset_password_token'])
             UserActivity.objects.create(user=request.user, activity_type='password_changed', description='Password changed')
             messages.success(request, 'Password changed successfully!')
@@ -259,7 +261,9 @@ def delete_account(request):
     logout(request)
     user.delete()
     response = redirect('pages:home')
-    response.set_cookie('account_deleted_msg', username, max_age=10)
+    from django.core.signing import Signer
+    signer = Signer()
+    response.set_cookie('account_deleted_msg', signer.sign(username), max_age=10)
     return response
 
 

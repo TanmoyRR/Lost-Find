@@ -123,10 +123,10 @@ def accept_match(request, match_id):
     match.is_accepted = True
     match.save(update_fields=['status', 'is_accepted'])
 
-    lost_post = match.post if match.post.post_type == 'lost' else match.matched_post
-    found_post = match.matched_post if match.post.post_type == 'lost' else match.post
     lost_post.status = 'claimed'
     lost_post.save(update_fields=['status'])
+    found_post.status = 'claimed'
+    found_post.save(update_fields=['status'])
 
     try:
         from apps.notifications.models import Notification
@@ -217,5 +217,13 @@ def undo_match(request, match_id):
     match.status = 'pending'
     match.is_accepted = False
     match.save(update_fields=['status', 'is_accepted'])
+
+    if match.post.status == 'claimed':
+        match.post.status = 'open'
+        match.post.save(update_fields=['status'])
+    if match.matched_post.status == 'claimed':
+        match.matched_post.status = 'open'
+        match.matched_post.save(update_fields=['status'])
+
     messages.success(request, 'Match restored to pending.')
     return redirect('ai:matches')

@@ -30,14 +30,22 @@
                     </div>
                     <h3 class="text-lg font-semibold text-gray-900">{{ session.post.title }}</h3>
                     <p class="text-sm text-gray-600 mt-1">
-                        {% if session.claimant %}
-                            {% if session.claimant == request.user %}
-                                You are the finder for <strong>{{ session.owner.get_full_name|default:session.owner.username }}</strong>'s item
+                        {% if session.post.post_type == 'found' %}
+                            {% if session.post.user == request.user %}
+                                You found this item — waiting for the owner to share their token
                             {% elif session.owner == request.user %}
-                                <strong>{{ session.claimant.get_full_name|default:session.claimant.username }}</strong> is your finder
+                                You are the owner — share your token with the finder to complete recovery
                             {% endif %}
                         {% else %}
-                            Waiting for a finder to claim
+                            {% if session.claimant %}
+                                {% if session.claimant == request.user %}
+                                    You are the finder for <strong>{{ session.owner.get_full_name|default:session.owner.username }}</strong>'s item
+                                {% elif session.owner == request.user %}
+                                    <strong>{{ session.claimant.get_full_name|default:session.claimant.username }}</strong> is your finder
+                                {% endif %}
+                            {% else %}
+                                Waiting for a finder to claim
+                            {% endif %}
                         {% endif %}
                     </p>
                 </div>

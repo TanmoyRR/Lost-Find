@@ -33,9 +33,11 @@
         </form>
     </div>
 
+    {% if session.post.post_type == 'lost' %}
     <div class="bg-indigo-50 rounded-xl border border-indigo-200 p-4 text-center">
         <p class="text-sm text-indigo-800"><strong>Your token:</strong> <span class="font-mono">{{ session.short_code }}</span></p>
         <p class="text-xs text-indigo-600 mt-1">This is your finder token. The owner doesn't need this.</p>
     </div>
+    {% endif %}
 </div>
 {% endblock %}

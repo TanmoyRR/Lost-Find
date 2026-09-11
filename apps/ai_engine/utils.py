@@ -247,8 +247,11 @@ def hybrid_match_score(post_a, post_b, semantic_similarity):
 
     semantic_component = weights.get('semantic', 0.60) * max(0.0, min(1.0, semantic_similarity))
     metadata_component = 0.0
-    if post_a.category_id and post_a.category_id == post_b.category_id:
+    category_match = post_a.category_id and post_a.category_id == post_b.category_id
+    if category_match:
         metadata_component += weights.get('category', 0.15)
+    else:
+        semantic_component *= 0.5
     if post_a.location_id and post_a.location_id == post_b.location_id:
         metadata_component += weights.get('location', 0.10)
     metadata_component += weights.get('date', 0.10) * compute_date_proximity(post_a, post_b)

@@ -3,7 +3,6 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.db.models import Q
-from apps.accounts.decorators import is_admin
 
 
 class MembershipPendingMiddleware:
@@ -67,7 +66,7 @@ class MembershipMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.user.is_authenticated and not is_admin(request.user) and hasattr(request.user, 'membership'):
+        if request.user.is_authenticated and request.user.role != 'admin' and hasattr(request.user, 'membership'):
             membership = request.user.membership
             if membership.is_active and membership.expires_at:
                 days_left = (membership.expires_at.date() - timezone.now().date()).days

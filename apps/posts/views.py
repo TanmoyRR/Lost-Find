@@ -72,6 +72,7 @@ def post_detail(request, pk):
         Post.objects.filter(pk=pk).update(views_count=F('views_count') + 1)
 
     can_view_full = False
+    has_active_lost_post = False
     if request.user.is_authenticated:
         if request.user == post.user:
             can_view_full = True
@@ -81,6 +82,9 @@ def post_detail(request, pk):
             membership = getattr(request.user, 'membership', None)
             if membership and membership.is_active:
                 can_view_full = True
+        has_active_lost_post = Post.objects.filter(
+            user=request.user, post_type='lost', status__in=['open', 'claimed']
+        ).exists()
     related_posts = Post.objects.select_related('location', 'category').filter(category=post.category).exclude(pk=post.pk)[:4]
     from apps.ai_engine.models import MatchSuggestion
     ai_matches_qs = MatchSuggestion.objects.select_related(
@@ -99,6 +103,7 @@ def post_detail(request, pk):
         'related_posts': related_posts,
         'ai_matches': ai_matches,
         'can_view_full': can_view_full,
+        'has_active_lost_post': has_active_lost_post,
     })
 
 
@@ -121,35 +126,6 @@ def create_post(request):
                     messages.info(request, f'Recovery token generated: {session.short_code}')
                 except Exception:
                     pass
-            elif post.post_type == 'found':
-                recovery_token = form.cleaned_data.get('recovery_token', '').strip().upper()
-                token_linked = False
-                if recovery_token:
-                    from apps.recovery.models import RecoverySession, RecoveryVerificationLog
-                    owner_session = RecoverySession.objects.filter(
-                        short_code=recovery_token,
-                        status='token_generated',
-                        post__status__in=['open', 'claimed'],
-                    ).select_related('post', 'owner').exclude(post=post).first()
-                    if owner_session and not owner_session.claimant:
-                        with transaction.atomic():
-                            owner_session.claimant = request.user
-                            owner_session.save(update_fields=['claimant'])
-                            post.matched_post = owner_session.post
-                            post.save(update_fields=['matched_post'])
-                            owner_session.post.matched_post = post
-                            owner_session.post.save(update_fields=['matched_post'])
-                            RecoveryVerificationLog.objects.create(
-                                session=owner_session, action='token_linked_on_creation',
-                                performed_by=request.user,
-                                details={'found_post_id': post.id, 'found_post_title': post.title},
-                            )
-                        messages.success(request, f'Post linked to lost item "{owner_session.post.title}" via recovery token.')
-                        token_linked = True
-                    else:
-                        messages.warning(request, 'Invalid or already-used recovery token. Your post was created without linking.')
-                if not token_linked:
-                    messages.info(request, 'Your found post was created. An owner can link it using their recovery token.')
             try:
                 find_matches_for_post(post)
             except Exception:
@@ -201,10 +177,9 @@ def mark_resolved(request, pk):
     post = get_object_or_404(Post, pk=pk, user=request.user)
     if request.method == 'POST':
         post.status = 'resolved'
-        post.is_resolved = True
         post.save()
         from apps.recovery.models import RecoverySession
-        RecoverySession.objects.filter(post=post, status='in_progress').update(status='completed')
+        RecoverySession.objects.filter(post=post, status__in=['pending', 'token_generated', 'token_entered']).update(status='completed')
         UserActivity.objects.create(user=request.user, activity_type='post_resolved', description=f'Resolved post: {post.title}')
         messages.success(request, 'Post marked as resolved!')
     return redirect('posts:detail', pk=pk)

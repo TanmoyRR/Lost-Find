@@ -331,7 +331,8 @@ def payment_success(request):
                         membership.save()
                 payment_completed = True
 
-    if not payment_completed and settings.SSLCOMMERZ_IS_SANDBOX:
+    sandbox_auto_complete = getattr(settings, 'SSLCOMMERZ_SANDBOX_AUTO_COMPLETE', False)
+    if not payment_completed and settings.SSLCOMMERZ_IS_SANDBOX and sandbox_auto_complete:
         pending = None
         if tran_id:
             pending = Payment.objects.filter(
@@ -374,6 +375,8 @@ def payment_success(request):
 @csrf_exempt
 def payment_fail(request):
     """SSLCommerz fail callback. Verifies with SSLCommerz, then shows fail page."""
+    if request.method not in ('POST', 'GET'):
+        return HttpResponseNotAllowed(['POST', 'GET'])
     tran_id = request.POST.get('tran_id') or request.GET.get('tran_id', '')
     val_id = request.POST.get('val_id') or request.GET.get('val_id', '')
     if tran_id and val_id:
@@ -405,6 +408,8 @@ def payment_fail(request):
 @csrf_exempt
 def payment_cancel(request):
     """SSLCommerz cancel callback. Verifies with SSLCommerz, then shows cancel page."""
+    if request.method not in ('POST', 'GET'):
+        return HttpResponseNotAllowed(['POST', 'GET'])
     tran_id = request.POST.get('tran_id') or request.GET.get('tran_id', '')
     val_id = request.POST.get('val_id') or request.GET.get('val_id', '')
     if tran_id and val_id:

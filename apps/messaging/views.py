@@ -31,6 +31,7 @@ def inbox(request):
     )
     for conv in conversations:
         conv.last_message = conv._last_msgs[0] if conv._last_msgs else None
+        conv._other_participants = conv.participants.exclude(pk=request.user.pk)
     return render(request, 'messaging/inbox.html', {
         'conversations': conversations,
     })
@@ -116,7 +117,7 @@ def start_conversation(request, post_id, user_id):
     return redirect('messaging:detail', pk=conv.pk)
 
 
-def _initiate_recovery(post, finder, owner):
+def _initiate_recovery(post, viewer, post_owner):
     from apps.recovery.models import RecoverySession, RecoveryVerificationLog
     if post.status == 'resolved':
         return
@@ -125,15 +126,15 @@ def _initiate_recovery(post, finder, owner):
     ).first()
     if not session:
         session = RecoverySession.objects.create(
-            post=post, owner=owner, claimant=finder, status='token_generated',
+            post=post, owner=post_owner, claimant=viewer, status='token_generated',
         )
         RecoveryVerificationLog.objects.create(
             session=session, action='session_created',
-            performed_by=owner,
+            performed_by=post_owner,
             details={'post_id': post.id, 'initiated_by': 'messaging'},
         )
-    elif not session.claimant or session.claimant == finder:
-        session.claimant = finder
+    elif not session.claimant or session.claimant == viewer:
+        session.claimant = viewer
         if session.status == 'pending':
             session.status = 'token_generated'
             session.save(update_fields=['claimant', 'status'])
@@ -141,23 +142,36 @@ def _initiate_recovery(post, finder, owner):
             session.save(update_fields=['claimant'])
         RecoveryVerificationLog.objects.create(
             session=session, action='finder_assigned',
-            performed_by=finder,
+            performed_by=viewer,
             details={'source': 'messaging'},
         )
 
 
-def _link_found_recovery(post, finder, owner):
+def _link_found_recovery(post, viewer, post_owner):
     from apps.recovery.models import RecoverySession, RecoveryVerificationLog
     if post.status == 'resolved':
         return
     session = RecoverySession.objects.filter(
         post=post, status__in=('pending', 'token_generated'),
     ).first()
-    if session:
-        session.claimant = finder
-        session.save(update_fields=['claimant'])
+    if not session:
+        session = RecoverySession.objects.create(
+            post=post, owner=viewer, claimant=post_owner, status='token_generated',
+        )
+        RecoveryVerificationLog.objects.create(
+            session=session, action='session_created',
+            performed_by=viewer,
+            details={'post_id': post.id, 'post_title': post.title, 'initiated_by': 'messaging', 'found_post': True},
+        )
+    elif not session.claimant or session.claimant == post_owner:
+        session.claimant = post_owner
+        if session.status == 'pending':
+            session.status = 'token_generated'
+            session.save(update_fields=['claimant', 'status'])
+        else:
+            session.save(update_fields=['claimant'])
         RecoveryVerificationLog.objects.create(
             session=session, action='finder_assigned',
-            performed_by=finder,
+            performed_by=post_owner,
             details={'source': 'messaging', 'found_post': True},
         )
