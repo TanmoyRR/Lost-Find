@@ -163,7 +163,10 @@ def edit_post(request, pk):
 
 @membership_required
 def delete_post(request, pk):
-    post = get_object_or_404(Post, pk=pk, user=request.user)
+    if is_admin(request.user):
+        post = get_object_or_404(Post, pk=pk)
+    else:
+        post = get_object_or_404(Post, pk=pk, user=request.user)
     if request.method == 'POST':
         UserActivity.objects.create(user=request.user, activity_type='post_deleted', description=f'Deleted post: {post.title}')
         post.delete()
