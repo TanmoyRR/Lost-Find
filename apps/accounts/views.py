@@ -1,3 +1,23 @@
+"""
+Account Views — Authentication, profile management, and user settings.
+
+This module handles:
+  - Registration (with rate limiting: 5/min per IP)
+  - Login (with brute-force protection: 5 failed attempts → 15-min lockout)
+  - Password reset (email-based token, 1-hour expiry)
+  - Profile viewing and editing
+  - Password change (admin passwords restricted to backend only)
+  - Account deletion (with signed cookie for post-delete message)
+  - Active session management (view and revoke other sessions)
+
+Security features:
+  - Rate limiting on all auth endpoints via django-ratelimit
+  - Open redirect prevention via _is_safe_redirect_url()
+  - Brute-force lockout after 5 failed login attempts
+  - Password reset tokens expire after 1 hour
+  - Admin passwords cannot be changed from the web interface
+"""
+
 import logging
 from urllib.parse import urlparse
 from datetime import timedelta
@@ -31,20 +51,27 @@ logger = logging.getLogger(__name__)
 
 
 def _is_safe_redirect_url(url, request=None):
-    """Check if a URL is safe for redirect (same host, no external domains)."""
+    """
+    Security check: prevent open redirect attacks.
+
+    Only allows relative paths starting with '/' (no schemes, no domains).
+    This prevents attackers from crafting login redirect URLs that point
+    to external malicious sites.
+    """
     if not url:
         return False
-    # Only allow relative paths
+    # Only allow relative paths — reject absolute URLs
     parsed = urlparse(url)
     if parsed.scheme or parsed.netloc:
         return False
-    # Must start with /
+    # Must start with / but not // (protocol-relative URL)
     if not url.startswith('/') or url.startswith('//'):
         return False
     return True
 
 
 def _send_email(subject, template, context, recipient):
+    """Helper: send an HTML email with plain-text fallback."""
     html = render_to_string(template, context)
     plain = strip_tags(html)
     send_mail(subject, plain, settings.DEFAULT_FROM_EMAIL, [recipient], html_message=html)
@@ -52,6 +79,17 @@ def _send_email(subject, template, context, recipient):
 
 @ratelimit(key='ip', rate='5/m', method=['POST'], block=True)
 def register(request):
+    """
+    New user registration.
+
+    Flow:
+      1. Validate form (username, email, password, department)
+      2. Set role='student', membership_paid=False, email_verified=True
+      3. Auto-login after registration
+      4. Redirect to membership purchase page (account inactive until paid)
+
+    Rate limited: 5 attempts per minute per IP.
+    """
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST)
         if form.is_valid():
@@ -70,37 +108,70 @@ def register(request):
 
 @ratelimit(key='ip', rate='10/m', method=['POST'], block=True)
 def user_login(request):
+    """
+    User login with brute-force protection.
+
+    Security flow:
+      1. If already logged in → redirect to appropriate dashboard
+      2. Check if account is suspended → reject
+      3. Check if account is locked (too many failed attempts) → reject
+      4. On successful login: reset failed_attempts, log activity, redirect
+      5. On failed login: increment failed_attempts, lock after 5 failures
+
+    Brute-force protection:
+      - After 5 failed attempts, account is locked for 15 minutes
+      - Lockout timestamp stored in user.locked_until
+      - Successful login resets the counter
+
+    Redirect logic:
+      - Admin → admin dashboard
+      - Non-paid member → membership purchase page
+      - Regular member → user dashboard (or ?next= URL if safe)
+    """
     if request.user.is_authenticated:
         if request.user.role == 'admin':
             return redirect('dashboard:admin_home')
         if not request.user.is_membership_paid:
             return redirect('membership:pending_purchase')
         return redirect('dashboard:home')
+
     if request.method == 'POST':
         form = LoginForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
+
+            # Check if account is suspended
             if user.is_suspended:
                 messages.error(request, 'Your account has been suspended.')
                 return render(request, 'accounts/login.html', {'form': form})
+
+            # Check if account is temporarily locked
             if user.locked_until and user.locked_until > timezone.now():
                 messages.error(request, 'Account is temporarily locked due to too many failed login attempts. Please try again later.')
                 return render(request, 'accounts/login.html', {'form': form})
+
             login(request, user)
+
+            # Reset login attempt counter on successful login
             user.failed_login_attempts = 0
             user.locked_until = None
             user.save(update_fields=['failed_login_attempts', 'locked_until'])
             UserActivity.objects.create(user=user, activity_type='login', description='User logged in')
+
+            # Role-based redirect
             if user.role == 'admin':
                 return redirect('dashboard:admin_home')
             if not user.is_membership_paid:
                 messages.info(request, 'Please complete your membership payment to activate your account.')
                 return redirect('membership:pending_purchase')
+
+            # Safe redirect: only allow same-origin ?next= URLs
             next_url = request.GET.get('next', '')
             if next_url and _is_safe_redirect_url(next_url):
                 return redirect(next_url)
             return redirect('dashboard:home')
         else:
+            # Failed login: increment counter, lock after 5 attempts
             username = request.POST.get('username', '')
             if username:
                 from .models import User as UserModel
@@ -119,6 +190,17 @@ def user_login(request):
 
 @ratelimit(key='ip', rate='5/m', method=['POST'], block=True)
 def forgot_password(request):
+    """
+    Password reset request — sends a reset link via email.
+
+    Flow:
+      1. User enters email address
+      2. If account exists: generate SHA-256 token, save to user, send email
+      3. If account doesn't exist: show same success message (prevents email enumeration)
+      4. In DEBUG mode: also display the reset link directly (for development)
+
+    Token is valid for 1 hour (checked in reset_password view).
+    """
     if request.method == 'POST':
         form = PasswordResetRequestForm(request.POST)
         if form.is_valid():
@@ -140,6 +222,7 @@ def forgot_password(request):
                 if settings.DEBUG:
                     messages.info(request, f'Dev reset link: {reset_url}')
             except User.DoesNotExist:
+                # Same message whether user exists or not (prevents email enumeration)
                 messages.success(request, 'If an account exists with this email, a reset link has been sent.')
             return redirect('accounts:login')
     else:
@@ -149,14 +232,26 @@ def forgot_password(request):
 
 @ratelimit(key='ip', rate='10/m', method=['POST'], block=True)
 def reset_password(request, token):
+    """
+    Set a new password using the reset token.
+
+    Validates:
+      - Token must match a user's reset_password_token
+      - Token must be less than 1 hour old (3600 seconds)
+      - On success: clears token, resets login lockout, redirects to login
+    """
     user = get_object_or_404(User, reset_password_token=token)
+
+    # Check if token has expired (1 hour)
     if user.reset_password_sent_at and (timezone.now() - user.reset_password_sent_at).total_seconds() > 3600:
         messages.error(request, 'Reset link has expired. Please request a new one.')
         return redirect('accounts:forgot_password')
+
     if request.method == 'POST':
         form = SetNewPasswordForm(user, request.POST)
         if form.is_valid():
             form.save()
+            # Clear reset token and login lockout
             user.reset_password_token = None
             user.reset_password_sent_at = None
             user.failed_login_attempts = 0
@@ -171,6 +266,7 @@ def reset_password(request, token):
 
 @login_required
 def user_logout(request):
+    """Log out the user and redirect to the home page."""
     logout(request)
     messages.success(request, 'Logged out successfully.')
     return redirect('pages:home')
@@ -178,6 +274,16 @@ def user_logout(request):
 
 @login_required
 def profile_view(request):
+    """
+    Display user profile with stats and activity history.
+
+    Shows:
+      - Total/open/resolved post counts
+      - Recovery rate (resolved / total * 100)
+      - Membership days remaining
+      - Recent activity log (last 10)
+      - All activities (last 50, for full history view)
+    """
     user = request.user
     user_posts = Post.objects.filter(user=user).select_related('category', 'location').order_by('-created_at')
     total_posts = user_posts.count()
@@ -187,9 +293,11 @@ def profile_view(request):
     membership_days = membership.days_remaining() if membership and membership.is_active else 0
     recent_activities = UserActivity.objects.filter(user=user)[:10]
     all_activities = UserActivity.objects.filter(user=user).order_by('-created_at')[:50]
+
     from apps.recovery.models import RecoverySession
-    recovery_sessions = RecoverySession.objects.filter(Q(claimant=user)|Q(owner=user)).count()
+    recovery_sessions = RecoverySession.objects.filter(Q(claimant=user) | Q(owner=user)).count()
     recovery_rate = round((resolved_posts / total_posts * 100) if total_posts > 0 else 0, 1)
+
     return render(request, 'profile/overview.html', {
         'user': user,
         'user_posts': user_posts[:10],
@@ -207,11 +315,15 @@ def profile_view(request):
 
 @login_required
 def profile_edit(request):
+    """Edit user profile (name, department, bio, profile picture)."""
     if request.method == 'POST':
         form = UserProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
-            UserActivity.objects.create(user=request.user, activity_type='profile_updated', description='Profile updated')
+            UserActivity.objects.create(
+                user=request.user, activity_type='profile_updated',
+                description='Profile updated'
+            )
             messages.success(request, 'Profile updated successfully!')
             return redirect('accounts:profile')
     else:
@@ -221,17 +333,29 @@ def profile_edit(request):
 
 @login_required
 def change_password(request):
+    """
+    Change account password.
+
+    Admin restriction: Admin passwords can only be changed through the Django
+    backend for security reasons. Regular users can change via this form.
+    """
     if request.user.role == 'admin':
         messages.error(request, 'Admin passwords can only be changed through the backend.')
         return redirect('accounts:profile')
+
     if request.method == 'POST':
         form = PasswordChangeForm(request.user, request.POST)
         if form.is_valid():
             form.save()
+            # Keep the user logged in after password change
             update_session_auth_hash(request, form.user)
+            # Clear any pending password reset token
             request.user.reset_password_token = None
             request.user.save(update_fields=['reset_password_token'])
-            UserActivity.objects.create(user=request.user, activity_type='password_changed', description='Password changed')
+            UserActivity.objects.create(
+                user=request.user, activity_type='password_changed',
+                description='Password changed'
+            )
             messages.success(request, 'Password changed successfully!')
             return redirect('accounts:profile')
     else:
@@ -241,6 +365,7 @@ def change_password(request):
 
 @login_required
 def settings_view(request):
+    """Edit user notification and privacy settings."""
     if request.method == 'POST':
         form = UserSettingsForm(request.POST, instance=request.user)
         if form.is_valid():
@@ -254,12 +379,26 @@ def settings_view(request):
 
 @login_required
 def delete_account(request):
+    """
+    Permanently delete the user's account.
+
+    Flow:
+      1. Only accepts POST requests (prevents accidental GET deletion)
+      2. Logs out the user first
+      3. Deletes the user from database
+      4. Sets a signed cookie with the username for the success message
+         (can't use Django messages framework after logout + delete)
+
+    The signed cookie prevents tampering — only the server can read it.
+    """
     if request.method != 'POST':
         return redirect('accounts:settings')
+
     user = request.user
     username = user.username
     logout(request)
     user.delete()
+
     response = redirect('pages:home')
     from django.core.signing import Signer
     signer = Signer()
@@ -269,11 +408,20 @@ def delete_account(request):
 
 @login_required
 def active_sessions(request):
+    """
+    Display all active login sessions for the current user.
+
+    Shows session key, expiry time, IP address, user agent, and whether
+    it's the current session. Users can revoke other sessions to force
+    logout on other devices.
+    """
     from django.contrib.sessions.models import Session
     from django.utils import timezone
+
     sessions = Session.objects.filter(expire_date__gte=timezone.now()).order_by('-expire_date')
     user_sessions = []
     current_session_key = request.session.session_key
+
     for s in sessions:
         data = s.get_decoded()
         if data.get('_auth_user_id') == str(request.user.pk):
@@ -284,20 +432,30 @@ def active_sessions(request):
                 'ip': data.get('ip_address', 'Unknown'),
                 'user_agent': data.get('user_agent', 'Unknown'),
             })
+
     return render(request, 'accounts/sessions.html', {'sessions': user_sessions})
 
 
 @login_required
 def revoke_session(request, session_key):
+    """
+    Revoke (delete) another login session to force logout on that device.
+    Cannot revoke the current session (would log out the user themselves).
+    """
     from django.contrib.sessions.models import Session
+
     if request.method != 'POST':
         return redirect('accounts:sessions')
+
+    # Prevent self-revocation
     if session_key == request.session.session_key:
         messages.error(request, 'You cannot revoke your current session.')
         return redirect('accounts:sessions')
+
     try:
         Session.objects.get(session_key=session_key).delete()
         messages.success(request, 'Session revoked successfully.')
     except Session.DoesNotExist:
         messages.error(request, 'Session not found.')
+
     return redirect('accounts:sessions')
