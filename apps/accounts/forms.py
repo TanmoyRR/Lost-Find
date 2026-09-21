@@ -3,7 +3,6 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, Pass
 from django.contrib.auth import authenticate
 import re
 from .models import User
-from .validators import validate_profile_image
 
 
 class UserRegistrationForm(UserCreationForm):
@@ -66,18 +65,6 @@ class UserProfileForm(forms.ModelForm):
     last_name = forms.CharField(widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}))
     email = forms.EmailField(widget=forms.EmailInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}))
 
-    def clean_profile_picture(self):
-        pic = self.cleaned_data.get('profile_picture')
-        if pic:
-            validate_profile_image(pic)
-        return pic
-
-    def clean_cover_photo(self):
-        photo = self.cleaned_data.get('cover_photo')
-        if photo:
-            validate_profile_image(photo)
-        return photo
-
     def clean_bio(self):
         bio = self.cleaned_data.get('bio', '')
         if bio and len(bio) > 500:
@@ -98,12 +85,10 @@ class UserProfileForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email', 'phone', 'department', 'profile_picture', 'cover_photo', 'bio', 'address', 'student_id']
+        fields = ['first_name', 'last_name', 'email', 'phone', 'department', 'bio', 'address', 'student_id']
         widgets = {
             'phone': forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}),
             'department': forms.Select(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}),
-            'profile_picture': forms.FileInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}),
-            'cover_photo': forms.FileInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}),
             'bio': forms.Textarea(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'rows': 3}),
             'address': forms.Textarea(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'rows': 2}),
         }

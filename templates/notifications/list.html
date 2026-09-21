@@ -69,10 +69,12 @@
                             </div>
                         </div>
                     </div>
-                    {% if notification.link %}
-                    <a href="{{ notification.link }}" class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 mt-2">
+                    {% if notification.link and not notification.is_read %}
+                    <a href="{{ notification.link }}" class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 mt-2" onclick="this.textContent='Loading...'">
                         View Details <i class="bi bi-arrow-right"></i>
                     </a>
+                    {% elif notification.link and notification.is_read %}
+                    <span class="text-xs text-gray-400 mt-2 block"><i class="bi bi-check-circle"></i> Read</span>
                     {% endif %}
                 </div>
             </div>

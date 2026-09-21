@@ -356,6 +356,9 @@ def payment_success(request):
 
     if payment_completed:
         effective_user = lookup_user if not request.user.is_authenticated else request.user
+        if effective_user and not request.user.is_authenticated:
+            from django.contrib.auth import login as auth_login
+            auth_login(request, effective_user)
         membership = getattr(effective_user, 'membership', None) if effective_user else None
         payment = Payment.objects.filter(user=effective_user, status='completed').order_by('-created_at').first() if effective_user else None
         try:

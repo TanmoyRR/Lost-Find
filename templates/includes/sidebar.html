@@ -15,12 +15,12 @@
          style="width: 280px;">
         <!-- Mobile header -->
         <div class="flex items-center justify-between h-16 px-4 border-b border-white/[0.06]">
-            <a href="{% url 'dashboard:home' %}" class="flex items-center gap-3">
+            <a href="{% url 'pages:home' %}" class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                     <i class="bi bi-shield-check text-white text-sm"></i>
                 </div>
                 <div>
-                    <p class="text-white font-bold text-sm leading-tight">CampusFind</p>
+                    <p class="text-white font-bold text-sm leading-tight">IUBAT SmartFind</p>
                     <p class="text-gray-500 text-[11px]">Lost & Found</p>
                 </div>
             </a>
@@ -104,7 +104,7 @@
         <!-- Logo Section -->
         <div class="flex items-center flex-shrink-0 h-16 px-0 border-b border-white/[0.06]"
              :style="expanded ? 'padding-left: 18px; padding-right: 18px;' : 'justify-content: center;'">
-            <a href="{% url 'dashboard:home' %}" class="flex items-center gap-3 overflow-hidden"
+            <a href="{% url 'pages:home' %}" class="flex items-center gap-3 overflow-hidden"
                :style="expanded ? 'justify-content: flex-start;' : 'justify-content: center; width: 72px;'"
                style="justify-content: center; width: 72px;">
                 <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20">
@@ -113,7 +113,7 @@
                 <div class="overflow-hidden"
                      :style="expanded ? 'max-width: 160px; opacity: 1;' : 'max-width: 0; opacity: 0;'"
                      style="max-width: 0; opacity: 0; transition: all 280ms cubic-bezier(0.4, 0, 0.2, 1);">
-                    <p class="text-white font-bold text-sm leading-tight whitespace-nowrap">CampusFind</p>
+                    <p class="text-white font-bold text-sm leading-tight whitespace-nowrap">IUBAT SmartFind</p>
                     <p class="text-gray-500 text-[11px] whitespace-nowrap"
                        style="transition: opacity 200ms ease; transition-delay: 100ms;">Lost & Found</p>
                 </div>

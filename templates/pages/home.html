@@ -25,12 +25,14 @@
                 The official IUBAT lost and found platform. Report lost items, browse found items, and let our AI match what belongs together.
             </p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                {% if not user.is_staff %}
                 <a href="{% url 'posts:create' %}" class="gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-semibold shadow-2xl shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:scale-105 transition-all duration-300 inline-flex items-center gap-3">
                     <i class="bi bi-plus-circle text-xl"></i> Report Lost Item
                 </a>
                 <a href="{% url 'posts:browse' %}" class="glass text-white px-8 py-4 rounded-2xl text-lg font-semibold hover:bg-white/20 transition-all duration-300 inline-flex items-center gap-3">
                     <i class="bi bi-search text-xl"></i> Browse Items
                 </a>
+                {% endif %}
                 {% if not user.is_authenticated %}
                 <a href="{% url 'accounts:register' %}" class="text-white/80 hover:text-white px-8 py-4 rounded-2xl text-lg font-semibold transition-all duration-300 inline-flex items-center gap-3">
                     <i class="bi bi-person-plus text-xl"></i> Join Now
@@ -210,12 +212,14 @@
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
                     {% if user.is_authenticated %}
-                    <a href="{% url 'dashboard:home' %}" class="bg-white text-indigo-600 px-8 py-4 rounded-2xl text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all duration-300 inline-flex items-center gap-3">
+                    <a href="{% if user.is_staff %}{% url 'dashboard:admin_home' %}{% else %}{% url 'dashboard:home' %}{% endif %}" class="bg-white text-indigo-600 px-8 py-4 rounded-2xl text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all duration-300 inline-flex items-center gap-3">
                         <i class="bi bi-grid-1x2 text-xl"></i> Go to Dashboard
                     </a>
+                    {% if not user.is_staff %}
                     <a href="{% url 'posts:create' %}" class="glass text-white px-8 py-4 rounded-2xl text-lg font-semibold hover:bg-white/20 transition-all duration-300 inline-flex items-center gap-3">
                         <i class="bi bi-plus-circle text-xl"></i> Report an Item
                     </a>
+                    {% endif %}
                     {% else %}
                     <a href="{% url 'accounts:register' %}" class="bg-white text-indigo-600 px-8 py-4 rounded-2xl text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all duration-300 inline-flex items-center gap-3">
                         <i class="bi bi-person-plus text-xl"></i> Create Account

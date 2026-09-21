@@ -27,6 +27,7 @@ urlpatterns = [
     path('dashboard/admin/users/<int:pk>/update-membership/', dashboard_views.admin_update_membership, name='admin_update_membership'),
     path('dashboard/admin/users/<int:pk>/toggle-membership/', dashboard_views.admin_toggle_membership, name='admin_toggle_membership'),
     path('dashboard/admin/users/<int:pk>/extend-membership/', dashboard_views.admin_extend_membership, name='admin_extend_membership'),
+    path('dashboard/admin/users/<int:pk>/delete-membership/', dashboard_views.admin_delete_membership, name='admin_delete_membership'),
     path('dashboard/admin/users/<int:pk>/delete/', dashboard_views.admin_delete_user, name='admin_delete_user'),
     path('dashboard/admin/users/<int:pk>/update-info/', dashboard_views.admin_update_user_info, name='admin_update_user_info'),
 ]

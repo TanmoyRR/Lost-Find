@@ -32,7 +32,6 @@
                         <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Category</th>
                         <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Location</th>
                         <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Views</th>
                         <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-right">Actions</th>
                     </tr>
                 </thead>
@@ -68,7 +67,6 @@
                         <td class="px-6 py-4 text-sm text-gray-600">{{ post.category.name|default:'—' }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ post.display_location }}</td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ post.created_at|date:"M d, Y" }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">{{ post.views_count }}</td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex items-center justify-end gap-1">
                                 <a href="{% url 'posts:detail' post.pk %}" class="p-2 rounded-lg hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 transition" title="View">
@@ -77,14 +75,6 @@
                                 <a href="{% url 'posts:edit' post.pk %}" class="p-2 rounded-lg hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 transition" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                {% if post.status != 'resolved' %}
-                                <form method="POST" action="{% url 'posts:resolve' post.pk %}" class="inline">
-                                    {% csrf_token %}
-                                    <button type="submit" class="p-2 rounded-lg hover:bg-emerald-100 text-gray-400 hover:text-emerald-600 transition bg-transparent border-0 cursor-pointer" title="Mark Resolved">
-                                        <i class="bi bi-check-circle"></i>
-                                    </button>
-                                </form>
-                                {% endif %}
                                 <a href="{% url 'posts:delete' post.pk %}" class="p-2 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-600 transition" title="Delete">
                                     <i class="bi bi-trash"></i>
                                 </a>

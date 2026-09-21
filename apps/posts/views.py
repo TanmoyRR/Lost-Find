@@ -111,7 +111,7 @@ def post_detail(request, pk):
       - Related posts from the same category (up to 4)
       - Whether the viewer has an active lost post (for recovery flow)
     """
-    post = get_object_or_404(Post.objects.select_related('category', 'location', 'user'), pk=pk)
+    post = get_object_or_404(Post.objects.select_related('category', 'location', 'user').prefetch_related('recovery_sessions'), pk=pk)
 
     # Increment view count for non-owner visitors
     if post.user != request.user:

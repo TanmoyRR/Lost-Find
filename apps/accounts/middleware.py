@@ -9,9 +9,11 @@ class MembershipPendingMiddleware:
     ALLOWED_PATH_PREFIXES = [
         '/membership/',
         '/payments/',
+        '/verify-email/',
+        '/resend-verification/',
         '/logout/',
         '/login/',
-
+        '/register/',
         '/static/',
         '/media/',
         '/favicon.ico',
@@ -23,9 +25,9 @@ class MembershipPendingMiddleware:
     def __call__(self, request):
         if request.user.is_authenticated:
             if request.user.role != 'admin':
-                membership_active = False
-                if hasattr(request.user, 'membership'):
-                    membership_active = request.user.membership.is_active
+                membership = getattr(request.user, 'membership', None)
+                request._membership = membership
+                membership_active = membership.is_active if membership else False
 
                 if not membership_active and not request.user.is_membership_paid:
                     from apps.payments.models import Payment
@@ -35,22 +37,20 @@ class MembershipPendingMiddleware:
                     if completed_payment:
                         request.user.is_membership_paid = True
                         request.user.save(update_fields=['is_membership_paid'])
-                        if not membership_active:
-                            if hasattr(request.user, 'membership'):
-                                m = request.user.membership
-                                if not m.is_active:
-                                    m.is_active = True
-                                    m.started_at = m.started_at or timezone.now()
-                                    if not m.expires_at or m.expires_at <= timezone.now():
-                                        m.expires_at = timezone.now() + timedelta(days=30)
-                                    m.save(update_fields=['is_active', 'started_at', 'expires_at'])
-                            else:
-                                from apps.membership.models import Membership
-                                Membership.objects.create(
-                                    user=request.user, is_active=True,
-                                    started_at=timezone.now(),
-                                    expires_at=timezone.now() + timedelta(days=30),
-                                )
+                        if membership and not membership.is_active:
+                            m = membership
+                            m.is_active = True
+                            m.started_at = m.started_at or timezone.now()
+                            if not m.expires_at or m.expires_at <= timezone.now():
+                                m.expires_at = timezone.now() + timedelta(days=30)
+                            m.save(update_fields=['is_active', 'started_at', 'expires_at'])
+                        elif not membership:
+                            from apps.membership.models import Membership
+                            Membership.objects.create(
+                                user=request.user, is_active=True,
+                                started_at=timezone.now(),
+                                expires_at=timezone.now() + timedelta(days=30),
+                            )
                         membership_active = True
 
                 if not membership_active and not request.user.is_membership_paid:
@@ -66,9 +66,10 @@ class MembershipMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.user.is_authenticated and request.user.role != 'admin' and hasattr(request.user, 'membership'):
-            membership = request.user.membership
-            if membership.is_active and membership.expires_at:
+        if request.user.is_authenticated and request.user.role != 'admin':
+            membership = getattr(request, '_membership', None) or getattr(request.user, 'membership', None)
+            request._membership = membership
+            if membership and membership.is_active and membership.expires_at:
                 days_left = (membership.expires_at.date() - timezone.now().date()).days
                 if days_left <= 0:
                     membership.is_active = False
@@ -106,5 +107,32 @@ class ActiveUserMiddleware:
             messages.error(request, 'Your account has been suspended. Please contact the administrator.')
             from django.shortcuts import redirect
             return redirect('accounts:login')
+        response = self.get_response(request)
+        return response
+
+
+class EmailVerificationMiddleware:
+    ALLOWED_PATH_PREFIXES = [
+        '/verify-email/',
+        '/resend-verification/',
+        '/logout/',
+        '/login/',
+        '/register/',
+        '/static/',
+        '/media/',
+        '/favicon.ico',
+    ]
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if (request.user.is_authenticated
+                and not request.user.email_verified
+                and request.user.role != 'admin'):
+            path = request.path
+            if not any(path.startswith(prefix) for prefix in self.ALLOWED_PATH_PREFIXES):
+                from django.shortcuts import redirect
+                return redirect('accounts:verify_email_gate')
         response = self.get_response(request)
         return response

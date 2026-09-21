@@ -4,81 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% block page_title %}{{ site_name }}{% endblock %} | {{ site_name }}{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/output.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        * { font-family: 'Inter', sans-serif; }
-
-        .glass { background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
-        .glass-dark { background: rgba(15,23,42,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
-
-        [x-cloak] { display: none !important; }
-
-        .gradient-primary { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); }
-        .gradient-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
-        .gradient-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
-        .gradient-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
-        .gradient-info { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
-
-        .text-gradient { background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-
-        .card-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
-
-        .stat-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.1); }
-
-        .animate-fade-in { animation: fadeIn 0.5s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .animate-slide-in { animation: slideIn 0.3s ease; }
-        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
-
-        .timeline-line { position: relative; }
-        .timeline-line::before {
-            content: '';
-            position: absolute;
-            left: 19px;
-            top: 44px;
-            bottom: 0;
-            width: 2px;
-            background: linear-gradient(180deg, #e2e8f0, #cbd5e1);
-        }
-        .timeline-line:last-child::before { display: none; }
-
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-        @keyframes pulse-dot {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.5); opacity: 0.5; }
-        }
-        .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
-
-        .gradient-text-primary {
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .tab-pill {
-            position: relative;
-            transition: all 0.2s ease;
-        }
-        .tab-pill.active {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            color: white;
-            box-shadow: 0 2px 8px rgba(99,102,241,0.3);
-        }
-        .tab-pill:not(.active):hover {
-            background: #f1f5f9;
-            color: #334155;
-        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 antialiased">
@@ -95,14 +26,14 @@
                 </a>
                 <div class="hidden sm:flex items-center gap-6">
                     <a href="{% url 'pages:home' %}" class="text-sm font-medium text-gray-500 hover:text-indigo-600 transition">Home</a>
-                    <a href="{% url 'posts:browse' %}" class="text-sm font-medium text-gray-500 hover:text-indigo-600 transition">Browse</a>
                     {% if user.is_authenticated %}
-                    <a href="{% url 'dashboard:home' %}" class="text-sm font-medium text-gray-500 hover:text-indigo-600 transition">Dashboard</a>
+                    <a href="{% url 'posts:browse' %}" class="text-sm font-medium text-gray-500 hover:text-indigo-600 transition">Browse</a>
+                    <a href="{% if user.is_staff %}{% url 'dashboard:admin_home' %}{% else %}{% url 'dashboard:home' %}{% endif %}" class="text-sm font-medium text-gray-500 hover:text-indigo-600 transition">Dashboard</a>
                     <form method="POST" action="{% url 'accounts:logout' %}" class="inline">
                         {% csrf_token %}
                         <button type="submit" class="text-sm font-medium text-gray-500 hover:text-red-600 transition bg-transparent border-0 cursor-pointer p-0">Logout</button>
                     </form>
-                    <a href="{% url 'dashboard:home' %}" class="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-semibold shadow-md">
+                    <a href="{% if user.is_staff %}{% url 'dashboard:admin_home' %}{% else %}{% url 'dashboard:home' %}{% endif %}" class="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-semibold shadow-md">
                         {{ user.get_full_name|default:user.username|first|upper }}
                     </a>
                     {% else %}
@@ -115,7 +46,7 @@
                 <!-- Mobile menu toggle -->
                 <div class="sm:hidden flex items-center gap-3">
                     {% if user.is_authenticated %}
-                    <a href="{% url 'dashboard:home' %}" class="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-semibold">
+                    <a href="{% if user.is_staff %}{% url 'dashboard:admin_home' %}{% else %}{% url 'dashboard:home' %}{% endif %}" class="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-semibold">
                         {{ user.get_full_name|default:user.username|first|upper }}
                     </a>
                     {% else %}
@@ -129,17 +60,36 @@
     <!-- Offset for fixed navbar -->
     <div class="{% if not user.is_authenticated %}pt-16{% endif %}">
         {% if messages %}
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+        <div id="toast-container" class="fixed top-20 right-6 z-[9999] space-y-3 max-w-sm w-full pointer-events-none">
             {% for message in messages %}
-            <div class="mb-2 px-4 py-3 rounded-xl text-sm font-medium
-                {% if message.tags == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-200
-                {% elif message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
-                {% elif message.tags == 'warning' %}bg-amber-50 text-amber-700 border border-amber-200
-                {% else %}bg-indigo-50 text-indigo-700 border border-indigo-200{% endif %}">
-                {{ message }}
+            <div class="pointer-events-auto toast-item px-5 py-3.5 rounded-xl text-sm font-medium shadow-lg border backdrop-blur-sm flex items-center gap-3 transform translate-x-full opacity-0 transition-all duration-300 ease-out
+                {% if message.tags == 'success' %}bg-emerald-50/95 text-emerald-700 border-emerald-200
+                {% elif message.tags == 'error' %}bg-red-50/95 text-red-700 border-red-200
+                {% elif message.tags == 'warning' %}bg-amber-50/95 text-amber-700 border-amber-200
+                {% else %}bg-indigo-50/95 text-indigo-700 border-indigo-200{% endif %}">
+                <i class="bi {% if message.tags == 'success' %}bi-check-circle-fill text-emerald-500{% elif message.tags == 'error' %}bi-exclamation-circle-fill text-red-500{% elif message.tags == 'warning' %}bi-exclamation-triangle-fill text-amber-500{% else %}bi-info-circle-fill text-indigo-500{% endif %} text-base flex-shrink-0"></i>
+                <span class="flex-1">{{ message|safe }}</span>
+                <button onclick="this.closest('.toast-item').remove()" class="text-gray-400 hover:text-gray-600 transition flex-shrink-0 ml-1">
+                    <i class="bi bi-x-lg text-xs"></i>
+                </button>
             </div>
             {% endfor %}
         </div>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var toasts = document.querySelectorAll('.toast-item');
+            toasts.forEach(function(toast, i) {
+                setTimeout(function() {
+                    toast.classList.remove('translate-x-full', 'opacity-0');
+                    toast.classList.add('translate-x-0', 'opacity-100');
+                }, i * 150);
+                setTimeout(function() {
+                    toast.classList.add('translate-x-full', 'opacity-0');
+                    setTimeout(function() { toast.remove(); }, 300);
+                }, 4000 + i * 150);
+            });
+        });
+        </script>
         {% endif %}
         {% block content %}{% endblock %}
     </div>

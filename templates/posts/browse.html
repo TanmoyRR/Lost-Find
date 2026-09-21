@@ -38,12 +38,6 @@
                         <option value="{{ cat.slug }}" {% if current_category == cat.slug %}selected{% endif %}>{{ cat.name }}</option>
                         {% endfor %}
                     </select>
-                    <select name="location" class="filter-select px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-sm bg-white">
-                        <option value="">All Locations</option>
-                        {% for loc in locations %}
-                        <option value="{{ loc.slug }}" {% if current_location == loc.slug %}selected{% endif %}>{{ loc.name }}</option>
-                        {% endfor %}
-                    </select>
                 </div>
             </div>
         </div>
@@ -100,11 +94,11 @@
         {% if posts.has_other_pages %}
         <div class="flex justify-center mt-8 gap-2">
             {% if posts.has_previous %}
-            <a href="?page={{ posts.previous_page_number }}&q={{ current_query }}&type={{ current_type }}&category={{ current_category }}&location={{ current_location }}&status={{ current_status }}" class="px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">&laquo; Prev</a>
+            <a href="?page={{ posts.previous_page_number }}&q={{ current_query }}&type={{ current_type }}&category={{ current_category }}&status={{ current_status }}" class="px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">&laquo; Prev</a>
             {% endif %}
             <span class="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-medium">{{ posts.number }}</span>
             {% if posts.has_next %}
-            <a href="?page={{ posts.next_page_number }}&q={{ current_query }}&type={{ current_type }}&category={{ current_category }}&location={{ current_location }}&status={{ current_status }}" class="px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Next &raquo;</a>
+            <a href="?page={{ posts.next_page_number }}&q={{ current_query }}&type={{ current_type }}&category={{ current_category }}&status={{ current_status }}" class="px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Next &raquo;</a>
             {% endif %}
         </div>
         {% endif %}

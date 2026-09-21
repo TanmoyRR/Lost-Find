@@ -64,6 +64,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.accounts.middleware.ActiveUserMiddleware',
+    'apps.accounts.middleware.EmailVerificationMiddleware',
     'apps.accounts.middleware.MembershipPendingMiddleware',
     'apps.accounts.middleware.MembershipMiddleware',
 ]
@@ -235,7 +236,7 @@ DATABASES = {
         'OPTIONS': {
             'sslmode': 'require',
         },
-        'CONN_MAX_AGE': 60,
+        'CONN_MAX_AGE': 0,
         'CONN_HEALTH_CHECKS': True,
     }
 }

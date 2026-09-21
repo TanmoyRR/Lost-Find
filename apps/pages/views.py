@@ -10,19 +10,28 @@ logger = logging.getLogger(__name__)
 
 
 def home(request):
-    counts = Post.objects.aggregate(
-        total_posts=Count('id'),
-        resolved_posts=Count('id', filter=Q(status='resolved')),
-        open_posts=Count('id', filter=Q(status='open')),
-    )
-    stats = {
-        'total_posts': counts['total_posts'],
-        'total_users': User.objects.count(),
-        'resolved_posts': counts['resolved_posts'],
-        'open_posts': counts['open_posts'],
-    }
+    from django.core.cache import cache
+    cache_key = 'home_stats'
+    stats = cache.get(cache_key)
+    if stats is None:
+        counts = Post.objects.aggregate(
+            total_posts=Count('id'),
+            resolved_posts=Count('id', filter=Q(status='resolved')),
+            open_posts=Count('id', filter=Q(status='open')),
+        )
+        stats = {
+            'total_posts': counts['total_posts'],
+            'total_users': User.objects.count(),
+            'resolved_posts': counts['resolved_posts'],
+            'open_posts': counts['open_posts'],
+        }
+        cache.set(cache_key, stats, 60)
     recent_posts = Post.objects.select_related('location', 'category').filter(is_active=True)[:6] if request.user.is_authenticated else []
-    categories = Category.objects.all()
+    categories_key = 'home_categories'
+    categories = cache.get(categories_key)
+    if categories is None:
+        categories = list(Category.objects.all())
+        cache.set(categories_key, categories, 300)
 
     deleted_username = None
     raw_cookie = request.COOKIES.get('account_deleted_msg')

@@ -72,9 +72,12 @@ def _is_safe_redirect_url(url, request=None):
 
 def _send_email(subject, template, context, recipient):
     """Helper: send an HTML email with plain-text fallback."""
-    html = render_to_string(template, context)
-    plain = strip_tags(html)
-    send_mail(subject, plain, settings.DEFAULT_FROM_EMAIL, [recipient], html_message=html)
+    try:
+        html = render_to_string(template, context)
+        plain = strip_tags(html)
+        send_mail(subject, plain, settings.DEFAULT_FROM_EMAIL, [recipient], html_message=html)
+    except Exception as e:
+        logger.error('Email send failed to %s: %s', recipient, e)
 
 
 @ratelimit(key='ip', rate='5/m', method=['POST'], block=True)
@@ -84,9 +87,9 @@ def register(request):
 
     Flow:
       1. Validate form (username, email, password, department)
-      2. Set role='student', membership_paid=False, email_verified=True
-      3. Auto-login after registration
-      4. Redirect to membership purchase page (account inactive until paid)
+      2. Set role='student', membership_paid=False, email_verified=False
+      3. Send verification email
+      4. Auto-login, redirect to email verification gate
 
     Rate limited: 5 attempts per minute per IP.
     """
@@ -96,14 +99,91 @@ def register(request):
             user = form.save(commit=False)
             user.role = 'student'
             user.is_membership_paid = False
-            user.email_verified = True
+            user.email_verified = False
+            import secrets
+            user.email_verification_token = secrets.token_urlsafe(32)
+            user.email_verification_sent_at = timezone.now()
             user.save()
             login(request, user)
-            messages.success(request, 'Registration successful!')
-            return redirect('membership:pending_purchase')
+
+            verify_url = request.build_absolute_uri(
+                reverse('accounts:verify_email', args=[user.email_verification_token])
+            )
+            _send_email(
+                'Verify your email - IUBAT SmartFind',
+                'accounts/emails/email_verification.html',
+                {'user': user, 'verify_url': verify_url, 'site_name': settings.SITE_NAME},
+                user.email,
+            )
+
+            messages.success(request, 'Registration successful! Please verify your email.')
+            return redirect('accounts:verify_email_gate')
     else:
         form = UserRegistrationForm()
     return render(request, 'accounts/register.html', {'form': form})
+
+
+@login_required
+def verify_email_gate(request):
+    """Display verification pending page for unverified users."""
+    if request.user.email_verified:
+        return redirect('dashboard:home')
+    return render(request, 'accounts/verify_email_gate.html')
+
+
+def verify_email(request, token):
+    """Verify email with token from verification link."""
+    from django.contrib.auth import login as auth_login
+    try:
+        user = User.objects.get(email_verification_token=token)
+    except User.DoesNotExist:
+        messages.error(request, 'Invalid or expired verification link.')
+        return redirect('accounts:login')
+
+    if user.email_verified:
+        messages.success(request, 'Email already verified. Please log in.')
+        return redirect('accounts:login')
+
+    if user.email_verification_sent_at:
+        from datetime import timedelta
+        if timezone.now() - user.email_verification_sent_at > timedelta(hours=24):
+            messages.error(request, 'Verification link has expired. Please request a new one.')
+            return redirect('accounts:login')
+
+    user.email_verified = True
+    user.email_verification_token = None
+    user.email_verification_sent_at = None
+    user.save(update_fields=['email_verified', 'email_verification_token', 'email_verification_sent_at'])
+    auth_login(request, user)
+    messages.success(request, 'Email verified successfully!')
+    return redirect('membership:pending_purchase')
+
+
+@login_required
+def resend_verification(request):
+    """Resend verification email."""
+    if request.method != 'POST':
+        return redirect('accounts:verify_email_gate')
+    if request.user.email_verified:
+        messages.success(request, 'Email already verified.')
+        return redirect('dashboard:home')
+
+    import secrets
+    request.user.email_verification_token = secrets.token_urlsafe(32)
+    request.user.email_verification_sent_at = timezone.now()
+    request.user.save(update_fields=['email_verification_token', 'email_verification_sent_at'])
+
+    verify_url = request.build_absolute_uri(
+        reverse('accounts:verify_email', args=[request.user.email_verification_token])
+    )
+    _send_email(
+        'Verify your email - IUBAT SmartFind',
+        'accounts/emails/email_verification.html',
+        {'user': request.user, 'verify_url': verify_url, 'site_name': settings.SITE_NAME},
+        request.user.email,
+    )
+    messages.success(request, 'Verification email sent! Check your inbox.')
+    return redirect('accounts:verify_email_gate')
 
 
 @ratelimit(key='ip', rate='10/m', method=['POST'], block=True)
@@ -131,6 +211,8 @@ def user_login(request):
     if request.user.is_authenticated:
         if request.user.role == 'admin':
             return redirect('dashboard:admin_home')
+        if not request.user.email_verified:
+            return redirect('accounts:verify_email_gate')
         if not request.user.is_membership_paid:
             return redirect('membership:pending_purchase')
         return redirect('dashboard:home')
@@ -161,6 +243,8 @@ def user_login(request):
             # Role-based redirect
             if user.role == 'admin':
                 return redirect('dashboard:admin_home')
+            if not user.email_verified:
+                return redirect('accounts:verify_email_gate')
             if not user.is_membership_paid:
                 messages.info(request, 'Please complete your membership payment to activate your account.')
                 return redirect('membership:pending_purchase')
@@ -220,7 +304,7 @@ def forgot_password(request):
                 )
                 messages.success(request, 'Password reset link sent to your email.')
                 if settings.DEBUG:
-                    messages.info(request, f'Dev reset link: {reset_url}')
+                    print(f'\n[DEV] Password reset link for {user.email}: {reset_url}\n')
             except User.DoesNotExist:
                 # Same message whether user exists or not (prevents email enumeration)
                 messages.success(request, 'If an account exists with this email, a reset link has been sent.')
@@ -317,7 +401,7 @@ def profile_view(request):
 def profile_edit(request):
     """Edit user profile (name, department, bio, profile picture)."""
     if request.method == 'POST':
-        form = UserProfileForm(request.POST, request.FILES, instance=request.user)
+        form = UserProfileForm(request.POST, instance=request.user)
         if form.is_valid():
             form.save()
             UserActivity.objects.create(

@@ -118,7 +118,7 @@ def membership_cancel(request):
 @login_required
 def manage_membership(request):
     membership = getattr(request.user, 'membership', None)
-    payments = Payment.objects.filter(user=request.user, payment_type='membership').order_by('-created_at')[:10]
+    payments = Payment.objects.filter(user=request.user, payment_type='membership').exclude(status='pending').order_by('-created_at')[:10]
     plans = MembershipPlan.objects.filter(is_active=True)
     return render(request, 'membership/manage.html', {
         'membership': membership,

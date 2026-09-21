@@ -142,6 +142,12 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const dateInput = document.querySelector('input[name="date_lost_found"]');
+        if (dateInput) {
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.setAttribute('max', today);
+        }
+
         const fileInput = document.querySelector('input[type="file"]');
         const preview = document.getElementById('image-preview');
         const previewImg = document.getElementById('preview-img');

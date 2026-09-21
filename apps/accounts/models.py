@@ -18,10 +18,7 @@ class User(AbstractUser):
         ('me', 'Mechanical Engineering'),
         ('bba', 'Business Administration'),
         ('english', 'English'),
-        ('law', 'Law'),
-        ('pharmacy', 'Pharmacy'),
         ('nursing', 'Nursing'),
-        ('textile', 'Textile Engineering'),
     )
 
     uid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)

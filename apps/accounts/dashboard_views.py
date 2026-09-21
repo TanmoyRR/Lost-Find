@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def user_dashboard(request):
+    if request.user.role == 'admin':
+        return redirect('dashboard:admin_home')
+    from django.core.cache import cache
     user = request.user
     posts = Post.objects.select_related('location', 'category').filter(user=user).order_by('-created_at')
     recent_activities = UserActivity.objects.filter(user=user)[:10]
@@ -32,14 +35,18 @@ def user_dashboard(request):
     matches = MatchSuggestion.objects.select_related('post', 'matched_post').filter(
         post__user=user, post__status='open', matched_post__status='open',
     )[:5]
-    unread_notifications = Notification.objects.filter(user=user, is_read=False).count()
-    user_agg = Post.objects.filter(user=user).aggregate(
-        total_posts=Count('id'),
-        open_posts=Count('id', filter=Q(status='open')),
-        resolved_posts=Count('id', filter=Q(status='resolved')),
-        lost_posts=Count('id', filter=Q(post_type='lost')),
-        found_posts=Count('id', filter=Q(post_type='found')),
-    )
+
+    cache_key = f'user_dash_agg_{user.pk}'
+    user_agg = cache.get(cache_key)
+    if user_agg is None:
+        user_agg = Post.objects.filter(user=user).aggregate(
+            total_posts=Count('id'),
+            open_posts=Count('id', filter=Q(status='open')),
+            resolved_posts=Count('id', filter=Q(status='resolved')),
+            lost_posts=Count('id', filter=Q(post_type='lost')),
+            found_posts=Count('id', filter=Q(post_type='found')),
+        )
+        cache.set(cache_key, user_agg, 30)
 
     context = {
         'total_posts': user_agg['total_posts'],
@@ -47,7 +54,7 @@ def user_dashboard(request):
         'resolved_posts': user_agg['resolved_posts'],
         'lost_posts': user_agg['lost_posts'],
         'found_posts': user_agg['found_posts'],
-        'unread_notifications': unread_notifications,
+        'unread_notifications': 0,
         'posts': posts,
         'recent_activities': recent_activities,
         'membership': membership,
@@ -70,53 +77,74 @@ ADMIN_SIDEBAR = [
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(request):
-    users_agg = User.objects.aggregate(
-        total_users=Count('id'),
-        active_users=Count('id', filter=Q(is_active=True, is_suspended=False)),
-    )
-    total_users = users_agg['total_users']
-    active_users = users_agg['active_users']
-    inactive_users = total_users - active_users
-    posts_agg = Post.objects.aggregate(
-        total_posts=Count('id'),
-        open_posts=Count('id', filter=Q(status='open')),
-        resolved_posts=Count('id', filter=Q(status='resolved')),
-        lost_posts=Count('id', filter=Q(post_type='lost')),
-        found_posts=Count('id', filter=Q(post_type='found')),
-    )
-    total_posts = posts_agg['total_posts']
-    open_posts = posts_agg['open_posts']
-    resolved_posts = posts_agg['resolved_posts']
-    lost_posts = posts_agg['lost_posts']
-    found_posts = posts_agg['found_posts']
-    payments_agg = Payment.objects.aggregate(
-        total_revenue=Sum('amount', filter=Q(status='completed')),
-        pending_payments=Count('id', filter=Q(status='pending')),
-    )
-    total_revenue = payments_agg['total_revenue'] or 0
-    pending_payments = payments_agg['pending_payments']
+    from django.core.cache import cache
+    cache_key = 'admin_dashboard_stats'
+    cached = cache.get(cache_key)
+    if cached:
+        total_users, active_users, inactive_users = cached['total_users'], cached['active_users'], cached['inactive_users']
+        total_posts, open_posts, resolved_posts = cached['total_posts'], cached['open_posts'], cached['resolved_posts']
+        lost_posts, found_posts = cached['lost_posts'], cached['found_posts']
+        total_revenue, pending_payments = cached['total_revenue'], cached['pending_payments']
+        posts_by_category, posts_by_location = cached['posts_by_category'], cached['posts_by_location']
+        monthly_registrations, monthly_revenue = cached['monthly_registrations'], cached['monthly_revenue']
+        max_revenue, max_registrations = cached['max_revenue'], cached['max_registrations']
+    else:
+        users_agg = User.objects.aggregate(
+            total_users=Count('id'),
+            active_users=Count('id', filter=Q(is_active=True, is_suspended=False)),
+        )
+        total_users = users_agg['total_users']
+        active_users = users_agg['active_users']
+        inactive_users = total_users - active_users
+        posts_agg = Post.objects.aggregate(
+            total_posts=Count('id'),
+            open_posts=Count('id', filter=Q(status='open')),
+            resolved_posts=Count('id', filter=Q(status='resolved')),
+            lost_posts=Count('id', filter=Q(post_type='lost')),
+            found_posts=Count('id', filter=Q(post_type='found')),
+        )
+        total_posts = posts_agg['total_posts']
+        open_posts = posts_agg['open_posts']
+        resolved_posts = posts_agg['resolved_posts']
+        lost_posts = posts_agg['lost_posts']
+        found_posts = posts_agg['found_posts']
+        payments_agg = Payment.objects.aggregate(
+            total_revenue=Sum('amount', filter=Q(status='completed')),
+            pending_payments=Count('id', filter=Q(status='pending')),
+        )
+        total_revenue = payments_agg['total_revenue'] or 0
+        pending_payments = payments_agg['pending_payments']
 
-    posts_by_category = list(Post.objects.values('category__name').annotate(count=Count('id')))
-    posts_by_location = list(Post.objects.values('location__name').annotate(count=Count('id')))
-    try:
-        monthly_registrations = list(User.objects.annotate(month=TruncMonth('date_joined')).values('month').annotate(count=Count('id')).order_by('-month')[:12])
-    except Exception:
-        monthly_registrations = []
-    try:
-        monthly_revenue = list(Payment.objects.filter(status='completed').annotate(month=TruncMonth('created_at')).values('month').annotate(total=Sum('amount')).order_by('-month')[:12])
-    except Exception:
-        monthly_revenue = []
-    max_revenue = max((item['total'] for item in monthly_revenue), default=1) or 1
-    max_registrations = max((item['count'] for item in monthly_registrations), default=1) or 1
+        posts_by_category = list(Post.objects.values('category__name').annotate(count=Count('id')))
+        posts_by_location = list(Post.objects.values('location__name').annotate(count=Count('id')))
+        try:
+            monthly_registrations = list(User.objects.annotate(month=TruncMonth('date_joined')).values('month').annotate(count=Count('id')).order_by('-month')[:12])
+        except Exception:
+            monthly_registrations = []
+        try:
+            monthly_revenue = list(Payment.objects.filter(status='completed').annotate(month=TruncMonth('created_at')).values('month').annotate(total=Sum('amount')).order_by('-month')[:12])
+        except Exception:
+            monthly_revenue = []
+        max_revenue = max((item['total'] for item in monthly_revenue), default=1) or 1
+        max_registrations = max((item['count'] for item in monthly_registrations), default=1) or 1
+        cache.set(cache_key, {
+            'total_users': total_users, 'active_users': active_users, 'inactive_users': inactive_users,
+            'total_posts': total_posts, 'open_posts': open_posts, 'resolved_posts': resolved_posts,
+            'lost_posts': lost_posts, 'found_posts': found_posts,
+            'total_revenue': total_revenue, 'pending_payments': pending_payments,
+            'posts_by_category': posts_by_category, 'posts_by_location': posts_by_location,
+            'monthly_registrations': monthly_registrations, 'monthly_revenue': monthly_revenue,
+            'max_revenue': max_revenue, 'max_registrations': max_registrations,
+        }, 30)
     from apps.recovery.models import RecoverySession
     recovery_agg = RecoverySession.objects.aggregate(
         recovery_sessions=Count('id'),
         completed_recoveries=Count('id', filter=Q(status='completed')),
         pending_recoveries=Count('id', filter=Q(status__in=['pending', 'token_generated'])),
     )
-    recent_activities = UserActivity.objects.all()[:20]
+    recent_activities = UserActivity.objects.select_related('user').all()[:20]
     users = User.objects.exclude(pk=request.user.pk).order_by('-date_joined')[:10]
-    posts = Post.objects.select_related('location', 'category').order_by('-created_at')[:10]
+    posts = Post.objects.select_related('location', 'category', 'user').order_by('-created_at')[:10]
     payments = Payment.objects.select_related('user').all().order_by('-created_at')[:10]
 
     context = {
@@ -166,7 +194,7 @@ def admin_user_detail(request, pk):
     from django.core.paginator import Paginator
     user = get_object_or_404(User, pk=pk)
     user_posts = Post.objects.filter(user=user).select_related('category', 'location')
-    user_payments = Payment.objects.filter(user=user).select_related('user')
+    user_payments = Payment.objects.filter(user=user).exclude(status='pending').select_related('user')
     user_activities = UserActivity.objects.filter(user=user)[:20]
     open_posts = user_posts.filter(status='open').count()
     resolved_posts = user_posts.filter(status='resolved').count()
@@ -838,6 +866,25 @@ def admin_extend_membership(request, pk):
     user.save(update_fields=['is_membership_paid'])
     messages.success(request, f'Membership extended by {days} days for {user.username}.')
     return redirect('dashboard:admin_user_detail', pk=pk)
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_delete_membership(request, pk):
+    if request.method != 'POST':
+        return redirect('dashboard:admin_user_detail', pk=pk)
+    user = get_object_or_404(User, pk=pk)
+    membership = getattr(user, 'membership', None)
+    if membership:
+        membership.delete()
+    user.is_membership_paid = False
+    user.save(update_fields=['is_membership_paid'])
+    from apps.payments.models import Payment
+    Payment.objects.filter(
+        user=user, payment_type='membership', status='completed'
+    ).update(status='refunded')
+    messages.success(request, f'Membership deleted for {user.username}. They must purchase a new membership to access the platform.')
+    return redirect('dashboard:admin_memberships')
 
 
 @login_required

@@ -6,6 +6,11 @@
 
 {% block dashboard_content %}
 <div class="space-y-6 animate-fade-in" x-data="{ activeTab: new URLSearchParams(window.location.search).get('tab') || 'posts' }">
+    <!-- Back Button -->
+    <a href="{% url 'dashboard:admin_users' %}" class="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-indigo-600 transition">
+        <i class="bi bi-arrow-left"></i> Back to Users
+    </a>
+
     <!-- User Profile Header -->
     <div class="relative overflow-hidden rounded-2xl gradient-primary p-8 text-white">
         <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
@@ -33,21 +38,6 @@
                 </p>
             </div>
             <div class="flex gap-2">
-                {% if profile_user.is_suspended %}
-                <form method="POST" action="{% url 'dashboard:admin_activate_user' profile_user.pk %}">
-                    {% csrf_token %}
-                    <button type="submit" class="glass px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-emerald-500/30 transition flex items-center gap-2">
-                        <i class="bi bi-check-circle"></i> Activate
-                    </button>
-                </form>
-                {% else %}
-                <form method="POST" action="{% url 'dashboard:admin_suspend_user' profile_user.pk %}" onsubmit="return confirm('Suspend this user?')">
-                    {% csrf_token %}
-                    <button type="submit" class="glass px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-red-500/30 transition flex items-center gap-2">
-                        <i class="bi bi-ban"></i> Suspend
-                    </button>
-                </form>
-                {% endif %}
                 {% if profile_user.pk != request.user.pk %}
                 <form method="POST" action="{% url 'dashboard:admin_delete_user' profile_user.pk %}" onsubmit="return confirm('Delete this user permanently? All their posts and data will be removed.')">
                     {% csrf_token %}
@@ -297,7 +287,9 @@
                     </div>
                     <div class="flex justify-between items-center py-3">
                         <span class="text-sm text-gray-500">Membership</span>
-                        <span class="text-sm font-medium text-gray-800">{{ profile_user.membership_type|default:'Free' }}</span>
+                        <span class="text-sm font-medium text-gray-800">
+                            {% if profile_user.membership and profile_user.membership.plan %}{{ profile_user.membership.plan.name }}{% else %}Free{% endif %}
+                        </span>
                     </div>
                 </div>
             </div>

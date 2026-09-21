@@ -22,4 +22,4 @@ def report_item(request, post_id):
         )
         messages.success(request, 'Report submitted. Our team will review it shortly.')
         return redirect('posts:detail', pk=post_id)
-    return render(request, 'posts/report_form.html', {'post': get_object_or_404(Post, pk=post_id)})
+    return render(request, 'posts/report_form.html', {'post': post})

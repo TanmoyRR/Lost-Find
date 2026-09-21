@@ -60,7 +60,7 @@ def inbox(request):
 
     for conv in conversations:
         conv.last_message = conv._last_msgs[0] if conv._last_msgs else None
-        conv._other_participants = conv.participants.exclude(pk=request.user.pk)
+        conv.other_users = conv.participants.exclude(pk=request.user.pk)
 
     return render(request, 'messaging/inbox.html', {
         'conversations': conversations,

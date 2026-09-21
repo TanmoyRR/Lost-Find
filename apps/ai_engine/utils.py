@@ -118,7 +118,7 @@ def refresh_post_embedding(post):
         vector = generate_embedding(text)
     except Exception as exc:
         logger.error('refresh_post_embedding error for post %s: %s', post.pk, exc)
-        return None
+        return None;                                     
     if not vector:
         logger.warning('refresh_post_embedding: no vector for post %s', post.pk)
         return None
