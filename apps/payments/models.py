@@ -56,14 +56,20 @@ class Payment(models.Model):
             try:
                 data = json.loads(session)
             except (ValueError, TypeError):
-                return 'N/A'
-            card = (data.get('card_type')
-                    or data.get('card_brand')
-                    or data.get('card_issuer')
-                    or data.get('card_ref_id'))
-            if card:
-                return str(card).title()
-        return 'N/A'
+                return 'SSLCommerz'
+            method = (data.get('payment_type')
+                      or data.get('method')
+                      or data.get('card_type')
+                      or data.get('card_brand')
+                      or data.get('card_issuer')
+                      or data.get('currencyType'))
+            if method:
+                return str(method).title()
+        return 'SSLCommerz'
+
+    @property
+    def display_transaction_id(self):
+        return self.transaction_id or self.sslcommerz_tran_id or 'N/A'
 
     @property
     def completion_date(self):

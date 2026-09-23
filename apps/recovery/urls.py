@@ -9,8 +9,8 @@ urlpatterns = [
     path('admin/<str:short_code>/force-complete/', views.admin_force_complete, name='admin_force_complete'),
     path('admin/<str:short_code>/force-cancel/', views.admin_force_cancel, name='admin_force_cancel'),
     path('admin/<str:short_code>/reassign/', views.admin_reassign_claimant, name='admin_reassign_claimant'),
-    path('<str:short_code>/', views.recovery_detail, name='detail'),
-    path('<str:short_code>/regenerate-token/', views.regenerate_token, name='regenerate_token'),
-    path('<str:short_code>/enter-token/', views.enter_token, name='enter_token'),
-    path('<str:short_code>/cancel/', views.cancel_recovery, name='cancel'),
+    path('<int:pk>/', views.recovery_detail, name='detail'),
+    path('<int:pk>/regenerate-token/', views.regenerate_token, name='regenerate_token'),
+    path('<int:pk>/enter-token/', views.enter_token, name='enter_token'),
+    path('<int:pk>/cancel/', views.cancel_recovery, name='cancel'),
 ]

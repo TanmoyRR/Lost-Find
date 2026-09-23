@@ -167,7 +167,7 @@
                                 {{ payment.get_status_display }}
                             </span>
                         </td>
-                        <td class="py-3 text-gray-500 font-mono text-xs">{{ payment.transaction_id|truncatechars:16|default:'—' }}</td>
+                        <td class="py-3 text-gray-500 font-mono text-xs">{{ payment.display_transaction_id|truncatechars:16 }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

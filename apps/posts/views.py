@@ -171,13 +171,11 @@ def create_post(request):
 
     Flow:
       1. Admins are redirected — they manage posts, not create them.
-      2. On POST: validate form → save post → trigger recovery session (for lost posts)
-         → trigger AI matching → redirect to post detail.
+      2. On POST: validate form → save post → trigger AI matching → redirect to post detail.
       3. On GET: render empty PostForm.
 
-    Recovery session: When a lost post is created, a RecoverySession is automatically
-    created with a unique short code (token). The owner shares this token with the
-    finder to verify recovery.
+    Recovery sessions are created ONLY when messaging starts (apps/messaging/views.py),
+    not at post creation. Whoever messages first creates the single session for the match.
 
     AI matching: find_matches_for_post() generates an embedding via Jina API,
     searches for opposite-type posts (lost↔found), and stores MatchSuggestions.
@@ -193,15 +191,6 @@ def create_post(request):
             post.user = request.user
             post.save()
             messages.success(request, 'Post created successfully!')
-
-            # Auto-create recovery session for lost posts
-            if post.post_type == 'lost':
-                try:
-                    from apps.recovery.views import create_recovery_session_for_post
-                    session = create_recovery_session_for_post(post)
-                    messages.info(request, f'Recovery token generated: {session.short_code}')
-                except Exception:
-                    pass
 
             # Trigger AI matching (generates embedding + finds matches)
             try:

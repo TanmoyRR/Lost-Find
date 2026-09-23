@@ -203,7 +203,7 @@ def payment_notify(request):
                 logger.warning('IPN validation failed for tran_id=%s: %s', tran_id, error_msg)
                 return HttpResponse('OK', status=200)
 
-            payment.transaction_id = result.get('bank_tran_id') or None
+            payment.transaction_id = result.get('bank_tran_id') or payment.sslcommerz_tran_id
             payment.sslcommerz_session = json.dumps(result)
             payment.save(update_fields=['transaction_id', 'sslcommerz_session', 'updated_at'])
             _complete_membership_payment(payment)
@@ -290,7 +290,7 @@ def payment_success(request):
                     payment = Payment.objects.select_for_update().get(sslcommerz_tran_id=tran_id)
                     is_valid, _ = _validate_payment_result(result, payment)
                     if is_valid:
-                        payment.transaction_id = result.get('bank_tran_id') or None
+                        payment.transaction_id = result.get('bank_tran_id') or payment.sslcommerz_tran_id
                         payment.sslcommerz_session = json.dumps(result)
                         if payment.status == 'pending':
                             payment.save(update_fields=['transaction_id', 'sslcommerz_session', 'updated_at'])

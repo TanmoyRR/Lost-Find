@@ -3,22 +3,23 @@ Recovery Views — Token-based item recovery verification system.
 
 This module implements the core recovery workflow that proves item ownership:
 
-  Recovery Flow (for a Lost post):
-    1. Owner creates a lost post → a RecoverySession is auto-created with a
-       unique short code (token), e.g. "LF-T2FJBL"
-    2. Finder finds the item → starts a conversation → recovery session is linked
-    3. Owner shares their token with the finder (in person or via chat)
-    4. Finder enters the token on the "Enter Token" page
-    5. Token is verified → both posts marked as 'resolved' → recovery complete
+  Recovery Flow (SINGLE session per match):
+    1. Lost post created (NO auto-session) / Found post created
+    2. First person to message creates ONE RecoverySession with a unique
+       short code (token), e.g. "LF-T2FJBL"
+    3. Second person messaging reuses the same session (never creates a second)
+    4. Owner (lost-item person) shares their token with the finder
+    5. Finder enters the token on the "Enter Token" page
+    6. Token verified (entered == session.short_code) → session completed,
+       both posts resolved → recovery complete
 
-  For Found posts:
-    - The roles are reversed: the found-post creator is the "finder" and the
-      person who lost the item is the "owner"
-    - The owner enters the finder's token to prove ownership
+  Roles:
+    - owner: The person who lost the item (session.owner, shares the token)
+    - claimant: The person who found it (session.claimant, enters the token)
 
   Session statuses:
     - pending: Session created, no token generated yet
-    - token_generated: Token ready to be shared (default for new lost posts)
+    - token_generated: Token ready to be shared (default for new sessions)
     - token_entered: Finder has entered a token (intermediate state)
     - completed: Token verified, item recovered
     - expired: Session older than 30 days, auto-expired
@@ -78,28 +79,29 @@ def _get_sidebar(user):
     return MEMBER_SIDEBAR
 
 
-def create_recovery_session_for_post(post):
+def _resolve_counterpart_post(session):
     """
-    Create a RecoverySession immediately when a Lost Post is created.
+    Find the counterpart (opposite-type) post for a single-session recovery.
 
-    Called from posts/views.py create_post(). The token (short_code) is generated
-    right away so the owner can share it with the finder. No claimant is assigned
-    yet — that happens later when the finder starts a conversation or AI matching
-    assigns them.
+    For a lost-post session: counterpart is the claimant's (finder's) found post.
+    For a found-post session: counterpart is the owner's (lost-item person's) lost post.
+    Returns None if no counterpart found.
     """
-    session = RecoverySession.objects.create(
-        post=post,
-        owner=post.user,
-        claimant=None,
-        status='token_generated',
-    )
-    RecoveryVerificationLog.objects.create(
-        session=session, action='session_created',
-        performed_by=post.user,
-        details={'post_id': post.id, 'post_title': post.title},
-    )
-    logger.info('Recovery session %s created for lost post %s', session.short_code, post.pk)
-    return session
+    if session.post.post_type == 'lost':
+        other_user = session.claimant
+        opposite_type = 'found'
+    else:
+        other_user = session.owner
+        opposite_type = 'lost'
+
+    if not other_user:
+        return None
+
+    return Post.objects.filter(
+        user=other_user,
+        post_type=opposite_type,
+        status__in=['open', 'claimed'],
+    ).order_by('-created_at').first()
 
 
 @login_required
@@ -118,23 +120,21 @@ def recovery_list(request):
 
 
 @login_required
-def recovery_detail(request, short_code):
+def recovery_detail(request, pk):
     """
     Display detailed view of a single recovery session.
 
-    Role resolution (critical for found posts):
-      For lost posts: owner = session.owner, finder = session.claimant (straightforward)
-      For found posts: the roles need dynamic resolution because the session owner
-        might not be the actual item owner. We determine:
-        - actual_finder: the found-post creator (post.user)
-        - actual_owner: the person who lost the item (determined from session relationships)
+    Role resolution (single session):
+      - owner: session.owner (lost-item person, shares the token)
+      - claimant: session.claimant (finder, enters the token)
+      - is_owner: True if viewer is the owner
+      - is_finder: True if viewer is the claimant
 
-    Also builds a progress stepper (Token Ready → Token Entered → Completed)
-    and checks if the owner has a matching lost post (for the found-post recovery flow).
+    Also builds a progress stepper (Token Ready → Token Entered → Completed).
     """
     session = get_object_or_404(
         RecoverySession.objects.select_related('post', 'post__category', 'claimant', 'owner'),
-        short_code=short_code,
+        pk=pk,
     )
 
     # Access control: only owner or claimant can view
@@ -142,25 +142,10 @@ def recovery_detail(request, short_code):
         messages.error(request, 'You do not have access to this recovery session.')
         return redirect('recovery:list')
 
-    # Dynamic role resolution — especially important for found posts
-    if session.post.post_type == 'found':
-        # For found posts: the finder is the post creator
-        actual_finder = session.post.user
-        # The owner is the person who lost the item (may differ from session.owner)
-        if session.owner != session.post.user:
-            actual_owner = session.owner
-        elif session.claimant and session.claimant != session.post.user:
-            actual_owner = session.claimant
-        else:
-            actual_owner = session.owner
-        is_owner = request.user == actual_owner
-        is_finder = request.user == actual_finder
-    else:
-        # For lost posts: straightforward from session fields
-        actual_finder = session.claimant
-        actual_owner = session.owner
-        is_owner = request.user == session.owner
-        is_finder = request.user == session.claimant
+    actual_owner = session.owner
+    actual_finder = session.claimant
+    is_owner = request.user == session.owner
+    is_finder = request.user == session.claimant
 
     # Build progress stepper based on session status
     step_order = ['pending', 'token_generated', 'token_entered', 'completed']
@@ -174,16 +159,6 @@ def recovery_detail(request, short_code):
         {'label': 'Completed', 'icon': 'bi-flag', 'done': session.status == 'completed'},
     ]
 
-    # For found-post owners: check if they have a matching lost post with a token
-    owner_lost_session = None
-    if session.post.post_type == 'found' and is_owner:
-        owner_lost_session = RecoverySession.objects.filter(
-            post__user=actual_owner,
-            post__post_type='lost',
-            post__status='open',
-            status='token_generated',
-        ).exclude(pk=session.pk).select_related('post').first()
-
     return render(request, 'recovery/recovery_detail.html', {
         'session': session,
         'steps': steps,
@@ -191,13 +166,12 @@ def recovery_detail(request, short_code):
         'is_finder': is_finder,
         'actual_owner': actual_owner,
         'actual_finder': actual_finder,
-        'owner_lost_session': owner_lost_session,
         'sidebar_items': _get_sidebar(request.user),
     })
 
 
 @login_required
-def regenerate_token(request, short_code):
+def regenerate_token(request, pk):
     """
     Generate a new recovery token for an active session.
 
@@ -206,13 +180,13 @@ def regenerate_token(request, short_code):
     immediately invalidated.
     """
     if request.method != 'POST':
-        return redirect('recovery:detail', short_code=short_code)
+        return redirect('recovery:detail', pk=pk)
 
-    session = get_object_or_404(RecoverySession, short_code=short_code, owner=request.user)
+    session = get_object_or_404(RecoverySession, pk=pk, owner=request.user)
 
     if session.status not in ('pending', 'token_generated'):
         messages.error(request, 'Token can only be regenerated while the session is active.')
-        return redirect('recovery:detail', short_code=short_code)
+        return redirect('recovery:detail', pk=pk)
 
     # Generate a unique new token
     new_code = generate_short_code()
@@ -229,33 +203,30 @@ def regenerate_token(request, short_code):
         ip_address=request.META.get('REMOTE_ADDR'),
     )
     messages.success(request, 'Recovery token regenerated successfully.')
-    return redirect('recovery:detail', short_code=session.short_code)
+    return redirect('recovery:detail', pk=session.pk)
 
 
 @login_required
 @ratelimit(key='ip', rate='10/m', method='POST', block=True)
-def enter_token(request, short_code):
+def enter_token(request, pk):
     """
     Finder enters the owner's recovery token to complete recovery.
 
-    This is the critical verification step. The flow:
+    SINGLE-SESSION verification:
       1. Only the claimant (finder) can access this page
-      2. The finder enters the owner's recovery token (short_code)
-      3. The system validates:
-         - Token exists and belongs to an active session
-         - The token's post is not already resolved
-         - The involved users match (prevents unrelated sessions from being linked)
+      2. The finder enters the owner's recovery token
+      3. The system validates entered token == session.short_code (this session's own token)
       4. On success (inside an atomic transaction):
-         - Both sessions marked as 'completed'
-         - Both posts marked as 'resolved'
-         - Posts linked via matched_post field
+         - Session marked as 'completed'
+         - This session's post marked as 'resolved'
+         - Counterpart post (other user's opposite-type post) resolved and linked
          - Notifications sent to both parties
 
     Rate limited: 10 attempts per minute per IP (brute-force protection).
     """
     session = get_object_or_404(
         RecoverySession.objects.select_related('post', 'claimant', 'owner'),
-        short_code=short_code,
+        pk=pk,
     )
 
     # Only the assigned finder (claimant) can enter the token
@@ -266,7 +237,7 @@ def enter_token(request, short_code):
     # Session must be in 'token_generated' state
     if session.status != 'token_generated':
         messages.error(request, 'This recovery session is no longer active.')
-        return redirect('recovery:detail', short_code=short_code)
+        return redirect('recovery:detail', pk=pk)
 
     if request.method == 'POST':
         token = (request.POST.get('short_code', '') or '').strip().upper()
@@ -277,91 +248,62 @@ def enter_token(request, short_code):
                 'session': session, 'sidebar_items': _get_sidebar(request.user)
             })
 
-        # Look up the token — must belong to a different active session
-        owner_session = RecoverySession.objects.filter(
-            short_code=token, status='token_generated',
-        ).exclude(pk=session.pk).select_related('post', 'owner').first()
-
-        if not owner_session:
-            messages.error(request, 'Invalid or inactive token. Please check the code and try again.')
+        # SINGLE-SESSION verification: entered token must match THIS session's short_code
+        if token != session.short_code:
+            messages.error(request, 'Invalid token. Please check the code and try again.')
             return render(request, 'recovery/enter_token.html', {
                 'session': session, 'sidebar_items': _get_sidebar(request.user)
             })
 
-        # Reject if the token's post is already resolved
-        if owner_session.post.status == 'resolved':
-            messages.error(request, 'This recovery token has already been used for a resolved case.')
-            return render(request, 'recovery/enter_token.html', {
-                'session': session, 'sidebar_items': _get_sidebar(request.user)
-            })
-
-        # Security: ensure the token belongs to related users only
-        # (prevents connecting unrelated recovery sessions)
-        involved_users = {session.owner_id, session.claimant_id, owner_session.owner_id, owner_session.claimant_id}
-        involved_users.discard(None)
-        if len(involved_users) > 2:
-            messages.error(request, 'This token does not match your recovery session. Please check the code and try again.')
-            return render(request, 'recovery/enter_token.html', {
-                'session': session, 'sidebar_items': _get_sidebar(request.user)
-            })
-
-        # Atomically complete both recovery sessions and resolve both posts
+        # Atomically complete session and resolve posts
         with transaction.atomic():
-            # Complete this session (finder's side)
-            session.claimant = request.user
+            # Complete this session
             session.status = 'completed'
             session.token_verified_at = timezone.now()
             session.completed_at = timezone.now()
-            session.save(update_fields=['claimant', 'status', 'token_verified_at', 'completed_at'])
+            session.save(update_fields=['status', 'token_verified_at', 'completed_at'])
 
-            # Complete the owner's session too
-            owner_session.claimant = request.user
-            owner_session.status = 'completed'
-            owner_session.token_verified_at = timezone.now()
-            owner_session.completed_at = timezone.now()
-            owner_session.save(update_fields=['claimant', 'status', 'token_verified_at', 'completed_at'])
-
-            # Mark both posts as resolved and link them to each other
+            # Resolve this session's post
             session.post.status = 'resolved'
-            session.post.matched_post = owner_session.post
-            session.post.save(update_fields=['status', 'matched_post'])
+            session.post.save(update_fields=['status'])
 
-            owner_session.post.status = 'resolved'
-            owner_session.post.matched_post = session.post
-            owner_session.post.save(update_fields=['status', 'matched_post'])
+            # Find and resolve counterpart post (other user's opposite-type post)
+            counterpart = _resolve_counterpart_post(session)
+            if counterpart and counterpart.status != 'resolved':
+                counterpart.status = 'resolved'
+                counterpart.matched_post = session.post
+                counterpart.save(update_fields=['status', 'matched_post'])
+                # Link session's post to counterpart
+                session.post.matched_post = counterpart
+                session.post.save(update_fields=['matched_post'])
 
-            # Log the completion for both sessions
+            # Log the completion
             RecoveryVerificationLog.objects.create(
                 session=session, action='recovery_completed',
                 performed_by=request.user,
-                details={'matched_with': owner_session.short_code},
-            )
-            RecoveryVerificationLog.objects.create(
-                session=owner_session, action='recovery_completed',
-                performed_by=request.user,
-                details={'matched_with': session.short_code},
+                details={'counterpart_post_id': counterpart.pk if counterpart else None},
             )
 
-            # Notify both parties about the successful recovery
-            if owner_session.owner != request.user:
-                Notification.objects.create(
-                    user=owner_session.owner,
-                    notification_type='post_resolved',
-                    title='Item Successfully Recovered',
-                    message=f'Your item "{owner_session.post.title}" has been successfully recovered.',
-                    link=reverse('recovery:list'),
-                )
+            # Notify both parties
             if session.owner != request.user:
                 Notification.objects.create(
                     user=session.owner,
                     notification_type='post_resolved',
                     title='Item Successfully Recovered',
-                    message=f'Your found item "{session.post.title}" has been matched and recovered.',
+                    message=f'Your item "{session.post.title}" has been successfully recovered.',
+                    link=reverse('recovery:list'),
+                )
+            if counterpart and counterpart.user != request.user:
+                Notification.objects.create(
+                    user=counterpart.user,
+                    notification_type='post_resolved',
+                    title='Item Successfully Recovered',
+                    message=f'Your item "{counterpart.title}" has been matched and recovered.',
                     link=reverse('recovery:list'),
                 )
 
-        messages.success(request, 'Recovery completed successfully! Both items marked as resolved.')
-        return redirect('recovery:detail', short_code=short_code)
+        messages.success(request, 'Recovery completed successfully! Items marked as resolved.')
+        return redirect('recovery:detail', pk=pk)
 
     return render(request, 'recovery/enter_token.html', {
         'session': session,
@@ -370,23 +312,23 @@ def enter_token(request, short_code):
 
 
 @login_required
-def cancel_recovery(request, short_code):
+def cancel_recovery(request, pk):
     """
-    Cancel an active recovery session. Either party (owner or claimant) can cancel.
-    Sends a notification to the other party about the cancellation.
+    Cancel an active recovery session. Only the owner (lost-item person) can cancel.
+    Sends a notification to the claimant about the cancellation.
     """
     if request.method != 'POST':
-        return redirect('recovery:detail', short_code=short_code)
+        return redirect('recovery:detail', pk=pk)
 
-    session = get_object_or_404(RecoverySession, short_code=short_code)
+    session = get_object_or_404(RecoverySession, pk=pk)
 
-    if request.user not in [session.claimant, session.owner]:
-        messages.error(request, 'Access denied.')
+    if request.user != session.owner:
+        messages.error(request, 'Only the session owner can cancel this recovery.')
         return redirect('recovery:list')
 
     if session.status in ('completed', 'expired', 'cancelled'):
         messages.error(request, 'Session cannot be cancelled.')
-        return redirect('recovery:detail', short_code=short_code)
+        return redirect('recovery:detail', pk=pk)
 
     session.status = 'cancelled'
     session.save(update_fields=['status'])
@@ -398,8 +340,8 @@ def cancel_recovery(request, short_code):
         ip_address=request.META.get('REMOTE_ADDR'),
     )
 
-    # Notify the other party
-    other_user = session.owner if request.user == session.claimant else session.claimant
+    # Notify the claimant
+    other_user = session.claimant
     if other_user:
         Notification.objects.create(
             user=other_user,
@@ -462,19 +404,6 @@ def admin_force_complete(request, short_code):
     # Also resolve the post
     session.post.status = 'resolved'
     session.post.save(update_fields=['status'])
-
-    # Find and complete the paired session if it exists
-    paired_session = RecoverySession.objects.filter(
-        post__matched_post=session.post,
-        status__in=['pending', 'token_generated', 'token_entered'],
-    ).exclude(pk=session.pk).first()
-
-    if paired_session and paired_session.post_id:
-        paired_session.status = 'completed'
-        paired_session.completed_at = tz.now()
-        paired_session.save(update_fields=['status', 'completed_at'])
-        paired_session.post.status = 'resolved'
-        paired_session.post.save(update_fields=['status'])
 
     messages.success(request, f'Recovery session {session.short_code} force-completed.')
     return redirect('recovery:admin_list')

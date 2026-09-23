@@ -700,6 +700,45 @@ def admin_reports(request):
 
 @login_required
 @user_passes_test(is_admin)
+def admin_report_detail(request, pk):
+    from apps.posts.models import TrustReport, Post
+    report = get_object_or_404(TrustReport, pk=pk)
+    post = report.post
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'investigating':
+            report.status = 'investigating'
+        elif action == 'resolved':
+            report.status = 'resolved'
+        elif action == 'dismissed':
+            report.status = 'dismissed'
+        report.reviewed_by = request.user
+        if request.POST.get('resolution_notes'):
+            report.resolution_notes = request.POST['resolution_notes']
+        report.save()
+        try:
+            from apps.notifications.models import Notification as _Notif
+            _Notif.objects.create(
+                notification_type='system',
+                title='Your report has been updated',
+                message=f'Your report on "{post.title}" is now {report.get_status_display().lower()}.',
+                link=reverse('posts:detail', args=[post.pk]),
+                user=report.reporter,
+            )
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception('Failed to notify reporter for report %s', report.pk)
+        messages.success(request, f'Report status updated to {report.get_status_display().lower()}.')
+        return redirect('dashboard:admin_report_detail', pk=pk)
+    return render(request, 'admin_dashboard/report_detail.html', {
+        'report': report,
+        'post': post,
+        'sidebar_items': ADMIN_SIDEBAR,
+    })
+
+
+@login_required
+@user_passes_test(is_admin)
 def admin_analytics(request):
     total_users = User.objects.count()
     total_posts = Post.objects.count()

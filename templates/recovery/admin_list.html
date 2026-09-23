@@ -49,7 +49,7 @@
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-500">{{ session.created_at|date:"M d, Y" }}</td>
                     <td class="px-4 py-3">
-                        <a href="{% url 'recovery:detail' short_code=session.short_code %}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">View</a>
+                        <a href="{% url 'recovery:detail' pk=session.pk %}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">View</a>
                     </td>
                 </tr>
                 {% endfor %}

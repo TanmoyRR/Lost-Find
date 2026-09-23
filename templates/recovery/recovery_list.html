@@ -21,31 +21,26 @@
                     <div class="flex items-center gap-3 mb-2">
                         <span class="px-2.5 py-0.5 rounded-full text-xs font-medium
                             {% if session.status == 'completed' %}bg-green-100 text-green-800
-                            {% elif session.status == 'pending' %}bg-yellow-100 text-yellow-800
+                            {% elif session.status == 'pending' or session.status == 'token_generated' or session.status == 'token_entered' %}bg-blue-100 text-blue-800
                             {% elif session.status == 'cancelled' or session.status == 'expired' %}bg-red-100 text-red-800
-                            {% else %}bg-blue-100 text-blue-800{% endif %}">
-                            {{ session.get_status_display }}
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {% if session.status == 'pending' or session.status == 'token_generated' or session.status == 'token_entered' %}
+                                In Progress
+                            {% else %}
+                                {{ session.get_status_display }}
+                            {% endif %}
                         </span>
-                        <span class="font-mono text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{{ session.short_code }}</span>
                     </div>
                     <h3 class="text-lg font-semibold text-gray-900">{{ session.post.title }}</h3>
                     <p class="text-sm text-gray-600 mt-1">
-                        {% if session.post.post_type == 'found' %}
-                            {% if session.post.user == request.user %}
-                                You found this item — waiting for the owner to share their token
-                            {% elif session.owner == request.user %}
-                                You are the owner — share your token with the finder to complete recovery
-                            {% endif %}
-                        {% else %}
+                        {% if session.owner == request.user %}
                             {% if session.claimant %}
-                                {% if session.claimant == request.user %}
-                                    You are the finder for <strong>{{ session.owner.get_full_name|default:session.owner.username }}</strong>'s item
-                                {% elif session.owner == request.user %}
-                                    <strong>{{ session.claimant.get_full_name|default:session.claimant.username }}</strong> is your finder
-                                {% endif %}
+                                <strong>{{ session.claimant.get_full_name|default:session.claimant.username }}</strong> is your finder — share your token with them
                             {% else %}
-                                Waiting for a finder to claim
+                                Waiting for a finder — your token is ready to share
                             {% endif %}
+                        {% elif session.claimant == request.user %}
+                            You are the finder for <strong>{{ session.owner.get_full_name|default:session.owner.username }}</strong>'s item
                         {% endif %}
                     </p>
                 </div>
@@ -54,10 +49,15 @@
                 <span>{{ session.created_at|date:"M d, Y H:i" }}</span>
                 <span>{{ session.post.get_post_type_display }}</span>
             </div>
-            <div class="mt-4">
-                <a href="{% url 'recovery:detail' short_code=session.short_code %}" class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            <div class="mt-4 flex items-center gap-4">
+                <a href="{% url 'recovery:detail' pk=session.pk %}" class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
                     View Details <i class="bi bi-arrow-right"></i>
                 </a>
+                {% if session.claimant == request.user and session.status == 'token_generated' %}
+                <a href="{% url 'recovery:enter_token' pk=session.pk %}" class="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-800">
+                    <i class="bi bi-key"></i> Enter Token
+                </a>
+                {% endif %}
             </div>
         </div>
         {% endfor %}

@@ -7,15 +7,12 @@ This module handles:
   - Starting conversations: links to a post and auto-initiates recovery sessions
 
 Recovery Integration:
-  When a conversation is started about a post, this module automatically
-  creates or links RecoverySessions. This is the bridge between messaging
+  When a conversation is started about a post, this module ensures a SINGLE
+  RecoverySession exists for the match. This is the bridge between messaging
   and the recovery verification system.
 
-  For lost posts: _initiate_recovery() creates/links a session with the
-    viewer as claimant (finder) and the post owner as owner.
-  For found posts: _link_found_recovery() creates/links a session with
-    the viewer as owner (the person who lost the item) and the post
-    creator as claimant (the finder).
+  Whoever messages first creates the session. A second message (either direction)
+  reuses the same session — one session per match, never two.
 """
 
 import logging
@@ -156,9 +153,8 @@ def start_conversation(request, post_id, user_id):
 
     Flow:
       1. Find or create a Conversation between the two users about this post
-      2. For lost posts: trigger _initiate_recovery() to create/link recovery session
-      3. For found posts: trigger _link_found_recovery() to create/link recovery session
-      4. Redirect to the conversation
+      2. Ensure a single recovery session exists for this match (_ensure_recovery_session)
+      3. Redirect to the conversation
 
     This is the entry point that connects the messaging system to the recovery system.
     """
@@ -182,106 +178,79 @@ def start_conversation(request, post_id, user_id):
         conv = Conversation.objects.create(post=post, subject=f'Regarding: {post.title}')
         conv.participants.add(request.user, other)
 
-    # Auto-initiate recovery session based on post type
-    if post.post_type == 'lost' and post.status != 'resolved':
-        _initiate_recovery(post, request.user, other)
-    elif post.post_type == 'found' and post.status != 'resolved':
-        _link_found_recovery(post, request.user, other)
+    # Auto-initiate single recovery session based on post type
+    if post.status != 'resolved':
+        _ensure_recovery_session(post, request.user, other)
 
     return redirect('messaging:detail', pk=conv.pk)
 
 
-def _initiate_recovery(post, viewer, post_owner):
+def _ensure_recovery_session(post, viewer, other):
     """
-    Create or link a recovery session for a LOST post when a conversation starts.
+    Ensure a SINGLE recovery session exists for this match (post + two users).
 
-    Roles:
-      - post_owner: The person who lost the item (session.owner, has the token)
-      - viewer: The person who found it (session.claimant, will enter the token)
+    Rules:
+      - Single session per match: whoever messages first creates it.
+      - No auto-create at lost post creation — only here.
+      - If an active session already exists linking these two users (either direction),
+        reuse it and do NOT create a second one.
 
-    If a session already exists for this post:
-      - Assign the viewer as claimant if no claimant is set yet
-      - Update status from 'pending' to 'token_generated' if needed
-    """
-    from apps.recovery.models import RecoverySession, RecoveryVerificationLog
-
-    if post.status == 'resolved':
-        return
-
-    session = RecoverySession.objects.filter(
-        post=post, status__in=('pending', 'token_generated'),
-    ).first()
-
-    if not session:
-        # No session exists yet — create one
-        session = RecoverySession.objects.create(
-            post=post, owner=post_owner, claimant=viewer, status='token_generated',
-        )
-        RecoveryVerificationLog.objects.create(
-            session=session, action='session_created',
-            performed_by=post_owner,
-            details={'post_id': post.id, 'initiated_by': 'messaging'},
-        )
-    elif not session.claimant or session.claimant == viewer:
-        # Session exists but claimant not set yet, or same viewer — update it
-        session.claimant = viewer
-        if session.status == 'pending':
-            session.status = 'token_generated'
-            session.save(update_fields=['claimant', 'status'])
-        else:
-            session.save(update_fields=['claimant'])
-
-        RecoveryVerificationLog.objects.create(
-            session=session, action='finder_assigned',
-            performed_by=viewer,
-            details={'source': 'messaging'},
-        )
-
-
-def _link_found_recovery(post, viewer, post_owner):
-    """
-    Create or link a recovery session for a FOUND post when a conversation starts.
-
-    For found posts, the roles are reversed:
-      - viewer: The person who lost the item (session.owner, will enter the token)
-      - post_owner: The person who found it (session.claimant, has the token)
-
-    This is the inverse of _initiate_recovery() because found posts flip the
-    owner/finder relationship.
+    Role assignment by post type:
+      - Lost post:  owner = post.user (lost item, has token), claimant = viewer (finder)
+      - Found post: owner = viewer (lost item), claimant = post.user (finder)
     """
     from apps.recovery.models import RecoverySession, RecoveryVerificationLog
+    from django.db.models import Q
 
     if post.status == 'resolved':
-        return
+        return None
 
-    session = RecoverySession.objects.filter(
-        post=post, status__in=('pending', 'token_generated'),
+    # 1. Reuse existing active session between these two users (single session per match)
+    existing = RecoverySession.objects.filter(
+        Q(owner=viewer, claimant=other) | Q(owner=other, claimant=viewer),
+        status__in=('pending', 'token_generated', 'token_entered'),
     ).first()
+    if existing:
+        # Ensure claimant is set
+        if not existing.claimant:
+            existing.claimant = viewer if existing.owner == other else other
+            if existing.status == 'pending':
+                existing.status = 'token_generated'
+            existing.save(update_fields=['claimant', 'status'])
+        return existing
 
-    if not session:
-        # Create session: viewer = owner (lost item), post_owner = claimant (finder)
-        session = RecoverySession.objects.create(
-            post=post, owner=viewer, claimant=post_owner, status='token_generated',
-        )
-        RecoveryVerificationLog.objects.create(
-            session=session, action='session_created',
-            performed_by=viewer,
-            details={
-                'post_id': post.id, 'post_title': post.title,
-                'initiated_by': 'messaging', 'found_post': True,
-            },
-        )
-    elif not session.claimant or session.claimant == post_owner:
-        # Update existing session with the post creator as claimant
-        session.claimant = post_owner
-        if session.status == 'pending':
-            session.status = 'token_generated'
-            session.save(update_fields=['claimant', 'status'])
+    # 2. Also check for an existing session on THIS post (for claimant=None edge cases)
+    existing_on_post = RecoverySession.objects.filter(
+        post=post, status__in=('pending', 'token_generated', 'token_entered'),
+    ).first()
+    if existing_on_post:
+        return existing_on_post
+
+    # 3. Determine roles based on post type
+    if post.post_type == 'lost':
+        owner_user = post.user       # lost item person
+        claimant_user = viewer       # finder messaging about the lost post
+    else:  # found
+        owner_user = viewer          # lost item person messaging about found post
+        claimant_user = post.user    # finder (found post creator)
+
+    # Guard: owner and claimant must differ
+    if owner_user == claimant_user:
+        # Viewer is messaging about their own post — swap to use 'other'
+        if post.post_type == 'lost':
+            claimant_user = other
         else:
-            session.save(update_fields=['claimant'])
+            owner_user = other
+        if owner_user == claimant_user:
+            return None
 
-        RecoveryVerificationLog.objects.create(
-            session=session, action='finder_assigned',
-            performed_by=post_owner,
-            details={'source': 'messaging', 'found_post': True},
-        )
+    session = RecoverySession.objects.create(
+        post=post, owner=owner_user, claimant=claimant_user, status='token_generated',
+    )
+    RecoveryVerificationLog.objects.create(
+        session=session, action='session_created',
+        performed_by=viewer,
+        details={'post_id': post.id, 'post_title': post.title, 'initiated_by': 'messaging'},
+    )
+    logger.info('Recovery session %s created via messaging for post %s', session.short_code, post.pk)
+    return session

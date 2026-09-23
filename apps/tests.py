@@ -1094,31 +1094,31 @@ class TestRecoverySystem(TestCase):
 
     def test_recovery_detail_requires_access(self):
         self.client.login(username='finder', password='testpass')
-        response = self.client.get(reverse('recovery:detail', args=[self.session.short_code]))
+        response = self.client.get(reverse('recovery:detail', args=[self.session.pk]))
         self.assertEqual(response.status_code, 302)
 
     def test_owner_can_view_detail(self):
         self.client.login(username='owner', password='testpass')
-        response = self.client.get(reverse('recovery:detail', args=[self.session.short_code]))
+        response = self.client.get(reverse('recovery:detail', args=[self.session.pk]))
         self.assertEqual(response.status_code, 200)
 
     def test_enter_token_requires_finder(self):
         self.client.login(username='owner', password='testpass')
-        response = self.client.get(reverse('recovery:enter_token', args=[self.session.short_code]))
+        response = self.client.get(reverse('recovery:enter_token', args=[self.session.pk]))
         self.assertEqual(response.status_code, 302)
 
     def test_finder_can_enter_token(self):
         self.session.claimant = self.finder
         self.session.save(update_fields=['claimant'])
         self.client.login(username='finder', password='testpass')
-        response = self.client.get(reverse('recovery:enter_token', args=[self.session.short_code]))
+        response = self.client.get(reverse('recovery:enter_token', args=[self.session.pk]))
         self.assertEqual(response.status_code, 200)
 
     def test_token_completes_recovery(self):
         self.session.claimant = self.finder
         self.session.save(update_fields=['claimant'])
         self.client.login(username='finder', password='testpass')
-        response = self.client.post(reverse('recovery:enter_token', args=[self.session.short_code]),
+        response = self.client.post(reverse('recovery:enter_token', args=[self.session.pk]),
                                     {'short_code': self.session.short_code})
         self.assertEqual(response.status_code, 302)
         self.session.refresh_from_db()
@@ -1130,7 +1130,7 @@ class TestRecoverySystem(TestCase):
         self.session.claimant = self.finder
         self.session.save(update_fields=['claimant'])
         self.client.login(username='finder', password='testpass')
-        response = self.client.post(reverse('recovery:enter_token', args=[self.session.short_code]),
+        response = self.client.post(reverse('recovery:enter_token', args=[self.session.pk]),
                                     {'short_code': 'WRONG-CODE'})
         self.assertEqual(response.status_code, 302)
         self.session.refresh_from_db()
@@ -1138,17 +1138,17 @@ class TestRecoverySystem(TestCase):
 
     def test_cancel_session(self):
         self.client.login(username='owner', password='testpass')
-        response = self.client.post(reverse('recovery:cancel', args=[self.session.short_code]))
+        response = self.client.post(reverse('recovery:cancel', args=[self.session.pk]))
         self.assertEqual(response.status_code, 302)
         self.session.refresh_from_db()
         self.assertEqual(self.session.status, 'cancelled')
 
     def test_regenerate_token_owner_only(self):
         self.client.login(username='finder', password='testpass')
-        response = self.client.post(reverse('recovery:regenerate_token', args=[self.session.short_code]))
+        response = self.client.post(reverse('recovery:regenerate_token', args=[self.session.pk]))
         self.assertEqual(response.status_code, 302)
 
-    def test_post_creates_recovery_session(self):
+    def test_post_does_not_auto_create_recovery_session(self):
         from apps.posts.models import Post
         from apps.membership.models import Membership, MembershipPlan
         plan = MembershipPlan.objects.create(name='Test Plan', price=100, duration_days=365)
@@ -1167,7 +1167,7 @@ class TestRecoverySystem(TestCase):
         post = Post.objects.filter(title='Lost Keys').first()
         self.assertIsNotNone(post)
         from apps.recovery.models import RecoverySession
-        self.assertTrue(RecoverySession.objects.filter(post=post).exists())
+        self.assertFalse(RecoverySession.objects.filter(post=post).exists())
 
 
 # ========================

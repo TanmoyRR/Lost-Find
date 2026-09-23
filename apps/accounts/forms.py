@@ -4,7 +4,11 @@ from django.contrib.auth import authenticate
 import re
 from .models import User
 
-
+DIGIT_ATTRS = {
+    'inputmode' : 'numeric',
+    'patterns' : '[0-9]*',
+    'oninput'   : "this.value = this.value.replace(/[^0-9]/g, '')",
+}
 class UserRegistrationForm(UserCreationForm):
     email = forms.EmailField(required=True, widget=forms.EmailInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Enter your email'}))
     username = forms.CharField(widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Choose a username'}))
@@ -12,7 +16,7 @@ class UserRegistrationForm(UserCreationForm):
     password2 = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Confirm password'}))
     student_id = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'Enter your Student ID'}))
     department = forms.ChoiceField(choices=User.DEPARTMENTS, widget=forms.Select(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition'}))
-    phone = forms.CharField(required=True, widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'e.g. 01XXXXXXXXX'}))
+    phone = forms.CharField(required=True, widget=forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition', 'placeholder': 'e.g. 01XXXXXXXXX',  **DIGIT_ATTRS}))
 
     class Meta:
         model = User

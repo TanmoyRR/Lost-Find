@@ -42,7 +42,7 @@
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
                     <span class="text-gray-500">Transaction ID</span>
-                    <span class="text-gray-800 font-mono font-medium">{{ payment.transaction_id|default:payment.sslcommerz_tran_id|default_if_none:"N/A" }}</span>
+                    <span class="text-gray-800 font-mono font-medium">{{ payment.display_transaction_id }}</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-500">Amount</span>

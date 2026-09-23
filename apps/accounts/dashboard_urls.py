@@ -21,6 +21,7 @@ urlpatterns = [
     path('dashboard/admin/revenue/', dashboard_views.admin_revenue, name='admin_revenue'),
     path('dashboard/admin/revenue/export/', dashboard_views.admin_revenue_export, name='admin_revenue_export'),
     path('dashboard/admin/reports/', dashboard_views.admin_reports, name='admin_reports'),
+    path('dashboard/admin/reports/<int:pk>/', dashboard_views.admin_report_detail, name='admin_report_detail'),
     path('dashboard/admin/analytics/', dashboard_views.admin_analytics, name='admin_analytics'),
     path('dashboard/admin/memberships/', dashboard_views.admin_memberships, name='admin_memberships'),
     path('dashboard/admin/settings/', dashboard_views.admin_settings, name='admin_settings'),

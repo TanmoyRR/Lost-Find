@@ -1,0 +1,92 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+{% block dashboard_content %}
+<div class="space-y-6 animate-fade-in">
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Report Detail</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-5">
+            <div class="space-y-5">
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Reporter</p>
+                    <p class="text-gray-800 font-medium">{{ report.reporter.get_full_name|default:report.reporter.username }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Reported User</p>
+                    <p class="text-gray-800 font-medium">{{ report.reported_user.get_full_name|default:report.reported_user.username }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Report Type</p>
+                    <p class="text-gray-800 font-medium">{{ report.get_report_type_display }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Status</p>
+                    {% if report.status == 'resolved' %}
+                        <span class="inline-block text-sm font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">{{ report.get_status_display }}</span>
+                    {% elif report.status == 'investigating' %}
+                        <span class="inline-block text-sm font-semibold px-3 py-1 rounded-full bg-amber-100 text-amber-700">{{ report.get_status_display }}</span>
+                    {% elif report.status == 'dismissed' %}
+                        <span class="inline-block text-sm font-semibold px-3 py-1 rounded-full bg-red-100 text-red-700">{{ report.get_status_display }}</span>
+                    {% else %}
+                        <span class="inline-block text-sm font-semibold px-3 py-1 rounded-full bg-blue-100 text-blue-700">{{ report.get_status_display }}</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Created At</p>
+                    <p class="text-gray-800">{{ report.created_at|date:"M d, Y H:i" }}</p>
+                </div>
+                {% if report.reviewed_by %}
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Reviewed By</p>
+                    <p class="text-gray-800">{{ report.reviewed_by.get_full_name|default:report.reviewed_by.username }}</p>
+                </div>
+                {% endif %}
+                {% if report.resolution_notes %}
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Resolution Notes</p>
+                    <p class="text-gray-600">{{ report.resolution_notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="space-y-5">
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Post Title</p>
+                    <p class="text-gray-800 font-medium">{{ post.title|truncatechars:50 }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Post User</p>
+                    <p class="text-gray-800 font-medium">{{ post.user.get_full_name|default:post.user.username }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Description</p>
+                    <p class="text-gray-600">{{ report.description|default:"(no description)" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Reported Post</p>
+                    <a href="{% url 'posts:detail' post.pk %}" class="gradient-primary text-white px-4 py-2 rounded-xl text-sm font-medium inline-flex items-center gap-2 hover:shadow-lg transition">
+                        <i class="bi bi-box-arrow-up-right"></i> View Reported Post
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if request.user.role == 'admin' %}
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Update Report Status</h3>
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <select name="action" class="px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                    <option value="">-- Select Action --</option>
+                    <option value="investigating">Investigating</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="dismissed">Dismissed</option>
+                </select>
+                <textarea name="resolution_notes" rows="2" class="px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition w-full text-sm resize-y" placeholder="Resolution notes (optional)"></textarea>
+            </div>
+            <button type="submit" class="gradient-primary text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg transition">Update Status</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

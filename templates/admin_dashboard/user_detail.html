@@ -198,7 +198,7 @@
                     <tbody>
                         {% for payment in user_payments %}
                         <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
-                            <td class="py-3 text-sm text-gray-500 font-mono">{{ payment.transaction_id|default:'N/A' }}</td>
+                            <td class="py-3 text-sm text-gray-500 font-mono">{{ payment.display_transaction_id }}</td>
                             <td class="py-3 text-sm font-medium text-gray-800">{{ payment.amount }} BDT</td>
                             <td class="py-3 text-sm text-gray-500">{{ payment.get_payment_type_display|default:'N/A' }}</td>
                             <td class="py-3">

@@ -1,12 +1,12 @@
 {% extends 'base/dashboard_base.html' %}
 {% load static %}
 
-{% block page_title %}Enter Token - {{ session.short_code }}{% endblock %}
+{% block page_title %}Enter Recovery Token{% endblock %}
 
 {% block dashboard_content %}
 <div class="max-w-lg mx-auto space-y-6 animate-fade-in">
     <div>
-        <a href="{% url 'recovery:detail' short_code=session.short_code %}" class="text-sm text-blue-600 hover:text-blue-700">&larr; Back to Recovery Session</a>
+        <a href="{% url 'recovery:detail' pk=session.pk %}" class="text-sm text-blue-600 hover:text-blue-700">&larr; Back to Recovery Session</a>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -32,12 +32,5 @@
             </button>
         </form>
     </div>
-
-    {% if session.post.post_type == 'lost' %}
-    <div class="bg-indigo-50 rounded-xl border border-indigo-200 p-4 text-center">
-        <p class="text-sm text-indigo-800"><strong>Your token:</strong> <span class="font-mono">{{ session.short_code }}</span></p>
-        <p class="text-xs text-indigo-600 mt-1">This is your finder token. The owner doesn't need this.</p>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}

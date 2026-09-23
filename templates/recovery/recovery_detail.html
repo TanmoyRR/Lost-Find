@@ -1,18 +1,20 @@
 {% extends 'base/dashboard_base.html' %}
 {% load static %}
 
-{% block page_title %}Recovery Session - {{ session.short_code }}{% endblock %}
+{% block page_title %}Recovery Session{% endblock %}
 
 {% block dashboard_content %}
 <div class="space-y-6 animate-fade-in">
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Recovery Session</h1>
+            {% if is_owner %}
             <p class="text-gray-500 text-sm mt-1">Code: <strong class="font-mono text-indigo-600">{{ session.short_code }}</strong></p>
+            {% endif %}
         </div>
         <div class="flex items-center gap-2">
-            {% if session.status != 'completed' and session.status != 'cancelled' and session.status != 'expired' %}
-            <form method="post" action="{% url 'recovery:cancel' short_code=session.short_code %}" class="inline">
+            {% if is_owner and session.status != 'completed' and session.status != 'cancelled' and session.status != 'expired' %}
+            <form method="post" action="{% url 'recovery:cancel' pk=session.pk %}" class="inline">
                 {% csrf_token %}
                 <button type="submit" class="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition">
                     <i class="bi bi-x-circle"></i> Cancel
@@ -75,55 +77,35 @@
             <div class="bg-indigo-50 rounded-xl border border-indigo-200 p-6">
                 <h2 class="text-lg font-semibold text-indigo-900 mb-2">Enter Token to Complete Recovery</h2>
                 <p class="text-sm text-indigo-800 mb-4">When you meet the owner in person, enter their recovery token to complete the recovery.</p>
-                <a href="{% url 'recovery:enter_token' short_code=session.short_code %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+                <a href="{% url 'recovery:enter_token' pk=session.pk %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
                     <i class="bi bi-key"></i> Enter Token
                 </a>
             </div>
             {% endif %}
 
-            {% if session.status == 'pending' and is_owner and not session.claimant %}
-            <div class="bg-amber-50 rounded-xl border border-amber-200 p-6">
-                <h2 class="text-lg font-semibold text-amber-900 mb-2">Waiting for a Finder</h2>
-                <p class="text-sm text-amber-800 mb-4">Your recovery token is ready. When a finder claims your item, they will enter this token to complete recovery.</p>
-                <form method="post" action="{% url 'recovery:regenerate_token' short_code=session.short_code %}" class="inline">
-                    {% csrf_token %}
-                    <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-100 transition text-sm font-medium">
-                        <i class="bi bi-arrow-clockwise"></i> Regenerate Token
-                    </button>
-                </form>
-            </div>
-            {% endif %}
-
-            {% if session.status != 'completed' and is_owner %}
-            {% if session.post.post_type == 'found' and owner_lost_session %}
+            {% if session.status != 'completed' and session.status != 'cancelled' and session.status != 'expired' and is_owner %}
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Your Lost Post Token</h2>
-                <div class="flex flex-col sm:flex-row items-start gap-6">
-                    <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-200 text-center">
-                        <p class="font-mono text-3xl font-bold text-indigo-700 tracking-widest">{{ owner_lost_session.short_code }}</p>
-                    </div>
-                    <div class="flex-1">
-                        <p class="text-sm text-gray-600 mb-1">Recovery Token: <strong class="font-mono text-lg text-indigo-600">{{ owner_lost_session.short_code }}</strong></p>
-                        <p class="text-sm text-gray-500 mb-2">Share this token with the finder when they come to claim the item. They will enter it to complete the recovery.</p>
-                        <p class="text-xs text-gray-400 mt-3">This token is from your lost post "<strong>{{ owner_lost_session.post.title }}</strong>".</p>
-                    </div>
+                <div class="flex items-start justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-900">Recovery Token</h2>
+                    {% if session.status in 'pending,token_generated' %}
+                    <form method="post" action="{% url 'recovery:regenerate_token' pk=session.pk %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition text-xs font-medium">
+                            <i class="bi bi-arrow-clockwise"></i> Regenerate
+                        </button>
+                    </form>
+                    {% endif %}
                 </div>
-            </div>
-            {% elif session.post.post_type == 'lost' %}
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Recovery Token</h2>
                 <div class="flex flex-col sm:flex-row items-start gap-6">
                     <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-200 text-center">
                         <p class="font-mono text-3xl font-bold text-indigo-700 tracking-widest">{{ session.short_code }}</p>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm text-gray-600 mb-1">Recovery Token: <strong class="font-mono text-lg text-indigo-600">{{ session.short_code }}</strong></p>
-                        <p class="text-sm text-gray-500 mb-2">Share this token with the finder when they come to claim the item.</p>
+                        <p class="text-sm text-gray-600 mb-1">Share this token with the finder when they come to claim the item. They will enter it to complete the recovery.</p>
                         <p class="text-xs text-gray-400 mt-3">This token is unique to this recovery session.</p>
                     </div>
                 </div>
             </div>
-            {% endif %}
             {% endif %}
         </div>
 
@@ -170,16 +152,22 @@
                         <span class="text-gray-500">Status</span>
                         <span class="px-2 py-0.5 rounded-full text-xs font-medium
                             {% if session.status == 'completed' %}bg-green-100 text-green-800
-                            {% elif session.status == 'pending' %}bg-yellow-100 text-yellow-800
+                            {% elif session.status == 'pending' or session.status == 'token_generated' or session.status == 'token_entered' %}bg-blue-100 text-blue-800
                             {% elif session.status == 'cancelled' or session.status == 'expired' %}bg-red-100 text-red-800
-                            {% else %}bg-blue-100 text-blue-800{% endif %}">
-                            {{ session.get_status_display }}
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {% if session.status == 'pending' or session.status == 'token_generated' or session.status == 'token_entered' %}
+                                In Progress
+                            {% else %}
+                                {{ session.get_status_display }}
+                            {% endif %}
                         </span>
                     </div>
+                    {% if is_owner %}
                     <div class="flex justify-between">
                         <span class="text-gray-500">Short Code</span>
                         <span class="font-mono font-medium text-indigo-600">{{ session.short_code }}</span>
                     </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

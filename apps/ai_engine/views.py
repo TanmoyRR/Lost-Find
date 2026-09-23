@@ -157,14 +157,14 @@ def accept_match(request, match_id):
                 notification_type='recovery_update',
                 title='Finder Claimed Your Item',
                 message=f'{finder.get_full_name() or finder.username} has been assigned as the finder for "{lost_post.title}". They can now enter the recovery token to complete recovery.',
-                link=reverse('recovery:detail', args=[session.short_code]),
+                link=reverse('recovery:detail', args=[session.pk]),
             )
             Notification.objects.create(
                 user=finder,
                 notification_type='recovery_update',
                 title='You Are Now the Finder',
                 message=f'You have been assigned as the finder for "{lost_post.title}". Go to the recovery session to enter the recovery token.',
-                link=reverse('recovery:detail', args=[session.short_code]),
+                link=reverse('recovery:detail', args=[session.pk]),
             )
     except Exception:
         import logging
